@@ -1,0 +1,2 @@
+ALTER TABLE public.banners ADD COLUMN IF NOT EXISTS badge TEXT;
+ALTER TABLE public.banners ADD COLUMN IF NOT EXISTS cta_label TEXT;

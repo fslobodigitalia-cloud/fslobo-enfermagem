@@ -1,0 +1,1 @@
+UPDATE public.categories SET deleted_at = now() WHERE id = '83f079b7-1e01-4e66-b956-3b76ff477aff';
