@@ -1,0 +1,18 @@
+# Este arquivo não existia no projeto antes desta etapa. Foi criado agora
+# somente com a configuração estritamente necessária para a Edge Function
+# supabase/functions/draw-cards: nenhuma outra seção (project_id, portas
+# locais, outras Edge Functions etc.) foi adicionada — isso fica para
+# quando essas partes forem de fato criadas/decididas.
+
+[functions.draw-cards]
+# Esta função não é chamada com um JWT do Supabase Auth (nem de usuário,
+# nem de service_role como Bearer) — quem chama é infraestrutura interna,
+# autenticada por um segredo próprio no header x-internal-secret, verificado
+# dentro do código da função (ver index.ts). Se verify_jwt ficasse ligado
+# (o padrão do Supabase), o próprio gateway rejeitaria a chamada antes de
+# ela chegar à função, exigindo também um Authorization: Bearer <jwt> que
+# não faz parte do contrato desta função. Por isso verify_jwt é desligado
+# aqui — e só aqui: esta seção não afeta nenhuma outra Edge Function, atual
+# ou futura, que continuará com o padrão do projeto (verify_jwt ligado) a
+# menos que tenha sua própria seção [functions.<nome>] dizendo o contrário.
+verify_jwt = false
