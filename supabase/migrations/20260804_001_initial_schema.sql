@@ -22,12 +22,19 @@ create extension if not exists pgcrypto;
 -- ──────────────────────────────── 2. Enums ─────────────────────────────────
 
 -- Ciclo de vida do pedido, do pagamento pendente até a leitura liberada.
+-- A ordem dos valores reflete a ordem lógica do pipeline (não é só cosmético
+-- — ajuda leitura humana no painel do Supabase, que costuma listar em ordem
+-- de declaração).
 create type public.order_status as enum (
   'pending_payment',  -- criado, aguardando confirmação do Mercado Pago
   'paid',              -- pagamento confirmado pelo webhook
-  'in_review',         -- rascunho gerado, aguardando revisão humana
+  'drawing_cards',     -- sorteio das cartas em andamento no servidor
+  'generating',        -- rascunho sendo gerado pela IA (Anthropic)
+  'awaiting_review',   -- rascunho(s) pronto(s), aguardando um administrador abrir a revisão
+  'in_review',         -- um administrador está revisando agora
   'approved',          -- revisão humana aprovou o conteúdo
   'released',          -- leitura liberada para o cliente ver
+  'failed',            -- alguma etapa do processo (sorteio ou geração) falhou e precisa de atenção
   'cancelled',         -- pedido cancelado antes do pagamento
   'refunded',          -- reembolsado após o pagamento
   'expired'            -- prazo de pagamento do Mercado Pago expirou
@@ -78,6 +85,15 @@ begin
 end;
 $$;
 
+-- Ninguém precisa CHAMAR esta função diretamente — ela só existe para ser
+-- disparada por trigger. Revogar de PUBLIC reduz a superfície de ataque sem
+-- quebrar nada: o Postgres não exige EXECUTE do papel que faz o UPDATE para
+-- que um trigger BEFORE UPDATE dispare (isso é checado pelo privilégio de
+-- UPDATE na tabela, não pelo EXECUTE na função). Ver confirmação no resumo
+-- desta revisão.
+revoke execute on function public.set_updated_at() from public;
+grant execute on function public.set_updated_at() to authenticated, service_role;
+
 
 -- ═══════════════════════════════ 4. Tabelas ════════════════════════════════
 
@@ -86,12 +102,12 @@ $$;
 -- 7 perguntas etc.). Substitui o array `packages` hoje hardcoded no front.
 create table public.packages (
   id             uuid primary key default gen_random_uuid(),
-  slug           text not null unique,
-  name           text not null,
+  slug           text not null unique check (btrim(slug) <> ''),
+  name           text not null check (btrim(name) <> ''),
   description    text,
   question_limit integer not null check (question_limit > 0),
-  price_cents    integer not null check (price_cents >= 0),
-  currency       text not null default 'BRL',
+  price_cents    integer not null check (price_cents > 0),
+  currency       text not null default 'BRL' check (currency ~ '^[A-Z]{3}$'),
   active         boolean not null default true,
   display_order  integer not null default 0,
   created_at     timestamptz not null default now(),
@@ -109,11 +125,14 @@ comment on table public.packages is
 create table public.orders (
   id                          uuid primary key default gen_random_uuid(),
   public_id                   uuid not null unique default gen_random_uuid(),
-  customer_name               text not null,
-  customer_email              text,
+  customer_name               text not null check (btrim(customer_name) <> ''),
+  customer_email              text not null check (
+                                 char_length(customer_email) <= 254
+                                 and customer_email like '%@%'
+                               ),
   package_id                  uuid not null references public.packages(id) on delete restrict,
-  amount_cents                integer not null check (amount_cents >= 0),
-  currency                    text not null default 'BRL',
+  amount_cents                integer not null check (amount_cents > 0),
+  currency                    text not null default 'BRL' check (currency ~ '^[A-Z]{3}$'),
   status                      public.order_status not null default 'pending_payment',
   mercado_pago_preference_id  text,
   mercado_pago_payment_id     text,
@@ -132,9 +151,13 @@ comment on table public.orders is
   'Um pedido de leitura. access_token_hash guarda o HASH do token enviado ao cliente (nunca o token em si) — usado pela página privada, sem exigir login.';
 comment on column public.orders.access_token_hash is
   'SHA-256 (ou equivalente) do token de acesso enviado ao cliente. O token em texto puro nunca é persistido no banco.';
+comment on column public.orders.customer_email is
+  'Obrigatório. Validação no banco é propositalmente simples (tamanho máximo e presença de "@") — validação completa de formato acontece na Edge Function/formulário, antes de chegar aqui.';
 
 create index orders_package_id_idx on public.orders (package_id);
 create index orders_status_idx on public.orders (status);
+create index orders_customer_email_idx on public.orders (customer_email);
+create index orders_created_at_idx on public.orders (created_at);
 
 
 -- ───────────────────────────────── questions ───────────────────────────────
@@ -144,7 +167,9 @@ create table public.questions (
   id                 uuid primary key default gen_random_uuid(),
   order_id           uuid not null references public.orders(id) on delete cascade,
   position           integer not null check (position > 0),
-  question_text      text not null,
+  question_text      text not null check (
+                        btrim(question_text) <> '' and char_length(question_text) <= 2000
+                      ),
   generation_status  public.question_generation_status not null default 'pending',
   approval_status    public.question_approval_status not null default 'pending',
   created_at         timestamptz not null default now(),
@@ -221,8 +246,8 @@ create table public.readings (
   final_json           jsonb,
   model_used           text,
   prompt_version       text,
-  input_tokens         integer,
-  output_tokens        integer,
+  input_tokens         integer check (input_tokens is null or input_tokens >= 0),
+  output_tokens        integer check (output_tokens is null or output_tokens >= 0),
   generation_attempts  integer not null default 0 check (generation_attempts >= 0),
   status               public.reading_status not null default 'pending',
   approved_by          uuid references auth.users(id) on delete set null,
@@ -240,13 +265,13 @@ create index readings_approved_by_idx on public.readings (approved_by);
 
 
 -- ────────────────────────────── payment_events ─────────────────────────────
--- Registro bruto de cada notificação recebida do Mercado Pago. A unicidade em
--- provider_event_id garante idempotência: a mesma notificação reenviada pelo
--- provedor não é processada duas vezes.
+-- Registro bruto de cada notificação recebida de um provedor de pagamento.
+-- A unicidade composta (provider, provider_event_id) garante idempotência:
+-- a mesma notificação reenviada pelo provedor não é processada duas vezes.
 create table public.payment_events (
   id                  uuid primary key default gen_random_uuid(),
   provider            text not null default 'mercado_pago',
-  provider_event_id   text not null unique,
+  provider_event_id   text not null,
   event_type          text not null,
   order_id            uuid references public.orders(id) on delete set null,
   payment_id          text,
@@ -254,13 +279,19 @@ create table public.payment_events (
   attempts            integer not null default 0 check (attempts >= 0),
   error_message       text,
   received_at         timestamptz not null default now(),
-  processed_at        timestamptz
+  processed_at        timestamptz,
+  -- Idempotência por provedor: o mesmo provider_event_id só é único DENTRO
+  -- de cada provedor — evita colisão caso um segundo provedor de pagamento
+  -- seja adicionado no futuro e use um esquema de IDs sobreposto ao do
+  -- Mercado Pago.
+  unique (provider, provider_event_id)
 );
 
 comment on table public.payment_events is
-  'Log bruto de notificações (webhooks) do Mercado Pago. provider_event_id é único para garantir que a mesma notificação nunca seja processada duas vezes.';
+  'Log bruto de notificações (webhooks) de pagamento. A dupla (provider, provider_event_id) é única para garantir que a mesma notificação nunca seja processada duas vezes, mesmo se outro provedor de pagamento for adicionado no futuro.';
 
 create index payment_events_order_id_idx on public.payment_events (order_id);
+create index payment_events_payment_id_idx on public.payment_events (payment_id);
 
 
 -- ─────────────────────────────── order_events ──────────────────────────────
@@ -288,7 +319,7 @@ create index order_events_actor_user_id_idx on public.order_events (actor_user_i
 -- RLS de escrita (ver seção de políticas) — só leitura para admins.
 create table public.admin_users (
   user_id     uuid primary key references auth.users(id) on delete cascade,
-  role        text not null default 'admin',
+  role        text not null default 'admin' check (role in ('admin', 'supervisor')),
   active      boolean not null default true,
   created_at  timestamptz not null default now(),
   updated_at  timestamptz not null default now()
@@ -296,6 +327,8 @@ create table public.admin_users (
 
 comment on table public.admin_users is
   'Quem pode acessar o painel administrativo. Conceder/revogar acesso é uma operação privilegiada — feita fora do RLS de escrita (SQL direto ou processo controlado), nunca pelo próprio painel autenticado.';
+comment on column public.admin_users.role is
+  'Rótulo "admin" ou "supervisor". Nesta etapa, is_admin() trata os dois de forma idêntica (qualquer linha ativa libera acesso) — a distinção de permissões entre os dois papéis, se necessária, é trabalho de uma fase futura.';
 
 
 -- ═══════════════════════ 5. Triggers de updated_at ═════════════════════════
@@ -340,6 +373,12 @@ $$;
 
 comment on function public.is_admin() is
   'Retorna true se o usuário autenticado atual (auth.uid()) é um administrador ativo. Usada em todas as políticas de RLS que liberam acesso administrativo.';
+
+-- Só quem precisa avaliar esta função pode chamá-la: papéis autenticados
+-- (usados dentro das políticas de RLS) e service_role (Edge Functions).
+-- anon nunca precisa — nenhuma política pública depende de is_admin().
+revoke execute on function public.is_admin() from public;
+grant execute on function public.is_admin() to authenticated, service_role;
 
 
 -- ═══════════════════════════════ 7. Ativar RLS ═════════════════════════════

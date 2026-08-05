@@ -16,6 +16,7 @@ Cliente escolhe pacote e escreve perguntas
         │
         ▼
    pedido (orders) criado — status "pending_payment"
+   (só uma Edge Function validada pode criar isso — ver seção de segurança)
         │
         ▼
    Checkout Pro do Mercado Pago
@@ -27,18 +28,23 @@ Cliente escolhe pacote e escreve perguntas
    orders.status = "paid"
         │
         ▼
-   Para cada pergunta (questions): sorteio de 3 cartas no servidor
+   orders.status = "drawing_cards" — sorteio de 3 cartas por pergunta no servidor
         │                                   │
         │                                   ▼
         │                            drawn_cards (3 por pergunta)
         ▼
-   Rascunho gerado pela IA (Anthropic) ──► readings.draft_json
+   orders.status = "generating" — rascunho sendo gerado pela IA (Anthropic)
         │
         ▼
-   orders.status = "in_review" — aguardando revisão humana
+   readings.draft_json preenchido
         │
         ▼
-   Administrador revisa no painel, edita se precisar ──► readings.edited_json
+   orders.status = "awaiting_review" — rascunho pronto, aguardando um
+   administrador abrir a revisão
+        │
+        ▼
+   orders.status = "in_review" — administrador revisando agora,
+   edita se precisar ──► readings.edited_json
         │
         ▼
    Administrador aprova ──► readings.status = "approved" / orders.status = "approved"
@@ -51,7 +57,14 @@ Cliente escolhe pacote e escreve perguntas
 ```
 
 Em nenhum momento desse fluxo uma resposta é liberada automaticamente — a
-aprovação e a liberação são sempre um clique manual de um administrador.
+aprovação e a liberação são **sempre** um clique manual de um administrador.
+Nenhum rascunho gerado pela IA (`readings.draft_json`) é, por si só, visível
+ao cliente: só `final_json`, e só depois que `readings.status` chega em
+`released`.
+
+Se qualquer etapa falhar (sorteio, geração da IA), o pedido vai para
+`orders.status = "failed"` em vez de travar silenciosamente — fica visível
+no painel para um administrador investigar.
 
 ---
 
@@ -74,11 +87,26 @@ acesso ao banco, não conseguiria reconstruir o token original.
 e da Política de Privacidade o cliente aceitou no momento da compra —
 importante para auditoria caso os textos mudem no futuro.
 
+**`customer_email` agora é obrigatório.** O site atual só coleta o primeiro
+nome no formulário — quando a Edge Function de criação de pedido for
+construída, o formulário público vai precisar de um campo de e-mail novo
+(isso é trabalho de uma fase futura; nada no site foi alterado agora). A
+validação no banco é propositalmente simples (até 254 caracteres e presença
+de "@") — só uma barreira mínima; validação completa de formato acontece
+antes, no formulário ou na Edge Function.
+
+Outras validações agora garantidas pelo próprio banco: nome e e-mail não
+podem ser vazios, o valor cobrado (`amount_cents`) precisa ser maior que
+zero, e a moeda precisa ter exatamente 3 letras maiúsculas (`BRL`, por
+exemplo) — o mesmo vale para `packages.price_cents` e `packages.currency`.
+
 ### `questions` — perguntas do pedido
 Cada linha é uma pergunta que o cliente escreveu, numerada por posição
 dentro do pedido (1ª, 2ª, 3ª...). Cada pergunta tem seu próprio sorteio de
 cartas e sua própria geração de rascunho — perguntas diferentes do mesmo
-pedido são tratadas de forma independente.
+pedido são tratadas de forma independente. O texto não pode ser vazio e
+tem limite de 2000 caracteres. A combinação `(order_id, position)` é única
+— não é possível ter duas "perguntas número 2" no mesmo pedido.
 
 ### `tarot_cards` — catálogo das 78 cartas
 Tabela de referência com o significado de cada carta (arcano maior/menor,
@@ -102,14 +130,20 @@ O conteúdo em si, em três camadas:
 
 Também guarda qual modelo de IA foi usado, quantos tokens consumiu e
 quantas tentativas de geração foram necessárias (`generation_attempts`) —
-útil para acompanhar custo e detectar falhas.
+útil para acompanhar custo e detectar falhas. `input_tokens` e
+`output_tokens` podem ficar em branco (antes da geração), mas nunca podem
+ser negativos quando preenchidos.
 
 ### `payment_events` — log bruto de pagamento
-Cada notificação (webhook) recebida do Mercado Pago é registrada aqui antes
-de qualquer processamento. `provider_event_id` é único: se o Mercado Pago
-reenviar a mesma notificação (o que é comum e esperado em qualquer
-integração de pagamento), ela é reconhecida e não processada duas vezes —
-evita cobrar ou liberar a mesma leitura duas vezes por erro de rede.
+Cada notificação (webhook) recebida de um provedor de pagamento é
+registrada aqui antes de qualquer processamento. A combinação
+`(provider, provider_event_id)` é única: se o Mercado Pago reenviar a mesma
+notificação (o que é comum e esperado em qualquer integração de
+pagamento), ela é reconhecida e não processada duas vezes — evita cobrar ou
+liberar a mesma leitura duas vezes por erro de rede. A unicidade é por
+*par* (provedor + id do evento), não só pelo id — assim, se um segundo
+provedor de pagamento for adicionado no futuro, os IDs de eventos de um não
+podem colidir com os do outro.
 
 ### `order_events` — auditoria de pedidos
 Um histórico de "o que aconteceu com este pedido e quando": mudanças de
@@ -124,18 +158,34 @@ uma ação disponível dentro do próprio painel** — só um administrador pode
 (SQL direto no Supabase, ou um processo separado e controlado). Isso evita
 que uma conta comprometida consiga se autopromover ou promover outra conta.
 
+**Diferença entre `admin` e `supervisor`:** a coluna `role` só aceita esses
+dois valores. Nesta etapa, porém, **o banco não trata os dois de forma
+diferente** — a função `is_admin()` libera acesso para qualquer linha ativa
+em `admin_users`, seja `admin` ou `supervisor`. O campo existe para permitir
+uma distinção de permissões *dentro do painel* (por exemplo: supervisor
+revisa e sugere edições, mas só admin aprova e libera) — mas essa regra
+ainda não está implementada em nenhuma política de RLS. Ela é trabalho de
+uma fase futura, quando o painel administrativo for construído.
+
 ---
 
 ## O que cada status significa
 
 ### Status do pedido (`order_status`)
+Os valores seguem a ordem lógica do pipeline, do pedido criado até a
+leitura liberada (ou um dos desfechos alternativos, ao final da tabela):
+
 | Status | Significado |
 |---|---|
 | `pending_payment` | Pedido criado, aguardando confirmação do Mercado Pago |
 | `paid` | Pagamento confirmado pelo webhook |
-| `in_review` | Rascunho(s) gerado(s), aguardando revisão humana |
+| `drawing_cards` | Sorteio das cartas em andamento no servidor |
+| `generating` | Rascunho sendo gerado pela IA (Anthropic) |
+| `awaiting_review` | Rascunho(s) pronto(s), aguardando um administrador abrir a revisão |
+| `in_review` | Um administrador está revisando agora |
 | `approved` | Revisão humana aprovou o conteúdo |
 | `released` | Leitura liberada — cliente já pode ver |
+| `failed` | Alguma etapa (sorteio ou geração) falhou e precisa de atenção humana |
 | `cancelled` | Pedido cancelado antes de pagar |
 | `refunded` | Reembolsado depois de pago |
 | `expired` | Prazo de pagamento do Mercado Pago venceu sem confirmação |
@@ -179,6 +229,13 @@ RLS está **ativado em todas as tabelas**. A regra geral do projeto:
   aparece nenhuma política "pública" nas tabelas operacionais: o acesso
   público real acontece por trás da Edge Function, nunca por uma consulta
   direta do navegador ao banco.
+- **Só uma Edge Function validada pode criar um pedido público.** Não existe
+  (e não deve existir) uma política de RLS que permita a `anon` inserir
+  diretamente em `orders`. Isso é proposital: criar um pedido também precisa
+  calcular o valor a partir de `packages` (nunca confiar em um valor vindo
+  do navegador) e gerar o token de acesso — regras de negócio que só fazem
+  sentido dentro de uma Edge Function controlada, nunca numa tabela aberta
+  para escrita direta.
 
 ### Por que a função `is_admin()` existe
 Em vez de repetir a mesma subconsulta em toda política ("existe uma linha
@@ -187,6 +244,20 @@ fica em uma única função, reaproveitada por todas as políticas. Ela é
 `security definer` com `search_path` fixo — uma prática de segurança padrão
 do Postgres/Supabase para esse tipo de função, que evita que ela seja
 enganada por configurações maliciosas de schema.
+
+### Permissões das funções (`EXECUTE`)
+Tanto `is_admin()` quanto `set_updated_at()` têm o `EXECUTE` revogado de
+`PUBLIC` e concedido só para `authenticated` e `service_role`:
+- `is_admin()` precisa ser chamável por `authenticated`, porque é usada
+  dentro das políticas de RLS acima; `anon` nunca precisa dela, já que
+  nenhuma política pública depende dela.
+- `set_updated_at()` só existe para ser disparada por trigger — nenhum
+  código chama essa função diretamente. Revogar o `EXECUTE` de `PUBLIC`
+  **não quebra os triggers**: o Postgres não exige que o papel que faz o
+  `UPDATE` tenha `EXECUTE` na função do trigger — quem precisa de permissão
+  é para fazer o `UPDATE` na tabela, não para "chamar" a função. O `GRANT`
+  para `authenticated`/`service_role` aqui é uma camada extra de cuidado,
+  não uma exigência técnica para o trigger funcionar.
 
 ---
 
