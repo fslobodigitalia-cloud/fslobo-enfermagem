@@ -134,8 +134,14 @@ create table public.orders (
   amount_cents                integer not null check (amount_cents > 0),
   currency                    text not null default 'BRL' check (currency ~ '^[A-Z]{3}$'),
   status                      public.order_status not null default 'pending_payment',
-  mercado_pago_preference_id  text,
-  mercado_pago_payment_id     text,
+  mercado_pago_preference_id  text unique check (
+                                 mercado_pago_preference_id is null
+                                 or btrim(mercado_pago_preference_id) <> ''
+                               ),
+  mercado_pago_payment_id     text unique check (
+                                 mercado_pago_payment_id is null
+                                 or btrim(mercado_pago_payment_id) <> ''
+                               ),
   access_token_hash           text not null unique,
   terms_version                text not null,
   privacy_version              text not null,
@@ -153,6 +159,10 @@ comment on column public.orders.access_token_hash is
   'SHA-256 (ou equivalente) do token de acesso enviado ao cliente. O token em texto puro nunca é persistido no banco.';
 comment on column public.orders.customer_email is
   'Obrigatório. Validação no banco é propositalmente simples (tamanho máximo e presença de "@") — validação completa de formato acontece na Edge Function/formulário, antes de chegar aqui.';
+comment on column public.orders.mercado_pago_preference_id is
+  'Único quando preenchido. UNIQUE em Postgres permite qualquer quantidade de linhas com NULL — a restrição só entra em vigor quando o valor é de fato preenchido, evitando duas preferências do Mercado Pago apontarem para o mesmo pedido.';
+comment on column public.orders.mercado_pago_payment_id is
+  'Único quando preenchido, pelo mesmo motivo de mercado_pago_preference_id — evita dois pedidos serem conciliados com o mesmo pagamento do Mercado Pago.';
 
 create index orders_package_id_idx on public.orders (package_id);
 create index orders_status_idx on public.orders (status);
@@ -165,7 +175,7 @@ create index orders_created_at_idx on public.orders (created_at);
 -- numeradas por posição (1, 2, 3...) dentro do pedido.
 create table public.questions (
   id                 uuid primary key default gen_random_uuid(),
-  order_id           uuid not null references public.orders(id) on delete cascade,
+  order_id           uuid not null references public.orders(id) on delete restrict,
   position           integer not null check (position > 0),
   question_text      text not null check (
                         btrim(question_text) <> '' and char_length(question_text) <= 2000
@@ -179,6 +189,8 @@ create table public.questions (
 
 comment on table public.questions is
   'Perguntas individuais de um pedido. Cada uma recebe seu próprio sorteio de cartas e seu próprio rascunho de leitura.';
+comment on column public.questions.order_id is
+  'ON DELETE RESTRICT (não CASCADE): um pedido com perguntas não pode ser apagado enquanto elas existirem. Cancelamento e expiração são representados por orders.status, nunca por exclusão de linhas.';
 
 
 -- ─────────────────────────────── tarot_cards ───────────────────────────────
@@ -214,7 +226,7 @@ create index tarot_cards_active_idx on public.tarot_cards (active);
 -- As 3 cartas sorteadas no servidor para UMA pergunta específica.
 create table public.drawn_cards (
   id             uuid primary key default gen_random_uuid(),
-  question_id    uuid not null references public.questions(id) on delete cascade,
+  question_id    uuid not null references public.questions(id) on delete restrict,
   card_id        uuid not null references public.tarot_cards(id) on delete restrict,
   draw_order     integer not null check (draw_order between 1 and 3),
   position_key   text not null,
@@ -231,6 +243,8 @@ comment on table public.drawn_cards is
   'Resultado do sorteio de 3 cartas por pergunta. O sorteio SEMPRE acontece no servidor (Edge Function), nunca no navegador do cliente.';
 comment on column public.drawn_cards.position_key is
   'Identificador curto da posição no sorteio (ex.: "passado", "presente", "futuro"), definido pela Edge Function no momento do sorteio.';
+comment on column public.drawn_cards.question_id is
+  'ON DELETE RESTRICT (não CASCADE): um sorteio já realizado é permanente. Se um sorteio precisar ser refeito, isso é uma decisão administrativa excepcional fora da aplicação — nunca um DELETE disparado pelo fluxo normal.';
 
 create index drawn_cards_card_id_idx on public.drawn_cards (card_id);
 
@@ -240,7 +254,7 @@ create index drawn_cards_card_id_idx on public.drawn_cards (card_id);
 -- editada pelo revisor humano e versão final liberada ao cliente.
 create table public.readings (
   id                   uuid primary key default gen_random_uuid(),
-  question_id          uuid not null unique references public.questions(id) on delete cascade,
+  question_id          uuid not null unique references public.questions(id) on delete restrict,
   draft_json           jsonb,
   edited_json          jsonb,
   final_json           jsonb,
@@ -260,6 +274,8 @@ create table public.readings (
 
 comment on table public.readings is
   'Conteúdo da leitura de uma pergunta. draft_json vem da IA (Anthropic) e NUNCA é exibido ao cliente diretamente — só final_json, depois de aprovação humana e liberação manual.';
+comment on column public.readings.question_id is
+  'ON DELETE RESTRICT (não CASCADE): uma leitura gerada não desaparece junto com a pergunta. O histórico de rascunho/edição/aprovação é preservado.';
 
 create index readings_approved_by_idx on public.readings (approved_by);
 
@@ -298,7 +314,7 @@ create index payment_events_payment_id_idx on public.payment_events (payment_id)
 -- Trilha de auditoria: cada mudança relevante de status de um pedido.
 create table public.order_events (
   id             uuid primary key default gen_random_uuid(),
-  order_id       uuid not null references public.orders(id) on delete cascade,
+  order_id       uuid not null references public.orders(id) on delete restrict,
   event_type     text not null,
   old_status     public.order_status,
   new_status     public.order_status,
@@ -309,6 +325,8 @@ create table public.order_events (
 
 comment on table public.order_events is
   'Auditoria: histórico de mudanças de status de cada pedido, incluindo quem (actor_user_id) realizou a ação quando aplicável.';
+comment on column public.order_events.order_id is
+  'ON DELETE RESTRICT (não CASCADE): apagar um pedido nunca pode fazer sua trilha de auditoria desaparecer arrastada em cascata. Enquanto existir qualquer order_events, o pedido não pode ser removido.';
 
 create index order_events_order_id_idx on public.order_events (order_id);
 create index order_events_actor_user_id_idx on public.order_events (actor_user_id);
@@ -434,11 +452,17 @@ grant select on public.packages to anon;
 -- RLS (seção 9) ainda exige public.is_admin() para qualquer coisa além de
 -- packages — estes GRANTs, sozinhos, NÃO tornam os dados públicos.
 grant select, insert, update, delete on public.packages       to authenticated;
-grant select, insert, update, delete on public.orders         to authenticated;
-grant select, insert, update, delete on public.questions      to authenticated;
+
+-- orders, questions, drawn_cards e readings são registros operacionais
+-- protegidos contra exclusão: nenhum papel tem DELETE nestas quatro
+-- tabelas. Cancelamento/expiração de pedido, sorteios e leituras são
+-- sempre representados por status, nunca por remoção de linha — ver
+-- comentários de coluna em cada tabela e docs/DB_SCHEMA.md.
+grant select, insert, update on public.orders         to authenticated;
+grant select, insert, update on public.questions      to authenticated;
 grant select, insert, update, delete on public.tarot_cards    to authenticated;
-grant select, insert, update, delete on public.drawn_cards    to authenticated;
-grant select, insert, update, delete on public.readings       to authenticated;
+grant select, insert, update on public.drawn_cards    to authenticated;
+grant select, insert, update on public.readings       to authenticated;
 
 -- payment_events e order_events são histórico append-only: administradores
 -- podem consultar e registrar eventos, mas nunca apagar. Nenhum dos dois
@@ -462,11 +486,16 @@ grant select on public.admin_users to authenticated;
 -- GRANT — sem ele, a Data API rejeitaria o comando antes de chequar RLS.
 -- Esta chave NUNCA pode aparecer no navegador do cliente.
 grant select, insert, update, delete on public.packages       to service_role;
-grant select, insert, update, delete on public.orders         to service_role;
-grant select, insert, update, delete on public.questions      to service_role;
+
+-- Mesma proteção contra exclusão vale para o backend: nem as Edge
+-- Functions apagam pedidos, perguntas, sorteios ou leituras — uma limpeza
+-- de dados, se um dia for necessária, é ação excepcional feita direto no
+-- banco, fora do papel service_role.
+grant select, insert, update on public.orders         to service_role;
+grant select, insert, update on public.questions      to service_role;
 grant select, insert, update, delete on public.tarot_cards    to service_role;
-grant select, insert, update, delete on public.drawn_cards    to service_role;
-grant select, insert, update, delete on public.readings       to service_role;
+grant select, insert, update on public.drawn_cards    to service_role;
+grant select, insert, update on public.readings       to service_role;
 
 -- payment_events e order_events são histórico append-only mesmo para o
 -- backend. A Edge Function do webhook precisa poder ATUALIZAR
@@ -509,24 +538,52 @@ create policy packages_admin_manage
 -- orders: nada de acesso direto para visitantes — só administradores.
 -- (o cliente vê o próprio pedido através de uma Edge Function, que valida
 -- o token e usa service_role, nunca uma política de RLS pública.)
-create policy orders_admin_manage
+-- Sem política de DELETE de propósito: um pedido nunca é apagado pela
+-- aplicação — cancelamento e expiração são representados por orders.status.
+create policy orders_admin_select
   on public.orders
-  for all
+  for select
+  to authenticated
+  using (public.is_admin());
+
+create policy orders_admin_insert
+  on public.orders
+  for insert
+  to authenticated
+  with check (public.is_admin());
+
+create policy orders_admin_update
+  on public.orders
+  for update
   to authenticated
   using (public.is_admin())
   with check (public.is_admin());
 
--- questions: mesmo princípio — só administradores.
-create policy questions_admin_manage
+-- questions: mesmo princípio — só administradores, e também sem DELETE:
+-- uma pergunta permanece registrada mesmo que o pedido seja cancelado.
+create policy questions_admin_select
   on public.questions
-  for all
+  for select
+  to authenticated
+  using (public.is_admin());
+
+create policy questions_admin_insert
+  on public.questions
+  for insert
+  to authenticated
+  with check (public.is_admin());
+
+create policy questions_admin_update
+  on public.questions
+  for update
   to authenticated
   using (public.is_admin())
   with check (public.is_admin());
 
 -- tarot_cards: catálogo interno de trabalho, não é exposto ao público
 -- diretamente (a página do cliente recebe o conteúdo já pronto via Edge
--- Function). Só administradores.
+-- Function). Só administradores. Catálogo de referência — mantém DELETE,
+-- diferente das tabelas de registro operacional abaixo.
 create policy tarot_cards_admin_manage
   on public.tarot_cards
   for all
@@ -534,19 +591,46 @@ create policy tarot_cards_admin_manage
   using (public.is_admin())
   with check (public.is_admin());
 
--- drawn_cards: nunca visível a visitantes — só administradores.
-create policy drawn_cards_admin_manage
+-- drawn_cards: nunca visível a visitantes — só administradores. Sem
+-- DELETE: um sorteio já realizado é permanente (ver comentário na tabela).
+create policy drawn_cards_admin_select
   on public.drawn_cards
-  for all
+  for select
+  to authenticated
+  using (public.is_admin());
+
+create policy drawn_cards_admin_insert
+  on public.drawn_cards
+  for insert
+  to authenticated
+  with check (public.is_admin());
+
+create policy drawn_cards_admin_update
+  on public.drawn_cards
+  for update
   to authenticated
   using (public.is_admin())
   with check (public.is_admin());
 
 -- readings: contém rascunhos e conteúdo ainda não aprovado — só
--- administradores. O cliente nunca lê esta tabela diretamente.
-create policy readings_admin_manage
+-- administradores. O cliente nunca lê esta tabela diretamente. Sem
+-- DELETE: uma leitura gerada não é apagada, mesmo que seja reprovada
+-- (o histórico de draft/edição/aprovação fica preservado).
+create policy readings_admin_select
   on public.readings
-  for all
+  for select
+  to authenticated
+  using (public.is_admin());
+
+create policy readings_admin_insert
+  on public.readings
+  for insert
+  to authenticated
+  with check (public.is_admin());
+
+create policy readings_admin_update
+  on public.readings
+  for update
   to authenticated
   using (public.is_admin())
   with check (public.is_admin());

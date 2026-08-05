@@ -100,6 +100,13 @@ podem ser vazios, o valor cobrado (`amount_cents`) precisa ser maior que
 zero, e a moeda precisa ter exatamente 3 letras maiúsculas (`BRL`, por
 exemplo) — o mesmo vale para `packages.price_cents` e `packages.currency`.
 
+`mercado_pago_preference_id` e `mercado_pago_payment_id` são únicos quando
+preenchidos — dois pedidos nunca podem apontar para a mesma preferência ou
+o mesmo pagamento do Mercado Pago. Os dois continuam opcionais (ficam
+`NULL` até o Checkout Pro ser iniciado/confirmado): em Postgres, `UNIQUE`
+não gera conflito entre linhas com `NULL`, então isso não impede vários
+pedidos existirem antes de qualquer um deles ter um pagamento associado.
+
 ### `questions` — perguntas do pedido
 Cada linha é uma pergunta que o cliente escreveu, numerada por posição
 dentro do pedido (1ª, 2ª, 3ª...). Cada pergunta tem seu próprio sorteio de
@@ -260,8 +267,8 @@ do servidor, que ignora RLS — ver abaixo).
 | Papel | GRANT (o que pode tentar) | RLS (o que realmente acontece) |
 |---|---|---|
 | `anon` (visitante, sem login) | `SELECT` só em `packages` | Só enxerga pacotes com `active = true` — é só isso que o site público precisa. Nas outras 8 tabelas, `anon` não tem nem `GRANT`: a Data API já rejeita antes do RLS entrar em ação. |
-| `authenticated` | `SELECT/INSERT/UPDATE/DELETE` em `packages`, `orders`, `questions`, `tarot_cards`, `drawn_cards`, `readings`; só `SELECT/INSERT` em `payment_events`; só `SELECT/INSERT` em `order_events`; só `SELECT` em `admin_users` | Ter o `GRANT` **não basta** — o RLS (seção de políticas) exige `public.is_admin()` para tudo além de `packages`. Um usuário autenticado que não está em `admin_users` tem o comando tecnicamente permitido pelo `GRANT`, mas o RLS devolve zero linhas (SELECT) ou rejeita a operação (INSERT/UPDATE/DELETE). Em `admin_users`, mesmo um administrador não consegue INSERT/UPDATE/DELETE — não existe esse `GRANT`. Em `payment_events`, a política de `UPDATE` existe (para uso futuro) mas hoje é inalcançável — não há `GRANT` de `UPDATE` para `authenticated` nessa tabela. Em `order_events`, nem a política existe: é imutável por completo. |
-| `service_role` | `SELECT/INSERT/UPDATE/DELETE` em `packages`, `orders`, `questions`, `tarot_cards`, `drawn_cards`, `readings`, `admin_users`; `SELECT/INSERT/UPDATE` (sem `DELETE`) em `payment_events`; só `SELECT/INSERT` em `order_events` | O `service_role` **ignora RLS por definição do Supabase** — é o papel usado exclusivamente pelas Edge Functions, nunca pelo navegador do cliente. Ele só precisa do `GRANT` porque a Data API confere privilégios antes de saber que RLS seria irrelevante para esse papel. Mesmo assim, `DELETE` foi removido do `GRANT` em `payment_events` e `order_events`, e `UPDATE` também foi removido em `order_events` — a imutabilidade do histórico de auditoria vale **mesmo para o backend**, não só para o painel administrativo. |
+| `authenticated` | `SELECT/INSERT/UPDATE/DELETE` só em `packages` e `tarot_cards` (catálogos); `SELECT/INSERT/UPDATE` (sem `DELETE`) em `orders`, `questions`, `drawn_cards`, `readings`; só `SELECT/INSERT` em `payment_events` e em `order_events`; só `SELECT` em `admin_users` | Ter o `GRANT` **não basta** — o RLS (seção de políticas) exige `public.is_admin()` para tudo além de `packages`. Um usuário autenticado que não está em `admin_users` tem o comando tecnicamente permitido pelo `GRANT`, mas o RLS devolve zero linhas (SELECT) ou rejeita a operação (INSERT/UPDATE/DELETE). Em `admin_users`, mesmo um administrador não consegue INSERT/UPDATE/DELETE — não existe esse `GRANT`. Em `orders`, `questions`, `drawn_cards` e `readings`, não existe política de `DELETE` — mesmo um administrador não consegue apagar essas linhas. Em `payment_events`, a política de `UPDATE` existe (para uso futuro) mas hoje é inalcançável — não há `GRANT` de `UPDATE` para `authenticated` nessa tabela. Em `order_events`, nem a política de `UPDATE` existe: é imutável por completo. |
+| `service_role` | `SELECT/INSERT/UPDATE/DELETE` só em `packages`, `tarot_cards` (catálogos) e `admin_users`; `SELECT/INSERT/UPDATE` (sem `DELETE`) em `orders`, `questions`, `drawn_cards`, `readings` e `payment_events`; só `SELECT/INSERT` em `order_events` | O `service_role` **ignora RLS por definição do Supabase** — é o papel usado exclusivamente pelas Edge Functions, nunca pelo navegador do cliente. Ele só precisa do `GRANT` porque a Data API confere privilégios antes de saber que RLS seria irrelevante para esse papel. Mesmo assim, `DELETE` foi removido do `GRANT` em `orders`, `questions`, `drawn_cards`, `readings`, `payment_events` e `order_events`, e `UPDATE` também foi removido em `order_events` — a proteção contra exclusão e a imutabilidade da auditoria valem **mesmo para o backend**, não só para o painel administrativo. |
 
 **Um ponto que não pode ser esquecido em nenhuma fase futura**: a chave
 `service_role` tem acesso total e sem filtro nenhuma das 9 tabelas — ela
@@ -322,6 +329,58 @@ Tanto `is_admin()` quanto `set_updated_at()` têm o `EXECUTE` revogado de
   é para fazer o `UPDATE` na tabela, não para "chamar" a função. O `GRANT`
   para `authenticated`/`service_role` aqui é uma camada extra de cuidado,
   não uma exigência técnica para o trigger funcionar.
+
+---
+
+## Integridade: o que nunca é apagado pela aplicação
+
+Além de RLS e GRANT, esta migration adiciona uma terceira camada de
+proteção nos registros operacionais: **nenhum papel — nem `authenticated`
+(o painel), nem `service_role` (as Edge Functions) — tem permissão de
+`DELETE`** em `orders`, `questions`, `drawn_cards` ou `readings`. Isso vale
+tanto no `GRANT` (a Data API rejeita o comando) quanto nas políticas de RLS
+(não existe nenhuma política de `DELETE` criada para essas tabelas).
+
+- **Pedidos, perguntas, sorteios e leituras não são apagados pela
+  aplicação.** Um pedido problemático não "some" — ele muda de `status`
+  (ver a tabela de status mais acima).
+- **Cancelamento e expiração são representados por `status`, nunca por
+  exclusão.** `orders.status = 'cancelled'` ou `'expired'` são estados
+  normais do pedido, não um convite para apagar a linha. O registro
+  continua existindo, para fins de histórico e de auditoria.
+- **Cartas sorteadas permanecem registradas.** Se um sorteio precisar ser
+  refeito por qualquer motivo, isso não é feito apagando linhas de
+  `drawn_cards` — é uma decisão administrativa excepcional, feita fora do
+  fluxo normal da aplicação (ver último tópico desta seção).
+- **`order_events` não pode desaparecer por exclusão em cascata.** A
+  chave estrangeira `order_events.order_id` usa `ON DELETE RESTRICT` (não
+  `CASCADE`): o Postgres **impede** que um pedido seja apagado enquanto
+  existir qualquer evento de auditoria apontando para ele. A mesma
+  proteção vale para `questions.order_id`, `drawn_cards.question_id` e
+  `readings.question_id` — a cadeia inteira (pedido → pergunta → sorteio →
+  leitura) só pode ser removida de trás para frente, e mesmo assim nenhum
+  papel tem `DELETE` para fazer isso pela aplicação.
+- **Os IDs do Mercado Pago são únicos por pedido.**
+  `orders.mercado_pago_preference_id` e `orders.mercado_pago_payment_id`
+  têm restrição `UNIQUE` — dois pedidos nunca podem ficar associados à
+  mesma preferência ou ao mesmo pagamento do Mercado Pago. Os dois campos
+  continuam opcionais (ficam vazios até o Checkout Pro ser iniciado/
+  confirmado) — em Postgres, `UNIQUE` permite qualquer quantidade de
+  linhas com o valor `NULL` normalmente; a restrição só passa a valer
+  quando o campo é de fato preenchido.
+- **Uma eventual limpeza de dados é uma ação administrativa excepcional,
+  feita direto no banco.** Se um dia for realmente necessário remover
+  registros antigos (por exemplo, por uma política de retenção de dados),
+  isso não deve — e, do jeito que este esquema está desenhado, tecnicamente
+  **não consegue** — ser feito pela aplicação ou pelas Edge Functions. Exige
+  acesso direto ao Supabase (SQL Editor, com um usuário com privilégios
+  além de `service_role`) e uma decisão humana deliberada, nunca um
+  `DELETE` disparado por código.
+
+`packages` e `tarot_cards` são exceções propositais: são catálogos de
+referência (não registros de um cliente específico), então mantêm `DELETE`
+para administradores — corrigir um pacote cadastrado errado ou remover uma
+carta duplicada do catálogo são operações de manutenção legítimas.
 
 ---
 
