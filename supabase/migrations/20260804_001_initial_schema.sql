@@ -394,7 +394,94 @@ alter table public.order_events   enable row level security;
 alter table public.admin_users    enable row level security;
 
 
--- ═══════════════════════════ 8. Políticas de acesso ════════════════════════
+-- ═══════════════ 8. Privilégios explícitos (GRANTs para a Data API) ═══════
+--
+-- Este projeto Supabase foi criado com "Expor automaticamente novas
+-- tabelas" DESATIVADO — ou seja, nenhuma tabela fica acessível pela Data
+-- API (PostgREST) até receber um GRANT explícito, mesmo com RLS ativo.
+--
+-- GRANT e RLS são camadas diferentes e ambas precisam liberar o acesso:
+--   • GRANT responde "este papel pode tentar este comando nesta tabela?"
+--   • RLS responde "e quais LINHAS ele efetivamente vê ou altera?"
+-- Sem RLS, um GRANT liberaria a tabela inteira. Sem GRANT, mesmo com RLS
+-- favorável, a Data API rejeita o pedido antes de chegar nas políticas.
+-- É por isso que esta seção vem depois da 7 (RLS) — o RLS já está armado
+-- antes de qualquer privilégio de tabela ser concedido.
+--
+-- Cada GRANT abaixo é explícito por tabela (não usamos
+-- "grant all on all tables in schema public") de propósito: a migration
+-- deve documentar exatamente o que cada papel pode tentar fazer.
+
+grant usage on schema public to anon, authenticated, service_role;
+
+-- ─── anon (visitante do site, sem login): só leitura de pacotes ativos.
+-- Os REVOKE abaixo são defensivos/documentais — uma tabela recém-criada já
+-- não concede nada a ninguém além do dono por padrão — mas deixam escrito,
+-- de forma explícita e à prova de futuras mudanças acidentais, que anon
+-- nunca deve ter acesso a estas 8 tabelas.
+revoke all on public.orders         from anon;
+revoke all on public.questions      from anon;
+revoke all on public.tarot_cards    from anon;
+revoke all on public.drawn_cards    from anon;
+revoke all on public.readings       from anon;
+revoke all on public.payment_events from anon;
+revoke all on public.order_events   from anon;
+revoke all on public.admin_users    from anon;
+
+grant select on public.packages to anon;
+
+-- ─── authenticated: privilégio SQL amplo nas tabelas operacionais, mas o
+-- RLS (seção 9) ainda exige public.is_admin() para qualquer coisa além de
+-- packages — estes GRANTs, sozinhos, NÃO tornam os dados públicos.
+grant select, insert, update, delete on public.packages       to authenticated;
+grant select, insert, update, delete on public.orders         to authenticated;
+grant select, insert, update, delete on public.questions      to authenticated;
+grant select, insert, update, delete on public.tarot_cards    to authenticated;
+grant select, insert, update, delete on public.drawn_cards    to authenticated;
+grant select, insert, update, delete on public.readings       to authenticated;
+
+-- payment_events e order_events são histórico append-only: administradores
+-- podem consultar e registrar eventos, mas nunca apagar. Nenhum dos dois
+-- recebe UPDATE aqui para o papel authenticated — em payment_events, a
+-- política payment_events_admin_update continua existindo (ver seção de
+-- políticas) para uso futuro, mas sem este GRANT ela é inalcançável pela
+-- Data API hoje: a atualização de status de processamento é feita só pelo
+-- service_role. Em order_events, nem a política existe — é imutável por
+-- completo, em qualquer papel.
+grant select, insert on public.payment_events to authenticated;
+grant select, insert on public.order_events   to authenticated;
+
+-- admin_users: só leitura. Conceder acesso de administrador continua sendo
+-- uma operação fora do RLS de escrita — sem GRANT de insert/update/delete
+-- aqui, nem um administrador autenticado consegue alterar esta tabela pela
+-- Data API (ver também a política admin_users_admin_read).
+grant select on public.admin_users to authenticated;
+
+-- ─── service_role: acesso operacional completo, usado somente pelas Edge
+-- Functions. Ignora RLS por definição do Supabase, mas ainda precisa do
+-- GRANT — sem ele, a Data API rejeitaria o comando antes de chequar RLS.
+-- Esta chave NUNCA pode aparecer no navegador do cliente.
+grant select, insert, update, delete on public.packages       to service_role;
+grant select, insert, update, delete on public.orders         to service_role;
+grant select, insert, update, delete on public.questions      to service_role;
+grant select, insert, update, delete on public.tarot_cards    to service_role;
+grant select, insert, update, delete on public.drawn_cards    to service_role;
+grant select, insert, update, delete on public.readings       to service_role;
+
+-- payment_events e order_events são histórico append-only mesmo para o
+-- backend. A Edge Function do webhook precisa poder ATUALIZAR
+-- payment_events (status de processamento, attempts, error_message,
+-- processed_at) — por isso mantém UPDATE ali. order_events é mais estrito
+-- ainda: NENHUM papel, nem service_role, recebe UPDATE ou DELETE — uma vez
+-- inserido, um evento de auditoria é permanente. Correção de um evento
+-- registrado deve gerar um novo evento, nunca apagar ou alterar o anterior.
+grant select, insert, update on public.payment_events to service_role;
+grant select, insert         on public.order_events   to service_role;
+
+grant select, insert, update, delete on public.admin_users    to service_role;
+
+
+-- ═══════════════════════════ 9. Políticas de acesso ════════════════════════
 --
 -- Regra geral: o service_role (usado pelas Edge Functions) IGNORA o RLS por
 -- padrão no Supabase — não precisa de política própria aqui. Todo o fluxo
@@ -464,20 +551,48 @@ create policy readings_admin_manage
   using (public.is_admin())
   with check (public.is_admin());
 
--- payment_events: dado financeiro sensível — só administradores.
-create policy payment_events_admin_manage
+-- payment_events: dado financeiro sensível, histórico append-only.
+-- Administradores podem consultar e registrar eventos — mas não existe
+-- política de DELETE: nenhum papel autenticado pode apagar um evento de
+-- pagamento já registrado.
+create policy payment_events_admin_select
   on public.payment_events
-  for all
+  for select
+  to authenticated
+  using (public.is_admin());
+
+create policy payment_events_admin_insert
+  on public.payment_events
+  for insert
+  to authenticated
+  with check (public.is_admin());
+
+-- Política mantida para uso futuro (ex.: um painel que precise corrigir
+-- manualmente um campo de processamento), mas HOJE é inalcançável: o
+-- GRANT de UPDATE em payment_events para authenticated foi removido de
+-- propósito (ver seção de GRANTs) — só o service_role atualiza esta
+-- tabela, a partir da Edge Function do webhook.
+create policy payment_events_admin_update
+  on public.payment_events
+  for update
   to authenticated
   using (public.is_admin())
   with check (public.is_admin());
 
--- order_events: auditoria — só administradores.
-create policy order_events_admin_manage
+-- order_events: histórico de auditoria IMUTÁVEL depois de inserido.
+-- Administradores podem consultar e inserir novos eventos — mas não existe
+-- política de UPDATE nem de DELETE: uma correção deve gerar um novo evento
+-- (nova linha), nunca alterar ou remover um evento já registrado.
+create policy order_events_admin_select
   on public.order_events
-  for all
+  for select
   to authenticated
-  using (public.is_admin())
+  using (public.is_admin());
+
+create policy order_events_admin_insert
+  on public.order_events
+  for insert
+  to authenticated
   with check (public.is_admin());
 
 -- admin_users: administradores podem CONSULTAR a lista (para o painel
@@ -493,7 +608,7 @@ create policy admin_users_admin_read
   using (public.is_admin());
 
 
--- ═══════════════════════ 9. Pacotes iniciais (seed) ════════════════════════
+-- ═══════════════════════ 10. Pacotes iniciais (seed) ═══════════════════════
 -- Apenas os dois pacotes pedidos nesta etapa. As 78 cartas ficam para uma
 -- migration futura dedicada.
 

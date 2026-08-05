@@ -1,8 +1,8 @@
 # Esquema do banco — Entre Nós Tarô
 
 Este documento explica, em português simples, o que cada tabela guarda, o
-que cada status significa e como a segurança (RLS) funciona. Corresponde à
-migration `supabase/migrations/20260804_001_initial_schema.sql`.
+que cada status significa e como a segurança (GRANT e RLS) funciona.
+Corresponde à migration `supabase/migrations/20260804_001_initial_schema.sql`.
 
 Nada neste documento foi aplicado a um banco real ainda — é a documentação
 da Fase 1 (esquema inicial), aguardando autorização para ser aplicada.
@@ -134,7 +134,7 @@ quantas tentativas de geração foram necessárias (`generation_attempts`) —
 `output_tokens` podem ficar em branco (antes da geração), mas nunca podem
 ser negativos quando preenchidos.
 
-### `payment_events` — log bruto de pagamento
+### `payment_events` — log bruto de pagamento (append-only)
 Cada notificação (webhook) recebida de um provedor de pagamento é
 registrada aqui antes de qualquer processamento. A combinação
 `(provider, provider_event_id)` é única: se o Mercado Pago reenviar a mesma
@@ -145,11 +145,37 @@ liberar a mesma leitura duas vezes por erro de rede. A unicidade é por
 provedor de pagamento for adicionado no futuro, os IDs de eventos de um não
 podem colidir com os do outro.
 
-### `order_events` — auditoria de pedidos
+**Permite atualização só pelo backend, não permite exclusão por
+ninguém.** Depois que um evento chega, os campos de processamento
+(`status`, `attempts`, `error_message`, `processed_at`) podem ser
+atualizados conforme a Edge Function do webhook avança no processamento —
+mas só o `service_role` tem esse `GRANT` de `UPDATE`. `authenticated` (ou
+seja, o painel administrativo) tem só `SELECT` e `INSERT`: a política de
+`UPDATE` para administradores existe no banco (reservada para um uso
+futuro), mas sem o `GRANT` correspondente ela é inalcançável hoje pela
+Data API. Em nenhum caso a linha em si pode ser apagada — `DELETE` não
+existe nem como `GRANT`, nem como política de RLS, para nenhum papel.
+
+### `order_events` — auditoria de pedidos (imutável)
 Um histórico de "o que aconteceu com este pedido e quando": mudanças de
 status, quem realizou a ação (`actor_user_id`, quando foi uma ação humana)
 e detalhes extras em `metadata`. Serve para investigar problemas e para
 prestar contas do processo.
+
+**É um histórico verdadeiramente imutável depois de inserido** — mais
+restrito que `payment_events`. Só existem privilégios e políticas de
+`SELECT` e `INSERT`; não há `UPDATE` nem `DELETE` em lugar nenhum (nem
+`GRANT`, nem política de RLS), para nenhum papel. Se um evento foi
+registrado errado, a correção é **inserir um novo evento** explicando a
+correção — o registro original permanece exatamente como foi gravado. Essa
+é a diferença de propósito entre as duas tabelas: `payment_events` reflete
+o estado mais atual do processamento de um pagamento (por isso aceita
+`UPDATE`); `order_events` é a linha do tempo em si, e uma linha do tempo
+que pode ser reescrita deixa de servir como auditoria confiável.
+
+**Nenhum registro de auditoria pode ser apagado pela aplicação** — nem pelo
+painel administrativo, nem pelas Edge Functions. Isso vale para as duas
+tabelas.
 
 ### `admin_users` — quem tem acesso ao painel
 Lista de administradores. Note que **conceder acesso de administrador não é
@@ -204,6 +230,44 @@ aprovar) ou `rejected` (não será liberada).
 ### Status da leitura (`reading_status`)
 `pending` → `draft_ready` → `in_review` → `approved` → `released` (ou
 `failed`, se a geração falhar repetidamente).
+
+---
+
+## GRANT e RLS são camadas diferentes
+
+Este projeto Supabase foi criado com **"Expor automaticamente novas
+tabelas" desativado**. Na prática, isso significa que criar uma tabela e
+ativar RLS nela **não é suficiente** para que ela funcione pela Data API
+(a API que o Supabase gera automaticamente, usada por `supabase-js` no
+navegador e nas Edge Functions) — é preciso também um `GRANT` explícito.
+
+As duas camadas respondem perguntas diferentes, nesta ordem:
+
+1. **`GRANT`** — "este papel (anon, authenticated, service_role) pode
+   *tentar* este comando (SELECT/INSERT/UPDATE/DELETE) nesta tabela?" Se a
+   resposta for não, a Data API rejeita o pedido antes mesmo de olhar para
+   o conteúdo da tabela.
+2. **RLS** — já dentro do comando permitido pelo `GRANT`, "quais *linhas*
+   este papel efetivamente vê ou altera?"
+
+Nenhuma das duas camadas sozinha é suficiente: um `GRANT` amplo sem RLS
+exporia a tabela inteira; RLS sem `GRANT` simplesmente bloqueia tudo pela
+Data API (mas não impede acesso feito com a chave `service_role` a partir
+do servidor, que ignora RLS — ver abaixo).
+
+### O que cada papel pode tentar (GRANT) — e o que RLS realmente libera
+
+| Papel | GRANT (o que pode tentar) | RLS (o que realmente acontece) |
+|---|---|---|
+| `anon` (visitante, sem login) | `SELECT` só em `packages` | Só enxerga pacotes com `active = true` — é só isso que o site público precisa. Nas outras 8 tabelas, `anon` não tem nem `GRANT`: a Data API já rejeita antes do RLS entrar em ação. |
+| `authenticated` | `SELECT/INSERT/UPDATE/DELETE` em `packages`, `orders`, `questions`, `tarot_cards`, `drawn_cards`, `readings`; só `SELECT/INSERT` em `payment_events`; só `SELECT/INSERT` em `order_events`; só `SELECT` em `admin_users` | Ter o `GRANT` **não basta** — o RLS (seção de políticas) exige `public.is_admin()` para tudo além de `packages`. Um usuário autenticado que não está em `admin_users` tem o comando tecnicamente permitido pelo `GRANT`, mas o RLS devolve zero linhas (SELECT) ou rejeita a operação (INSERT/UPDATE/DELETE). Em `admin_users`, mesmo um administrador não consegue INSERT/UPDATE/DELETE — não existe esse `GRANT`. Em `payment_events`, a política de `UPDATE` existe (para uso futuro) mas hoje é inalcançável — não há `GRANT` de `UPDATE` para `authenticated` nessa tabela. Em `order_events`, nem a política existe: é imutável por completo. |
+| `service_role` | `SELECT/INSERT/UPDATE/DELETE` em `packages`, `orders`, `questions`, `tarot_cards`, `drawn_cards`, `readings`, `admin_users`; `SELECT/INSERT/UPDATE` (sem `DELETE`) em `payment_events`; só `SELECT/INSERT` em `order_events` | O `service_role` **ignora RLS por definição do Supabase** — é o papel usado exclusivamente pelas Edge Functions, nunca pelo navegador do cliente. Ele só precisa do `GRANT` porque a Data API confere privilégios antes de saber que RLS seria irrelevante para esse papel. Mesmo assim, `DELETE` foi removido do `GRANT` em `payment_events` e `order_events`, e `UPDATE` também foi removido em `order_events` — a imutabilidade do histórico de auditoria vale **mesmo para o backend**, não só para o painel administrativo. |
+
+**Um ponto que não pode ser esquecido em nenhuma fase futura**: a chave
+`service_role` tem acesso total e sem filtro nenhuma das 9 tabelas — ela
+**nunca pode aparecer em código que roda no navegador** (nenhum `.env`
+com prefixo `VITE_`, nenhum bundle do front). Ela existe só para as Edge
+Functions, que rodam no servidor do Supabase.
 
 ---
 
