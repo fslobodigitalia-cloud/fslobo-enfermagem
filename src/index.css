@@ -1,0 +1,231 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --ink: #07040d;
+    --ink-soft: #0c0712;
+    --plum: #180a2a;
+    --violet-deep: #6d28d9;
+    --violet: #8b5cf6;
+    --gold: #d9ac5b;
+    --gold-light: #f3d79a;
+    --cream: #f7f0e5;
+    --dim: #c8bccf;
+    --border-gold: rgba(217, 172, 91, 0.25);
+    --header-offset: 84px;
+  }
+
+  * {
+    border-color: var(--border-gold);
+  }
+
+  html {
+    scroll-behavior: smooth;
+    scroll-padding-top: var(--header-offset);
+    -webkit-text-size-adjust: 100%;
+  }
+
+  html,
+  body {
+    /* Impede qualquer rolagem horizontal indesejada em telas estreitas. */
+    overflow-x: hidden;
+    max-width: 100%;
+  }
+
+  body {
+    background-color: var(--ink);
+    color: var(--cream);
+    font-family: theme("fontFamily.sans");
+    font-synthesis-weight: none;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1,
+  h2,
+  h3 {
+    font-family: theme("fontFamily.display");
+    font-weight: 500;
+    letter-spacing: -0.01em;
+  }
+
+  /* Foco visível e consistente em toda a interface. */
+  :focus-visible {
+    outline: 2px solid var(--gold);
+    outline-offset: 3px;
+    border-radius: 6px;
+  }
+
+  /* Inputs com no mínimo 16px evitam o zoom automático no iOS. */
+  input,
+  textarea,
+  select {
+    font-size: 16px;
+  }
+
+  ::selection {
+    background: rgba(217, 172, 91, 0.28);
+    color: var(--cream);
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: var(--ink);
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(217, 172, 91, 0.22);
+    border-radius: 999px;
+  }
+}
+
+@layer components {
+  .shell {
+    @apply mx-auto w-full max-w-shell px-[22px] sm:px-6 lg:px-8;
+  }
+
+  .eyebrow {
+    @apply text-[11px] font-semibold uppercase tracking-[0.28em] text-gold/85 sm:text-xs;
+  }
+
+  .section-title {
+    @apply font-display text-[clamp(1.9rem,6.2vw,3.1rem)] leading-[1.08] text-cream;
+  }
+
+  .section-text {
+    @apply max-w-prose text-[15px] leading-relaxed text-dim sm:text-base;
+  }
+
+  /* Vidro escuro: base do sistema de cards. */
+  .glass {
+    background:
+      linear-gradient(160deg, rgba(24, 10, 42, 0.72) 0%, rgba(12, 7, 18, 0.86) 62%),
+      radial-gradient(120% 90% at 12% 0%, rgba(109, 40, 217, 0.22), transparent 60%);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border: 1px solid var(--border-gold);
+  }
+
+  .glass-strong {
+    background:
+      linear-gradient(165deg, rgba(31, 13, 54, 0.88) 0%, rgba(9, 5, 14, 0.94) 70%),
+      radial-gradient(120% 90% at 50% 0%, rgba(139, 92, 246, 0.2), transparent 62%);
+    backdrop-filter: blur(22px);
+    -webkit-backdrop-filter: blur(22px);
+    border: 1px solid rgba(217, 172, 91, 0.34);
+  }
+
+  .gold-text {
+    background: linear-gradient(96deg, #f3d79a 0%, #d9ac5b 42%, #f3d79a 78%, #c08f3e 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .gold-rule {
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(217, 172, 91, 0.65) 45%,
+      rgba(243, 215, 154, 0.9) 50%,
+      rgba(217, 172, 91, 0.65) 55%,
+      transparent
+    );
+  }
+
+  /* Área mínima de toque de 54px conforme a especificação mobile. */
+  .btn-base {
+    @apply inline-flex min-h-[54px] items-center justify-center gap-2 rounded-2xl px-6 text-[15px] font-semibold
+           transition-all duration-300 will-change-transform active:scale-[0.98] disabled:pointer-events-none
+           disabled:opacity-50;
+  }
+
+  .btn-gold {
+    @apply btn-base text-ink;
+    background: linear-gradient(135deg, #f3d79a 0%, #d9ac5b 52%, #c69444 100%);
+    box-shadow:
+      0 0 0 1px rgba(243, 215, 154, 0.45),
+      0 16px 44px -20px rgba(217, 172, 91, 0.85);
+  }
+  .btn-gold:hover {
+    box-shadow:
+      0 0 0 1px rgba(243, 215, 154, 0.75),
+      0 20px 60px -18px rgba(217, 172, 91, 0.95);
+    transform: translateY(-1px);
+  }
+
+  .btn-ghost {
+    @apply btn-base border border-gold/30 bg-white/[0.03] text-cream;
+  }
+  .btn-ghost:hover {
+    @apply border-gold/60 bg-white/[0.06];
+  }
+
+  .hairline {
+    border-top: 1px solid var(--border-gold);
+  }
+
+  /* Carrosséis mobile com scroll-snap. */
+  .snap-row {
+    @apply flex snap-x snap-mandatory gap-4 overflow-x-auto pb-4;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    scroll-padding-left: 22px;
+  }
+  .snap-row::-webkit-scrollbar {
+    display: none;
+  }
+  .snap-item {
+    @apply w-[min(82vw,340px)] shrink-0 snap-start;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+  .text-pretty {
+    text-wrap: pretty;
+  }
+  .perspective {
+    perspective: 1400px;
+  }
+  .preserve-3d {
+    transform-style: preserve-3d;
+  }
+  .backface-hidden {
+    backface-visibility: hidden;
+  }
+  .safe-bottom {
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+  }
+  .mask-fade-x {
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+    mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+  }
+}
+
+/* Pausa as animações quando a aba não está visível (economia de bateria/CPU). */
+html[data-page-hidden="true"] *,
+html[data-page-hidden="true"] *::before,
+html[data-page-hidden="true"] *::after {
+  animation-play-state: paused !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
