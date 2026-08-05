@@ -2,10 +2,12 @@
 
 Este documento explica, em português simples, o que cada tabela guarda, o
 que cada status significa e como a segurança (GRANT e RLS) funciona.
-Corresponde à migration `supabase/migrations/20260804_001_initial_schema.sql`.
+Corresponde a duas migrations, já aplicadas ao projeto Supabase:
 
-Nada neste documento foi aplicado a um banco real ainda — é a documentação
-da Fase 1 (esquema inicial), aguardando autorização para ser aplicada.
+- `supabase/migrations/20260804_001_initial_schema.sql` — esquema inicial
+  (Fase 1: tabelas, enums, RLS, GRANTs, seed dos pacotes).
+- `supabase/migrations/20260805_002_harden_database_functions.sql` —
+  reforço pontual de segurança em duas funções (ver seção de segurança).
 
 ---
 
@@ -329,6 +331,23 @@ Tanto `is_admin()` quanto `set_updated_at()` têm o `EXECUTE` revogado de
   é para fazer o `UPDATE` na tabela, não para "chamar" a função. O `GRANT`
   para `authenticated`/`service_role` aqui é uma camada extra de cuidado,
   não uma exigência técnica para o trigger funcionar.
+
+### Reforço adicional (migration 002 — `harden_database_functions`)
+Depois da migration inicial, dois ajustes pontuais de segurança foram
+aplicados diretamente no projeto Supabase:
+
+- **`set_updated_at()` agora tem `search_path` fixo em `pg_catalog`.** Toda
+  função seria alvo de um ataque de "search_path hijacking" se alguém
+  conseguisse criar um objeto com o mesmo nome de uma função/tipo usada
+  internamente, num schema que apareça antes na busca do Postgres. Fixar o
+  `search_path` (como `is_admin()` já fazia desde a migration inicial)
+  fecha essa brecha também em `set_updated_at()`.
+- **`rls_auto_enable()` — função interna do Supabase, ligada à opção
+  "Ativar RLS automático" usada na criação deste projeto — teve o
+  `EXECUTE` revogado de `PUBLIC`, `anon` e `authenticated`, mantendo só
+  `service_role`.** Essa função não foi criada por nenhuma das nossas
+  migrations (é provisionada pelo próprio Supabase); o ajuste garante que
+  nenhum papel de cliente possa invocá-la diretamente.
 
 ---
 
