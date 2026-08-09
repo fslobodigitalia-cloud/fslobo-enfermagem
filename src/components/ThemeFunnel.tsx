@@ -25,6 +25,7 @@ import { Label } from "./ui/label";
 import { Checkbox } from "./ui/checkbox";
 import { Progress } from "./ui/progress";
 import { StarField } from "./common/StarField";
+import { PixEssentialCheckout } from "./checkout/PixEssentialCheckout";
 import { cn } from "@/lib/utils";
 
 type Phase = "intro" | "quiz" | "summary" | "pricing" | "details" | "final";
@@ -215,22 +216,34 @@ export function ThemeFunnel({ theme }: { theme: ReadingTheme }) {
 
             {phase === "details" && selectedPackage && (
               <Stage key="details" transition={transition}>
-                <DetailsStep
-                  pkg={selectedPackage}
-                  firstName={firstName}
-                  setFirstName={setFirstName}
-                  format={format}
-                  setFormat={setFormat}
-                  questionsText={questionsText}
-                  setQuestionsText={setQuestionsText}
-                  awareDeadline={awareDeadline}
-                  setAwareDeadline={setAwareDeadline}
-                  awarePrice={awarePrice}
-                  setAwarePrice={setAwarePrice}
-                  errors={errors}
-                  onSubmit={submitDetails}
-                  onChangePackage={() => setPhase("pricing")}
-                />
+                {selectedPackage.pixCheckoutSlug ? (
+                  // Leitura Essencial (único pacote com checkout Pix
+                  // habilitado por enquanto): fluxo autocontido, do
+                  // formulário até o resultado do pagamento — nunca chega
+                  // à fase "final" (WhatsApp), usada só pelos outros
+                  // pacotes.
+                  <PixEssentialCheckout
+                    pkg={selectedPackage}
+                    onChangePackage={() => setPhase("pricing")}
+                  />
+                ) : (
+                  <DetailsStep
+                    pkg={selectedPackage}
+                    firstName={firstName}
+                    setFirstName={setFirstName}
+                    format={format}
+                    setFormat={setFormat}
+                    questionsText={questionsText}
+                    setQuestionsText={setQuestionsText}
+                    awareDeadline={awareDeadline}
+                    setAwareDeadline={setAwareDeadline}
+                    awarePrice={awarePrice}
+                    setAwarePrice={setAwarePrice}
+                    errors={errors}
+                    onSubmit={submitDetails}
+                    onChangePackage={() => setPhase("pricing")}
+                  />
+                )}
               </Stage>
             )}
 

@@ -176,3 +176,24 @@ export function buildQuickProductWhatsAppUrl(data: QuickProductWhatsAppData): st
 export function openQuickProductWhatsApp(data: QuickProductWhatsAppData): void {
   window.open(buildQuickProductWhatsAppUrl(data), "_blank", "noopener,noreferrer");
 }
+
+/* ═══════════════════ Suporte — checkout Pix transparente ═════════════════
+ *
+ * Usado só quando o checkout Pix devolve um estado que exige contato
+ * manual (reconciliação, conflito etc.) — nunca inclui o código de erro
+ * bruto do servidor, IDs internos ou o checkout_access_token; só o
+ * public_id do pedido (já exibido ao cliente na tela, não sensível), que
+ * ajuda o atendimento a localizar a compra.
+ * ══════════════════════════════════════════════════════════════════════ */
+
+export function buildPixSupportWhatsAppUrl(orderPublicId: string | null): string {
+  const number = contact.whatsappNumber.replace(/\D/g, "");
+  const lines = [
+    `Olá! Estou com um problema para confirmar o pagamento de uma leitura no site da ${brand.name}.`,
+  ];
+  if (orderPublicId) {
+    lines.push(`Código do pedido: ${orderPublicId}`);
+  }
+  const text = encodeURIComponent(lines.join("\n"));
+  return appendCampaignParams(`https://wa.me/${number}?text=${text}`);
+}

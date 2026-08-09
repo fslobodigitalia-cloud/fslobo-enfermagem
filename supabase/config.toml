@@ -1,8 +1,7 @@
-# Este arquivo não existia no projeto antes desta etapa. Foi criado agora
-# somente com a configuração estritamente necessária para a Edge Function
-# supabase/functions/draw-cards: nenhuma outra seção (project_id, portas
-# locais, outras Edge Functions etc.) foi adicionada — isso fica para
-# quando essas partes forem de fato criadas/decididas.
+# Este arquivo não existia no projeto antes da etapa do draw-cards. Contém
+# somente a configuração estritamente necessária para cada Edge Function —
+# nenhuma outra seção (project_id, portas locais etc.) foi adicionada; isso
+# fica para quando essas partes forem de fato criadas/decididas.
 
 [functions.draw-cards]
 # Esta função não é chamada com um JWT do Supabase Auth (nem de usuário,
@@ -15,4 +14,61 @@
 # aqui — e só aqui: esta seção não afeta nenhuma outra Edge Function, atual
 # ou futura, que continuará com o padrão do projeto (verify_jwt ligado) a
 # menos que tenha sua própria seção [functions.<nome>] dizendo o contrário.
+verify_jwt = false
+
+[functions.create-pix-order]
+# Diferente de draw-cards: esta função é PÚBLICA por natureza — é chamada
+# pelo navegador de um visitante do site, que nunca tem (nem deveria ter) um
+# JWT do Supabase Auth, já que não existe login de cliente nesta plataforma.
+# Com verify_jwt ligado (padrão do Supabase), o gateway exigiria um
+# Authorization: Bearer <jwt> que nenhum visitante anônimo possui,
+# bloqueando toda a função. verify_jwt é desligado só para esta função, sem
+# afetar draw-cards nem qualquer Edge Function futura.
+#
+# IMPORTANTE — isto NÃO é a proteção do endpoint, é só a ausência de uma
+# camada que não se aplicaria de qualquer forma (não há login de cliente).
+# Validação estrita de entrada e preço/limite de perguntas recalculados no
+# banco são higiene básica esperada de qualquer endpoint, não uma defesa
+# contra abuso.
+#
+# Turnstile (Cloudflare) e rate limiting JÁ ESTÃO IMPLEMENTADOS no código
+# (index.ts) e na migration (checkout_rate_limit_windows/
+# checkout_rate_limit_decisions/record_checkout_attempt): turnstile_token é
+# exigido e validado (success/hostname/action exatos, com classificação
+# granular de error-codes); tentativas de checkout são limitadas por hash
+# de IP (quando disponível — CF-Connecting-IP) e de e-mail (10/10min por
+# IP, 5/30min por e-mail), com decisão congelada por request_hash — HMAC de
+# checkout_request_id E e-mail normalizado JUNTOS, não só o primeiro: o
+# mesmo checkout_request_id reenviado com um e-mail diferente conta como
+# tentativa distinta — com expiração (24h se permitida; fim da janela que
+# causou o bloqueio, se bloqueada), reavaliada automaticamente depois de
+# expirar. Isso ainda NÃO
+# significa que o endpoint está protegido de verdade — depende de dois
+# passos que ainda não aconteceram:
+#   1. a migration 005 ser aplicada no projeto Supabase real (ainda não
+#      aplicada nesta etapa);
+#   2. os secrets reais existirem no ambiente: TURNSTILE_SECRET_KEY,
+#      TURNSTILE_EXPECTED_HOSTNAME, TURNSTILE_EXPECTED_ACTION,
+#      RATE_LIMIT_HASH_SECRET (mínimo 32 caracteres) — nenhum deles foi
+#      configurado ou inventado. Sem eles, a função falha com
+#      "server_misconfigured" em toda chamada — o que é intencional (falha
+#      fechada), mas significa que o endpoint simplesmente não funciona
+#      ainda, não que já esteja seguro em produção.
+# ALLOWED_ORIGIN (CORS) continua não sendo autenticação nem proteção contra
+# automação — só impede que JavaScript de outra origem LEIA a resposta no
+# navegador; uma chamada server-to-server (curl, script) ignora CORS
+# completamente.
+verify_jwt = false
+
+[functions.mercado-pago-webhook]
+# Quem chama esta função é o servidor do Mercado Pago (notificação de
+# webhook), nunca um navegador nem um cliente com JWT do Supabase Auth — com
+# verify_jwt ligado (padrão), o gateway exigiria um Authorization: Bearer
+# <jwt> que o Mercado Pago nunca envia, bloqueando toda notificação legítima
+# antes de chegar ao código. Mesma razão de create-pix-order/draw-cards.
+#
+# A autenticação real é a validação de x-signature (HMAC-SHA256, manual, via
+# Web Crypto do Deno — ver index.ts) contra MERCADO_PAGO_WEBHOOK_SECRET, que
+# ainda NÃO foi configurado neste ambiente. Sem esse secret, a função falha
+# com "server_misconfigured" em toda chamada — falha fechada, intencional.
 verify_jwt = false

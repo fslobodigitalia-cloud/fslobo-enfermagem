@@ -110,6 +110,14 @@ export interface ReadingPackage {
   ctaLabel: string;
   featured: boolean;
   badge?: string;
+  /**
+   * package_slug usado pela Edge Function create-pix-order — corresponde
+   * exatamente a public.packages.slug no banco. Só definido para pacotes
+   * com checkout Pix habilitado (hoje, só "essencial" — os outros dois
+   * pacotes continuam no fluxo de WhatsApp e nem têm linha ativa na
+   * tabela packages ainda).
+   */
+  pixCheckoutSlug?: string;
 }
 
 export const packages: ReadingPackage[] = [
@@ -123,13 +131,14 @@ export const packages: ReadingPackage[] = [
     description: "Para compreender uma situação específica com objetividade.",
     benefits: [
       "Três perguntas",
-      "Respostas pelo WhatsApp",
+      "Acesso privado à sua leitura",
       "Foto das cartas",
       "Leitura individual",
       "Atendimento confidencial",
     ],
     ctaLabel: "Escolher 3 perguntas",
     featured: false,
+    pixCheckoutSlug: "leitura-essencial",
   },
   {
     id: "clareza",
@@ -1151,6 +1160,118 @@ export const copy = {
       "Revise as informações abaixo e envie pelo WhatsApp para confirmar disponibilidade e pagamento.",
     finalCta: "Enviar pelo WhatsApp",
     back: "Voltar",
+  },
+
+  /**
+   * Checkout Pix transparente — hoje só usado pela Leitura Essencial
+   * (único pacote com package_slug configurado). Substitui a etapa final
+   * de WhatsApp por um pagamento Pix direto no site, via create-pix-order.
+   */
+  pixCheckout: {
+    detailsEyebrow: "Últimos detalhes",
+    detailsTitle: "Suas perguntas para esta leitura",
+    nameLabel: "Primeiro nome",
+    namePlaceholder: "Como podemos te chamar?",
+    nameError: "Informe seu primeiro nome para continuar.",
+    emailLabel: "E-mail",
+    emailPlaceholder: "seuemail@exemplo.com",
+    emailError: "Informe um e-mail válido para continuar.",
+    questionsLabel: "Escreva suas 3 perguntas, uma por linha",
+    questionsPlaceholder:
+      "Ex.: O que preciso compreender sobre esta situação?\nComo posso agir com mais clareza agora?\nO que devo observar nas próximas semanas?",
+    questionsError: "Escreva exatamente 3 perguntas, uma por linha.",
+    questionsTooLongError: "Uma das perguntas é muito longa. Tente resumir um pouco.",
+    changePackage: "Escolher outro pacote",
+    turnstileLoadError:
+      "Não foi possível carregar a verificação de segurança. Recarregue a página e tente novamente.",
+    turnstileRequiredError: "Aguarde a verificação de segurança terminar antes de continuar.",
+    turnstileRetryCta: "Tentar verificação novamente",
+    submitCta: "Gerar meu Pix",
+    submittingCta: "Gerando seu Pix…",
+
+    /** Confirmações obrigatórias do formulário — nunca enviadas no corpo
+     * da requisição, só bloqueiam o envio enquanto desmarcadas. */
+    consentPriceLabel: "Estou ciente do valor do pacote escolhido.",
+    consentDeadlineLabel: `Estou ciente de que a entrega é estimada ${commercial.deliveryTime}.`,
+    consentAgeLabel: "Confirmo que tenho 18 anos ou mais.",
+    consentTermsBeforeLink: "Li e aceito os ",
+    consentTermsLinkLabel: "Termos de Uso",
+    consentTermsBetweenLinks: " e a ",
+    consentPrivacyLinkLabel: "Política de Privacidade",
+    consentTermsAfterLink: ".",
+    consentError: "Confirme todos os itens acima para continuar.",
+
+    pendingTitle: "Escaneie para pagar com Pix",
+    pendingText: "Abra o app do seu banco, escaneie o QR Code abaixo ou use o código Copia e Cola.",
+    qrCodeAlt: "QR Code para pagamento via Pix",
+    copyCodeLabel: "Código Pix Copia e Cola",
+    copyCodeButton: "Copiar código Pix",
+    copyCodeCopied: "Código copiado!",
+    checkPaymentCta: "Já paguei, verificar pagamento",
+    checkingPaymentCta: "Verificando…",
+
+    preparingTitle: "Estamos preparando seu Pix",
+    preparingText: "Seu pagamento está sendo preparado. Aguarde alguns instantes e verifique novamente.",
+    preparingStatusLabel: "Preparando Pix",
+    preparingCheckCta: "Verificar novamente",
+
+    processingTitle: "Pagamento sendo confirmado",
+    processingText: "O Mercado Pago está confirmando o status do pagamento.",
+    processingStatusLabel: "Em confirmação",
+
+    processedTitle: "Pagamento confirmado",
+    processedText:
+      "Pagamento confirmado. Sua leitura entrará em preparação e passará por revisão antes de ser liberada.",
+
+    orderPackageLabel: "Pacote",
+    orderAmountLabel: "Valor",
+    orderStatusLabel: "Status",
+
+    retryCta: "Tentar novamente",
+    startOverCta: "Fazer um novo pedido",
+    contactSupportCta: "Falar com o suporte",
+
+    /**
+     * Mensagens amigáveis por código de erro devolvido pela Edge Function
+     * — a mensagem bruta do servidor NUNCA é exibida diretamente. Códigos
+     * ausentes deste mapa caem no genericError. Códigos da categoria
+     * "contact" (ver classifyCheckoutErrorCode em lib/pixCheckout.ts) usam
+     * blockedRetryMessage em vez desta mensagem específica — mantidos aqui
+     * mesmo assim, para completude e possível reuso futuro.
+     */
+    genericError: "Não foi possível processar seu pedido agora. Tente novamente em instantes.",
+    errorMessages: {
+      rate_limit_exceeded: "Muitas tentativas em pouco tempo. Aguarde um instante e tente novamente.",
+      human_verification_failed:
+        "Não foi possível confirmar a verificação de segurança. Tente novamente.",
+      human_verification_temporarily_unavailable:
+        "A verificação de segurança está indisponível no momento. Tente novamente em instantes.",
+      payment_provider_temporarily_unavailable:
+        "O provedor de pagamento está temporariamente indisponível. Tente novamente em instantes.",
+      incomplete_provider_response:
+        "Não foi possível confirmar o status do pagamento agora. Tente novamente em instantes.",
+      order_link_persistence_failed:
+        "O pagamento foi iniciado, mas não conseguimos confirmar o registro agora. Tente novamente.",
+      payment_provider_error:
+        "Não foi possível iniciar o pagamento agora. Tente novamente em instantes.",
+      database_error: "Não foi possível processar seu pedido agora. Tente novamente em instantes.",
+      package_not_found_or_inactive: "Este pacote não está disponível no momento.",
+      question_count_mismatch: "A quantidade de perguntas não corresponde ao pacote escolhido.",
+      invalid_question: "Uma das perguntas enviadas é inválida.",
+      invalid_request: "Alguns dados do formulário são inválidos. Revise e tente novamente.",
+      payment_not_payable:
+        "Este pagamento não pode mais ser concluído. Inicie um novo pedido para tentar novamente.",
+      checkout_conflict:
+        "Identificamos uma inconsistência nesta tentativa de compra. Inicie um novo pedido.",
+      payment_request_rejected:
+        "Não foi possível processar esta solicitação de pagamento. Fale com a gente para continuar.",
+      payment_provider_configuration_error:
+        "Não foi possível processar pagamentos no momento. Fale com a gente.",
+      server_misconfigured: "Não foi possível processar pagamentos no momento. Fale com a gente.",
+      origin_not_allowed: "Não foi possível confirmar esta requisição. Fale com a gente.",
+    },
+    blockedRetryMessage:
+      "Não foi possível confirmar automaticamente este pagamento. Não tente novamente sozinho — fale com a gente que resolvemos rapidinho.",
   },
 
   /** Banner das experiências rápidas, logo após a hero da home. */
