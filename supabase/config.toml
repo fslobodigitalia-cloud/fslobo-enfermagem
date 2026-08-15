@@ -93,3 +93,14 @@ verify_jwt = false
 # falha com "server_misconfigured" em toda chamada, falha fechada,
 # intencional.
 verify_jwt = false
+
+[functions.get-order-downloads]
+# Mesma razão de create-pix-order/create-product-order: função PÚBLICA por
+# natureza, chamada pelo navegador de um visitante sem login. Só leitura
+# (e, quando o pedido está pago, geração de signed URL no bucket privado
+# "product-files") — nunca cria pedido, nunca cobra, nunca altera
+# orders.status. Autenticação real é public_id + checkout_access_token
+# (mesmo hash SHA-256 já usado para gravar orders.access_token_hash — ver
+# migration 20260815_010/011), não JWT nem Turnstile. Esta seção não afeta
+# nenhuma outra Edge Function.
+verify_jwt = false
