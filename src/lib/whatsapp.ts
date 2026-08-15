@@ -186,11 +186,21 @@ export function openQuickProductWhatsApp(data: QuickProductWhatsAppData): void {
  * ajuda o atendimento a localizar a compra.
  * ══════════════════════════════════════════════════════════════════════ */
 
-export function buildPixSupportWhatsAppUrl(orderPublicId: string | null): string {
+export interface PixSupportContext {
+  /**
+   * Descreve o que foi comprado, ex.: "o Guia de Evolução de Enfermagem".
+   * Se omitido, mantém o texto padrão do checkout de tarô (leitura + nome
+   * da marca) — nenhuma chamada existente precisa mudar.
+   */
+  purchaseLabel?: string;
+}
+
+export function buildPixSupportWhatsAppUrl(orderPublicId: string | null, context?: PixSupportContext): string {
   const number = contact.whatsappNumber.replace(/\D/g, "");
-  const lines = [
-    `Olá! Estou com um problema para confirmar o pagamento de uma leitura no site da ${brand.name}.`,
-  ];
+  const openingLine = context?.purchaseLabel
+    ? `Olá! Estou com um problema para confirmar o pagamento de ${context.purchaseLabel}.`
+    : `Olá! Estou com um problema para confirmar o pagamento de uma leitura no site da ${brand.name}.`;
+  const lines = [openingLine];
   if (orderPublicId) {
     lines.push(`Código do pedido: ${orderPublicId}`);
   }

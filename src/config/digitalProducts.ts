@@ -25,6 +25,8 @@ export const guiaEvolucaoProduct = {
 export interface DigitalBump {
   slug: string;
   name: string;
+  /** Descrição curta exibida no card do order bump — só copy, não afeta preço/lógica. */
+  description: string;
   priceCents: number;
   priceLabel: string;
 }
@@ -33,18 +35,21 @@ export const guiaEvolucaoBumps: DigitalBump[] = [
   {
     slug: "guia-ilustrado-enfermagem",
     name: "Guia Ilustrado de Enfermagem",
+    description: "Transforme conteúdos difíceis em consultas rápidas e visuais para o dia a dia.",
     priceCents: 1000,
     priceLabel: "R$ 10,00",
   },
   {
     slug: "2000-questoes-enfermagem",
     name: "2000 Questões de Enfermagem",
+    description: "Pare de só ler: pratique com questões e descubra exatamente o que ainda precisa revisar.",
     priceCents: 1000,
     priceLabel: "R$ 10,00",
   },
   {
     slug: "guia-feridas-cronicas",
     name: "Guia de Feridas Crônicas",
+    description: "Tenha à mão um guia prático para consultar quando surgir dúvida sobre os principais tipos de feridas.",
     priceCents: 1000,
     priceLabel: "R$ 10,00",
   },
