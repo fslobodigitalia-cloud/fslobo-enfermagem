@@ -72,3 +72,24 @@ verify_jwt = false
 # ainda NÃO foi configurado neste ambiente. Sem esse secret, a função falha
 # com "server_misconfigured" em toda chamada — falha fechada, intencional.
 verify_jwt = false
+
+[functions.create-product-order]
+# Mesma razão de create-pix-order (ver seção acima, não repetida aqui por
+# completo): função PÚBLICA por natureza, chamada pelo navegador de um
+# visitante sem login — com verify_jwt ligado (padrão), o gateway exigiria
+# um Authorization: Bearer <jwt> que nenhum visitante anônimo possui,
+# bloqueando toda a função. Esta seção não afeta create-pix-order,
+# draw-cards nem mercado-pago-webhook — cada uma continua só com a própria
+# seção acima.
+#
+# Turnstile e rate limiting já implementados no código (index.ts), MESMA
+# RPC record_checkout_attempt() de create-pix-order. Secret de action
+# EXCLUSIVO desta função: TURNSTILE_EXPECTED_ACTION_PRODUCT_ORDER (nunca o
+# mesmo TURNSTILE_EXPECTED_ACTION de create-pix-order, para que cada função
+# valide a action exata do próprio widget). Sem ele — ou sem
+# TURNSTILE_SECRET_KEY/TURNSTILE_EXPECTED_HOSTNAME/RATE_LIMIT_HASH_SECRET/
+# ALLOWED_ORIGIN/MERCADO_PAGO_ACCESS_TOKEN/MERCADO_PAGO_ENVIRONMENT, todos
+# já configurados para create-pix-order e reaproveitados aqui — a função
+# falha com "server_misconfigured" em toda chamada, falha fechada,
+# intencional.
+verify_jwt = false
