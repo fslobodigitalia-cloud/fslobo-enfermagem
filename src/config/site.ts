@@ -56,7 +56,7 @@ export const contact = {
   instagramHandle: "[INSTAGRAM]",
 
   /** ⚠️ PREENCHER — domínio final, usado em canonical, sitemap e Open Graph. */
-  siteUrl: "https://www.entrenostaro.com.br",
+  siteUrl: "https://www.fsloboenfermagem.com.br",
 
   /** ⚠️ PREENCHER — e-mail de contato exibido nas páginas legais. */
   email: "[EMAIL]",
