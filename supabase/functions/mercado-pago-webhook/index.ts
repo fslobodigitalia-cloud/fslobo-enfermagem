@@ -1054,6 +1054,14 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
+    // dataId: passado exatamente como recebido na query (sem .toLowerCase()
+    // nem qualquer outra transformação) — confirmado em teste end-to-end
+    // real (Pix pago, webhook v13 retornou 200, pedido mudou para paid) que
+    // este é o valor esperado pelo WebhookSignatureValidator do SDK oficial
+    // para Orders API. queryDataId nunca é alterado em nenhum outro lugar
+    // deste arquivo: GET /v1/orders/{id}, comparação com body.data.id,
+    // mercado_pago_order_id e vínculo do pedido sempre usam o mesmo valor
+    // original.
     WebhookSignatureValidator.validate({
       xSignature: xSignatureHeader,
       xRequestId,

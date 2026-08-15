@@ -9,6 +9,7 @@ import { pendingConfigFields } from "@/config/site";
 import Index from "@/pages/Index";
 import ThemeReading from "@/pages/ThemeReading";
 import QuickProductReading from "@/pages/QuickProductReading";
+import GuiaEvolucaoEnfermagemPage from "@/pages/GuiaEvolucaoEnfermagemPage";
 import Privacy from "@/pages/Privacy";
 import Terms from "@/pages/Terms";
 import Delivery from "@/pages/Delivery";
@@ -47,6 +48,7 @@ export default function App() {
           <Route path="/" element={<Index />} />
           <Route path="/leituras/:slug" element={<ThemeReading />} />
           <Route path="/experiencias/:slug" element={<QuickProductReading />} />
+          <Route path="/guia-evolucao-enfermagem" element={<GuiaEvolucaoEnfermagemPage />} />
           <Route path="/privacidade" element={<Privacy />} />
           <Route path="/termos" element={<Terms />} />
           <Route path="/entrega" element={<Delivery />} />
