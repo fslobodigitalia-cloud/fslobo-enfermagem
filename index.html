@@ -3,15 +3,15 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#07040D" />
+    <meta name="theme-color" content="#ffffff" />
 
-    <title>Entre Nós Tarô | Leituras de Tarô Online</title>
+    <title>Guia de Evolução de Enfermagem | FSlobo Enfermagem</title>
     <meta
       name="description"
-      content="Leituras de tarô online, individuais e confidenciais para amor, decisões, vida profissional e autoconhecimento. Escolha suas perguntas e consulte pelo WhatsApp."
+      content="Mais de 132 modelos prontos de evolução e anotação de enfermagem para consulta prática no plantão e nos estudos. Material digital em PDF."
     />
     <meta name="robots" content="index, follow" />
-    <meta name="author" content="Entre Nós Tarô" />
+    <meta name="author" content="FSlobo Enfermagem" />
 
     <!-- ⚠️ Ajuste o domínio em src/config/site.ts (contact.siteUrl) e nas linhas abaixo. -->
     <link rel="canonical" href="https://www.fsloboenfermagem.com.br/" />
@@ -19,31 +19,35 @@
     <!-- Open Graph -->
     <meta property="og:type" content="website" />
     <meta property="og:locale" content="pt_BR" />
-    <meta property="og:site_name" content="Entre Nós Tarô" />
-    <meta property="og:title" content="Entre Nós Tarô | Leituras de Tarô Online" />
+    <meta property="og:site_name" content="FSlobo Enfermagem" />
+    <meta property="og:title" content="Guia de Evolução de Enfermagem | FSlobo Enfermagem" />
     <meta
       property="og:description"
-      content="Leituras de tarô online, individuais e confidenciais para amor, decisões, vida profissional e autoconhecimento."
+      content="Mais de 132 modelos prontos de evolução e anotação de enfermagem para consulta prática no plantão e nos estudos. Material digital em PDF."
     />
     <meta property="og:url" content="https://www.fsloboenfermagem.com.br/" />
-    <meta property="og:image" content="https://www.fsloboenfermagem.com.br/brand/og-entre-nos-taro.jpg" />
+    <meta property="og:image" content="https://www.fsloboenfermagem.com.br/guia-evolucao/og-guia-evolucao.jpg" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
     <meta
       property="og:image:alt"
-      content="Cartas de tarô douradas diante de um eclipse roxo — Entre Nós Tarô"
+      content="Guia de Evolução de Enfermagem — mais de 132 modelos prontos"
     />
 
     <!-- Twitter / X -->
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Entre Nós Tarô | Leituras de Tarô Online" />
+    <meta name="twitter:title" content="Guia de Evolução de Enfermagem | FSlobo Enfermagem" />
     <meta
       name="twitter:description"
-      content="Leituras de tarô online, individuais e confidenciais. Escolha suas perguntas e consulte pelo WhatsApp."
+      content="Mais de 132 modelos prontos de evolução e anotação de enfermagem para consulta prática no plantão e nos estudos."
     />
-    <meta name="twitter:image" content="https://www.fsloboenfermagem.com.br/brand/og-entre-nos-taro.jpg" />
+    <meta name="twitter:image" content="https://www.fsloboenfermagem.com.br/guia-evolucao/og-guia-evolucao.jpg" />
 
-    <!-- Ícones -->
+    <!-- Ícones — identidade FSlobo Enfermagem (teal + coração/pulso), sem
+         nenhum traço de tarô. favicon.svg é o principal (nítido em
+         qualquer tamanho); os PNGs abaixo são fallback para navegadores
+         sem suporte a favicon SVG. -->
+    <link rel="icon" type="image/svg+xml" href="/brand/favicon.svg" />
     <link rel="icon" type="image/png" sizes="32x32" href="/brand/favicon-32.png" />
     <link rel="icon" type="image/png" sizes="16x16" href="/brand/favicon-16.png" />
     <link rel="apple-touch-icon" href="/brand/apple-touch-icon.png" />
@@ -74,11 +78,14 @@
     </noscript>
 
     <style>
-      /* Cor de fundo aplicada antes do CSS principal: evita flash claro. */
+      /* Cor de fundo aplicada antes do CSS principal: evita flash escuro na
+         nova home pública (branca). O tema dark/dourado do funil de tarô
+         continua existindo em index.css/tailwind.config.js — só este flash
+         de pré-carregamento, específico da home pública, muda aqui. */
       html,
       body,
       #root {
-        background-color: #07040d;
+        background-color: #ffffff;
         margin: 0;
         min-height: 100%;
       }
@@ -87,11 +94,11 @@
   <body>
     <div id="root"></div>
     <noscript>
-      <div style="padding: 24px; color: #f7f0e5; font-family: system-ui, sans-serif">
-        <h1>Entre Nós Tarô</h1>
+      <div style="padding: 24px; color: #0f172a; font-family: system-ui, sans-serif">
+        <h1>Guia de Evolução de Enfermagem</h1>
         <p>
-          Leituras de tarô online, individuais e confidenciais para amor, decisões, vida
-          profissional e autoconhecimento. Ative o JavaScript para visualizar o site completo.
+          Mais de 132 modelos prontos de evolução e anotação de enfermagem para consulta prática
+          no plantão e nos estudos. Ative o JavaScript para visualizar o site completo.
         </p>
       </div>
     </noscript>

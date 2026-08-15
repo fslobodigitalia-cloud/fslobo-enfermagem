@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="FSlobo Enfermagem">
+  <rect width="512" height="512" rx="104" fill="#0d9488"/>
+  <path d="M256,392 C256,392 90,276 90,176 C90,114 144,88 186,88 C220,88 246,110 256,144 C266,110 292,88 326,88 C368,88 422,114 422,176 C422,276 256,392 256,392 Z" fill="#ffffff"/>
+  <path d="M132,266 L198,266 L220,206 L244,330 L266,232 L286,266 L380,266" fill="none" stroke="#0d9488" stroke-width="22" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

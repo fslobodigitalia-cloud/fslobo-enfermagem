@@ -6,7 +6,6 @@ import { ProtectedAdminRoute } from "@/components/admin/ProtectedAdminRoute";
 import { captureCampaignParams } from "@/lib/utmTracking";
 import { pendingConfigFields } from "@/config/site";
 
-import Index from "@/pages/Index";
 import ThemeReading from "@/pages/ThemeReading";
 import QuickProductReading from "@/pages/QuickProductReading";
 import GuiaEvolucaoEnfermagemPage from "@/pages/GuiaEvolucaoEnfermagemPage";
@@ -45,7 +44,11 @@ export default function App() {
     <BrowserRouter>
       <SelectionProvider>
         <Routes>
-          <Route path="/" element={<Index />} />
+          {/* Home pública = a mesma landing do Guia de Evolução de Enfermagem
+              (reutiliza o componente, não duplica) — a rota antiga do tarô
+              (Index.tsx) fica sem rota por enquanto, mas o arquivo continua
+              intacto no projeto, sem remoção agressiva. */}
+          <Route path="/" element={<GuiaEvolucaoEnfermagemPage />} />
           <Route path="/leituras/:slug" element={<ThemeReading />} />
           <Route path="/experiencias/:slug" element={<QuickProductReading />} />
           <Route path="/guia-evolucao-enfermagem" element={<GuiaEvolucaoEnfermagemPage />} />

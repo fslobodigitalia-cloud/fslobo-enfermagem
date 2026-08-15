@@ -178,11 +178,16 @@ function scrollToOffer() {
 }
 
 export default function GuiaEvolucaoEnfermagemPage() {
+  // Esta página é servida em duas rotas ("/" e "/guia-evolucao-enfermagem"
+  // — ver App.tsx), com o MESMO conteúdo. A URL canônica principal do
+  // Guia é a home ("/") — por isso o canonical/og:url é sempre "/",
+  // independentemente de qual rota renderizou a página, evitando
+  // conteúdo duplicado aos olhos do Google.
   useDocumentMeta({
-    title: "Guia de Evolução de Enfermagem — Modelos Prontos para o Plantão",
+    title: "Guia de Evolução de Enfermagem | FSlobo Enfermagem",
     description:
-      "Mais de 130 modelos prontos de evolução e anotação de enfermagem, em PDF, para Clínica Médica, UTI e Emergência. Acesso imediato via Pix.",
-    path: `/${guiaEvolucaoProduct.slug}`,
+      "Mais de 132 modelos prontos de evolução e anotação de enfermagem para consulta prática no plantão e nos estudos. Material digital em PDF.",
+    path: "/",
   });
 
   // Fundo do <body> é escuro globalmente (tema do tarô, em src/index.css,
