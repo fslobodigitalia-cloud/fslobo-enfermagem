@@ -914,11 +914,20 @@ type EvaluatedOrder =
   | { kind: "shell"; mercadoPagoOrderId: string; orderStatus: string; orderStatusDetail: string }
   | { kind: "incomplete_provider_response"; mercadoPagoOrderId: string; mercadoPagoPaymentId: string }
   | { kind: "processed"; mercadoPagoOrderId: string; mercadoPagoPaymentId: string }
-  | { kind: "terminal"; mercadoPagoOrderId: string; mercadoPagoPaymentId: string; orderStatus: string; orderStatusDetail: string; paymentStatus: string; paymentStatusDetail: string }
+  | { kind: "terminal"; mercadoPagoOrderId: string; mercadoPagoPaymentId: string; orderStatus: string; orderStatusDetail: string; paymentStatus: string; paymentStatusDetail: string; mercadoPagoRequestId: string | null }
   | { kind: "state_conflict_with_identity"; mercadoPagoOrderId: string; mercadoPagoPaymentId: string }
   | { kind: "identity_invalid" };
 
-function evaluateMercadoPagoOrderBody(mpBody: unknown, expected: IdentityExpected): EvaluatedOrder {
+// mercadoPagoRequestId (3º parâmetro, opcional): header x-request-id da
+// resposta HTTP que originou mpBody — usado SOMENTE para anexar ao kind
+// "terminal" (instrumentação de diagnóstico, ver payment_terminal_state no
+// handler). Não é segredo. Não participa de nenhuma validação: toda a
+// lógica de identidade/estado abaixo é EXATAMENTE a mesma de antes.
+function evaluateMercadoPagoOrderBody(
+  mpBody: unknown,
+  expected: IdentityExpected,
+  mercadoPagoRequestId: string | null = null,
+): EvaluatedOrder {
   const identity = validateMercadoPagoOrderIdentity(mpBody, expected);
   if (identity !== null) {
     const state = classifyPaymentState(identity, expected.amountString);
@@ -959,6 +968,7 @@ function evaluateMercadoPagoOrderBody(mpBody: unknown, expected: IdentityExpecte
         orderStatusDetail: state.orderStatusDetail,
         paymentStatus: state.paymentStatus,
         paymentStatusDetail: state.paymentStatusDetail,
+        mercadoPagoRequestId,
       };
     }
     return {
@@ -984,9 +994,13 @@ function evaluateMercadoPagoOrderBody(mpBody: unknown, expected: IdentityExpecte
 }
 
 // ────────────────── Chamadas HTTP ao Mercado Pago (com timeout) ─────────────
+// mercadoPagoRequestId: header x-request-id devolvido pelo Mercado Pago —
+// NÃO é segredo (documentado por eles como identificador de suporte/
+// diagnóstico), então é seguro logar. Presente em "ok"/"http_error" (ambos
+// têm uma Response real); "network_error" nunca tem, por definição.
 type MpFetchResult =
-  | { kind: "ok"; body: unknown }
-  | { kind: "http_error"; status: number; retryAfter: string | null; body: unknown }
+  | { kind: "ok"; body: unknown; mercadoPagoRequestId: string | null }
+  | { kind: "http_error"; status: number; retryAfter: string | null; body: unknown; mercadoPagoRequestId: string | null }
   | { kind: "network_error" };
 
 async function mpFetchJson(url: string, init: RequestInit): Promise<MpFetchResult> {
@@ -997,6 +1011,8 @@ async function mpFetchJson(url: string, init: RequestInit): Promise<MpFetchResul
     return { kind: "network_error" };
   }
 
+  const mercadoPagoRequestId = response.headers.get("x-request-id");
+
   let body: unknown = null;
   try {
     body = await response.json();
@@ -1005,9 +1021,9 @@ async function mpFetchJson(url: string, init: RequestInit): Promise<MpFetchResul
   }
 
   if (!response.ok) {
-    return { kind: "http_error", status: response.status, retryAfter: response.headers.get("retry-after"), body };
+    return { kind: "http_error", status: response.status, retryAfter: response.headers.get("retry-after"), body, mercadoPagoRequestId };
   }
-  return { kind: "ok", body };
+  return { kind: "ok", body, mercadoPagoRequestId };
 }
 
 // ─────────────────────── Busca (reconciliação, só produção) ─────────────────
@@ -1090,15 +1106,109 @@ function classifySearchResult(result: MpFetchResult): SearchCallResult {
   return { kind: "ok", envelope };
 }
 
+// ── Instrumentação TEMPORÁRIA (diagnóstico do incidente provider_state_conflict
+//    em produção, 2026-08-15 ~22:03 UTC) ──────────────────────────────────────
+//    Objetivo único: descobrir qual das 6 checagens que produzem
+//    "provider_state_conflict" realmente disparou, sem afrouxar nenhuma
+//    validação de identidade e sem confiar em nada do corpo do webhook (esta
+//    instrumentação não toca no webhook). Só números/booleanos/enums curtos
+//    já considerados seguros no restante deste arquivo (status/status_detail
+//    já aparecem em outros logs de sucesso) — NUNCA token, e-mail, qr_code,
+//    Pix copia-e-cola ou corpo completo. Remover depois que a causa exata for
+//    confirmada em um novo incidente real (não overte aqui — nenhuma compra
+//    nova foi feita para gerar esse próximo dado).
+interface ConflictDiagnostics {
+  reason:
+    | "paging_total_lt_data_length"
+    | "paging_total_zero_with_data"
+    | "paging_total_one_data_mismatch"
+    | "search_summary_invalid"
+    | "detail_get_failed"
+    | "detail_identity_invalid"
+    | "unmapped_evaluated_kind"
+    | "create_409_unrecognized_error_code";
+  pagingTotal?: number;
+  pagingTotalPages?: number;
+  pagingOffset?: number;
+  pagingLimit?: number;
+  dataLength?: number;
+  orderStatus?: string;
+  orderStatusDetail?: string;
+  paymentStatus?: string;
+  paymentStatusDetail?: string;
+  hasTransactions?: boolean;
+  hasPayments?: boolean;
+  paymentsLength?: number;
+  hasPaymentMethod?: boolean;
+  hasQrCode?: boolean;
+  hasQrCodeBase64?: boolean;
+  hasTicketUrl?: boolean;
+  mercadoPagoErrorCode?: string | null;
+}
+
+/** Inspeciona defensivamente um item bruto de Order (sem nunca lançar) e
+ * devolve só presença/tipo/enums curtos — nunca os valores de qr_code,
+ * ticket_url ou qualquer dado do pagador. */
+function snapshotOrderShape(item: unknown): Partial<ConflictDiagnostics> {
+  if (item === null || typeof item !== "object") return {};
+  const record = item as Record<string, unknown>;
+  const snapshot: Partial<ConflictDiagnostics> = {};
+
+  if (typeof record.status === "string") snapshot.orderStatus = record.status;
+  if (typeof record.status_detail === "string") snapshot.orderStatusDetail = record.status_detail;
+
+  const transactions = record.transactions;
+  snapshot.hasTransactions = transactions !== undefined && transactions !== null;
+  if (snapshot.hasTransactions && typeof transactions === "object" && !Array.isArray(transactions)) {
+    const payments = (transactions as Record<string, unknown>).payments;
+    snapshot.hasPayments = Array.isArray(payments);
+    if (Array.isArray(payments)) {
+      snapshot.paymentsLength = payments.length;
+      const firstPayment = payments[0];
+      if (firstPayment !== null && typeof firstPayment === "object") {
+        const paymentRecord = firstPayment as Record<string, unknown>;
+        if (typeof paymentRecord.status === "string") snapshot.paymentStatus = paymentRecord.status;
+        if (typeof paymentRecord.status_detail === "string") snapshot.paymentStatusDetail = paymentRecord.status_detail;
+        const paymentMethod = paymentRecord.payment_method;
+        snapshot.hasPaymentMethod = paymentMethod !== undefined && paymentMethod !== null;
+        if (snapshot.hasPaymentMethod && typeof paymentMethod === "object") {
+          const pm = paymentMethod as Record<string, unknown>;
+          snapshot.hasQrCode = typeof pm.qr_code === "string" && pm.qr_code.length > 0;
+          snapshot.hasQrCodeBase64 = typeof pm.qr_code_base64 === "string" && pm.qr_code_base64.length > 0;
+          snapshot.hasTicketUrl = typeof pm.ticket_url === "string" && pm.ticket_url.length > 0;
+        }
+      }
+    }
+  }
+
+  return snapshot;
+}
+
+/**
+ * Extrai SOMENTE o id de um item de /v1/orders/search — nunca usa o resto
+ * do item para decidir identidade/estado (essa busca devolve uma
+ * representação resumida; ver PATCH 2026-08-15: status_detail/payment.status
+ * ausentes no resumo, confirmado via instrumentação em incidente real).
+ * Validação defensiva idêntica à já usada em validateMercadoPagoOrderIdentity/
+ * Shell para o campo id: existe, é string ou number, não é vazio.
+ */
+function extractOrderIdFromSearchItem(item: unknown): string | null {
+  if (item === null || typeof item !== "object") return null;
+  const record = item as Record<string, unknown>;
+  const id = record.id;
+  if ((typeof id !== "string" && typeof id !== "number") || String(id).length === 0) return null;
+  return String(id);
+}
+
 type ReconcileResult =
   | { kind: "success_pending"; mercadoPagoOrderId: string; mercadoPagoPaymentId: string; qrCode: string; qrCodeBase64: string | null; ticketUrl: string | null }
   | { kind: "success_processing"; mercadoPagoOrderId: string; mercadoPagoPaymentId: string; orderStatus: string; orderStatusDetail: string; paymentStatus: string; paymentStatusDetail: string }
   | { kind: "success_shell"; mercadoPagoOrderId: string; orderStatus: string; orderStatusDetail: string }
   | { kind: "success_processed"; mercadoPagoOrderId: string; mercadoPagoPaymentId: string }
-  | { kind: "terminal"; mercadoPagoOrderId: string; mercadoPagoPaymentId: string; orderStatus: string; orderStatusDetail: string; paymentStatus: string; paymentStatusDetail: string }
+  | { kind: "terminal"; mercadoPagoOrderId: string; mercadoPagoPaymentId: string; orderStatus: string; orderStatusDetail: string; paymentStatus: string; paymentStatusDetail: string; mercadoPagoRequestId: string | null }
   | { kind: "state_conflict_with_identity"; mercadoPagoOrderId: string; mercadoPagoPaymentId: string }
   | { kind: "manual_reconciliation_required" }
-  | { kind: "provider_state_conflict" }
+  | { kind: "provider_state_conflict"; diagnostics: ConflictDiagnostics }
   | { kind: "not_found" }
   | { kind: "temporary"; retryAfter: string | null }
   | { kind: "provider_configuration_error" }
@@ -1136,27 +1246,77 @@ async function tryReconcileViaSearch(
   if (searchResult.kind === "provider_error") return { kind: "provider_error" };
 
   const { data, paging } = searchResult.envelope;
+  const pagingDiagnostics = {
+    pagingTotal: paging.total,
+    pagingTotalPages: paging.totalPages,
+    pagingOffset: paging.offset,
+    pagingLimit: paging.limit,
+    dataLength: data.length,
+  };
 
   if (paging.total < data.length) {
-    return { kind: "provider_state_conflict" };
+    return { kind: "provider_state_conflict", diagnostics: { reason: "paging_total_lt_data_length", ...pagingDiagnostics } };
   }
 
   if (paging.total === 0) {
-    return data.length === 0 ? { kind: "not_found" } : { kind: "provider_state_conflict" };
+    return data.length === 0
+      ? { kind: "not_found" }
+      : { kind: "provider_state_conflict", diagnostics: { reason: "paging_total_zero_with_data", ...pagingDiagnostics } };
   }
 
   if (paging.total === 1) {
     if (data.length !== 1) {
-      return { kind: "provider_state_conflict" };
+      return { kind: "provider_state_conflict", diagnostics: { reason: "paging_total_one_data_mismatch", ...pagingDiagnostics } };
     }
   } else {
     return { kind: "manual_reconciliation_required" };
   }
 
-  const only = evaluateMercadoPagoOrderBody(data[0], identityExpected);
+  // ── PATCH 2026-08-15 (provider_state_conflict): o item de /v1/orders/search
+  //    é uma representação RESUMIDA (paginada) — NUNCA a mesma forma do
+  //    detalhe completo de GET /v1/orders/{id}. Confirmado via instrumentação
+  //    em incidente real: status_detail (nível Order) e status/status_detail
+  //    (nível payment) chegaram ausentes no resumo, o que reprovava
+  //    corretamente validateMercadoPagoOrderIdentity/Shell (as duas exigem
+  //    esses campos como string) mesmo quando a Order era genuína. A partir
+  //    daqui usamos o item de busca SOMENTE para obter o id, e validamos
+  //    identidade/estado (external_reference, total_amount, type,
+  //    processing_mode, payment_method, status/status_detail, valor, QR
+  //    Code) exclusivamente sobre o corpo COMPLETO de GET /v1/orders/{id} —
+  //    mesma validação estrita de sempre, nenhuma checagem removida ou
+  //    afrouxada, só a FONTE dos dados validados muda.
+  const searchItemId = extractOrderIdFromSearchItem(data[0]);
+  if (searchItemId === null) {
+    return {
+      kind: "provider_state_conflict",
+      diagnostics: { reason: "search_summary_invalid", ...pagingDiagnostics },
+    };
+  }
+
+  const detailResult = await mpFetchJson(
+    `${MERCADO_PAGO_ORDERS_URL}/${encodeURIComponent(searchItemId)}`,
+    { method: "GET", headers: mpAuthHeaders() },
+  );
+
+  if (detailResult.kind === "network_error") {
+    return { kind: "temporary", retryAfter: null };
+  }
+  if (detailResult.kind === "http_error") {
+    if (detailResult.status === 401 || detailResult.status === 403) return { kind: "provider_configuration_error" };
+    if (isTemporaryStatus(detailResult.status)) return { kind: "temporary", retryAfter: detailResult.retryAfter };
+    return {
+      kind: "provider_state_conflict",
+      diagnostics: { reason: "detail_get_failed", ...pagingDiagnostics },
+    };
+  }
+
+  const only = evaluateMercadoPagoOrderBody(detailResult.body, identityExpected, detailResult.mercadoPagoRequestId);
 
   if (only.kind === "identity_invalid") {
-    return { kind: "provider_state_conflict" };
+    return {
+      kind: "provider_state_conflict",
+      diagnostics: { reason: "detail_identity_invalid", ...pagingDiagnostics, ...snapshotOrderShape(detailResult.body) },
+    };
   }
   if (only.kind === "pending") {
     return {
@@ -1194,6 +1354,7 @@ async function tryReconcileViaSearch(
       orderStatusDetail: only.orderStatusDetail,
       paymentStatus: only.paymentStatus,
       paymentStatusDetail: only.paymentStatusDetail,
+      mercadoPagoRequestId: only.mercadoPagoRequestId,
     };
   }
   if (only.kind === "state_conflict_with_identity") {
@@ -1203,7 +1364,10 @@ async function tryReconcileViaSearch(
       mercadoPagoPaymentId: only.mercadoPagoPaymentId,
     };
   }
-  return { kind: "provider_state_conflict" };
+  return {
+    kind: "provider_state_conflict",
+    diagnostics: { reason: "unmapped_evaluated_kind", ...pagingDiagnostics, ...snapshotOrderShape(detailResult.body) },
+  };
 }
 
 // ─────────────────────────── Resolução final do Pix ──────────────────────────
@@ -1213,11 +1377,11 @@ type PixResolution =
   | { kind: "shell"; mercadoPagoOrderId: string; orderStatus: string; orderStatusDetail: string }
   | { kind: "incomplete_provider_response"; mercadoPagoOrderId: string; mercadoPagoPaymentId: string }
   | { kind: "processed"; mercadoPagoOrderId: string; mercadoPagoPaymentId: string }
-  | { kind: "terminal"; mercadoPagoOrderId: string; mercadoPagoPaymentId: string; orderStatus: string; orderStatusDetail: string; paymentStatus: string; paymentStatusDetail: string }
+  | { kind: "terminal"; mercadoPagoOrderId: string; mercadoPagoPaymentId: string; orderStatus: string; orderStatusDetail: string; paymentStatus: string; paymentStatusDetail: string; mercadoPagoRequestId: string | null }
   | { kind: "state_conflict_with_identity"; mercadoPagoOrderId: string; mercadoPagoPaymentId: string }
   | { kind: "temporary"; retryAfter: string | null }
   | { kind: "manual_reconciliation_required" }
-  | { kind: "provider_state_conflict" }
+  | { kind: "provider_state_conflict"; diagnostics: ConflictDiagnostics }
   | { kind: "provider_configuration_error" }
   | { kind: "payment_creation_failed_order_created" }
   | { kind: "idempotency_reconciliation_required" }
@@ -1266,6 +1430,7 @@ function resolutionFromEvaluation(evaluated: EvaluatedOrder): PixResolution {
       orderStatusDetail: evaluated.orderStatusDetail,
       paymentStatus: evaluated.paymentStatus,
       paymentStatusDetail: evaluated.paymentStatusDetail,
+      mercadoPagoRequestId: evaluated.mercadoPagoRequestId,
     };
   }
   if (evaluated.kind === "state_conflict_with_identity") {
@@ -1285,13 +1450,13 @@ function resolutionFromReconcile(r: ReconcileResult): PixResolution | { kind: "n
     case "success_processed":
       return { kind: "processed", mercadoPagoOrderId: r.mercadoPagoOrderId, mercadoPagoPaymentId: r.mercadoPagoPaymentId };
     case "terminal":
-      return { kind: "terminal", mercadoPagoOrderId: r.mercadoPagoOrderId, mercadoPagoPaymentId: r.mercadoPagoPaymentId, orderStatus: r.orderStatus, orderStatusDetail: r.orderStatusDetail, paymentStatus: r.paymentStatus, paymentStatusDetail: r.paymentStatusDetail };
+      return { kind: "terminal", mercadoPagoOrderId: r.mercadoPagoOrderId, mercadoPagoPaymentId: r.mercadoPagoPaymentId, orderStatus: r.orderStatus, orderStatusDetail: r.orderStatusDetail, paymentStatus: r.paymentStatus, paymentStatusDetail: r.paymentStatusDetail, mercadoPagoRequestId: r.mercadoPagoRequestId };
     case "state_conflict_with_identity":
       return { kind: "state_conflict_with_identity", mercadoPagoOrderId: r.mercadoPagoOrderId, mercadoPagoPaymentId: r.mercadoPagoPaymentId };
     case "manual_reconciliation_required":
       return { kind: "manual_reconciliation_required" };
     case "provider_state_conflict":
-      return { kind: "provider_state_conflict" };
+      return { kind: "provider_state_conflict", diagnostics: r.diagnostics };
     case "temporary":
       return { kind: "temporary", retryAfter: r.retryAfter };
     case "provider_configuration_error":
@@ -1353,7 +1518,7 @@ async function resolvePixPayment(
       if (isTemporaryStatus(result.status)) return { kind: "temporary", retryAfter: result.retryAfter };
       return { kind: "linked_order_lookup_conflict" };
     }
-    return resolutionFromEvaluation(evaluateMercadoPagoOrderBody(result.body, identityExpected));
+    return resolutionFromEvaluation(evaluateMercadoPagoOrderBody(result.body, identityExpected, result.mercadoPagoRequestId));
   }
 
   if (environment === "production") {
@@ -1386,7 +1551,7 @@ async function resolvePixPayment(
       return { kind: "temporary", retryAfter: createResult.retryAfter };
     }
     if (createResult.status === 402) {
-      const evaluated402 = evaluateMercadoPagoOrderBody(createResult.body, baseIdentityExpected);
+      const evaluated402 = evaluateMercadoPagoOrderBody(createResult.body, baseIdentityExpected, createResult.mercadoPagoRequestId);
       if (evaluated402.kind !== "identity_invalid") {
         return resolutionFromEvaluation(evaluated402);
       }
@@ -1413,12 +1578,15 @@ async function resolvePixPayment(
         return { kind: "idempotency_reconciliation_required" };
       }
 
-      return { kind: "provider_state_conflict" };
+      return {
+        kind: "provider_state_conflict",
+        diagnostics: { reason: "create_409_unrecognized_error_code", mercadoPagoErrorCode: errorCode },
+      };
     }
     return { kind: "provider_request_error" };
   }
 
-  const evaluatedCreate = evaluateMercadoPagoOrderBody(createResult.body, baseIdentityExpected);
+  const evaluatedCreate = evaluateMercadoPagoOrderBody(createResult.body, baseIdentityExpected, createResult.mercadoPagoRequestId);
   if (evaluatedCreate.kind !== "identity_invalid") {
     return resolutionFromEvaluation(evaluatedCreate);
   }
@@ -1855,8 +2023,11 @@ Deno.serve(async (req: Request) => {
   }
 
   if (resolution.kind === "provider_state_conflict") {
+    // Instrumentação temporária de diagnóstico (ver ConflictDiagnostics) —
+    // só números/enums curtos/booleanos, nunca token/e-mail/qr_code/corpo.
     console.error("[create-product-order] Order encontrada com identidade/estado inconsistente.", {
       category: "provider_state_conflict",
+      ...resolution.diagnostics,
     });
     return errorResponse(
       409,
@@ -1967,8 +2138,19 @@ Deno.serve(async (req: Request) => {
   }
 
   if (resolution.kind === "terminal") {
+    // Instrumentação temporária: só os 4 campos de status já presentes em
+    // resolution.terminal (enums curtos do Mercado Pago) + mercadoPagoRequestId
+    // (header x-request-id — NÃO é segredo, é o identificador que a própria
+    // documentação do Mercado Pago recomenda usar em contato com o suporte
+    // deles para casos como processing_error) — nunca e-mail, QR Code, Pix,
+    // token, payer, Access Token ou corpo completo.
     console.error("[create-product-order] Pagamento em estado terminal — não pagável.", {
       category: "payment_terminal_state",
+      orderStatus: resolution.orderStatus,
+      orderStatusDetail: resolution.orderStatusDetail,
+      paymentStatus: resolution.paymentStatus,
+      paymentStatusDetail: resolution.paymentStatusDetail,
+      mercadoPagoRequestId: resolution.mercadoPagoRequestId,
     });
     return errorResponse(
       409,

@@ -21,9 +21,7 @@ import { Button } from "@/components/ui/button";
 /**
  * Layout das 4 páginas legais (Privacidade/Termos/Entrega/Reembolso) —
  * branco + teal, mesmo universo visual da landing do Guia de Evolução de
- * Enfermagem (src/pages/GuiaEvolucaoEnfermagemPage.tsx). Sem nenhum
- * traço da identidade dark/dourada/cósmica do tarô: sem CosmicBackdrop,
- * sem Logo antiga (SVG com "TARÔ"), sem gold/cream/dim/bg-ink.
+ * Enfermagem (src/pages/GuiaEvolucaoEnfermagemPage.tsx).
  *
  * Só a APARÊNCIA muda aqui — o conteúdo legal (src/config/legal.ts)
  * continua exatamente o mesmo, incluindo os dados reais do fornecedor.

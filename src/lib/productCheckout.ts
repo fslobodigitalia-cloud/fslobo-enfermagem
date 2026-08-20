@@ -130,7 +130,7 @@ function parseItems(raw: unknown): OrderItemSummary[] | null {
 }
 
 export async function createProductOrder(request: CreateProductOrderRequest): Promise<ProductCheckoutResult> {
-  const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-product-order`;
+  const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-product-order-efi-prod`;
 
   let response: Response;
   try {

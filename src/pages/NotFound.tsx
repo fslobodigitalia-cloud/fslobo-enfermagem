@@ -1,10 +1,9 @@
 import { Link } from "react-router-dom";
+import { HeartPulse } from "lucide-react";
 import { brand } from "@/config/site";
 import { useDocumentMeta } from "@/lib/seo";
 import { withCampaignQuery } from "@/lib/utmTracking";
-import { Logo } from "@/components/common/Logo";
-import { CosmicBackdrop } from "@/components/common/CosmicBackdrop";
-import { StarField } from "@/components/common/StarField";
+import { Button } from "@/components/ui/button";
 
 export default function NotFound() {
   useDocumentMeta({
@@ -15,22 +14,20 @@ export default function NotFound() {
   });
 
   return (
-    <main className="relative grid min-h-screen place-items-center overflow-hidden px-[22px] text-center">
-      <CosmicBackdrop variant="final" />
-      <StarField count={24} mobileCount={10} seed={41} />
-
-      <div className="relative z-10 flex flex-col items-center">
-        <Logo size={72} tone="large" />
-        <h1 className="mt-8 font-display text-[clamp(2rem,8vw,3rem)] leading-tight text-cream">
+    <main className="grid min-h-screen place-items-center bg-white px-5 text-center font-sans">
+      <div className="flex flex-col items-center">
+        <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-teal-50 text-teal-600">
+          <HeartPulse className="h-7 w-7" strokeWidth={2} aria-hidden="true" />
+        </span>
+        <h1 className="mt-6 text-[2rem] font-extrabold leading-tight tracking-tight text-slate-900 sm:text-[2.4rem]">
           Esta página não foi encontrada.
         </h1>
-        <p className="mt-4 max-w-[42ch] text-[15px] leading-relaxed text-dim">
-          O endereço acessado não existe ou foi movido. Você pode voltar ao início e escolher a sua
-          leitura.
+        <p className="mt-3 max-w-[42ch] text-[15.5px] leading-relaxed text-slate-600">
+          O endereço acessado não existe ou foi movido.
         </p>
-        <Link to={withCampaignQuery("/")} className="btn-gold mt-9">
-          Voltar ao início
-        </Link>
+        <Button asChild className="mt-8 bg-teal-600 text-white hover:bg-teal-700">
+          <Link to={withCampaignQuery("/")}>Voltar ao início</Link>
+        </Button>
       </div>
     </main>
   );

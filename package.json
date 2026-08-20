@@ -1,5 +1,5 @@
 {
-  "name": "entre-nos-taro",
+  "name": "fslobo-enfermagem",
   "private": true,
   "version": "1.0.0",
   "type": "module",
@@ -7,7 +7,6 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "assets": "node scripts/generate-assets.mjs",
     "typecheck": "tsc -b --noEmit false --emitDeclarationOnly false"
   },
   "dependencies": {

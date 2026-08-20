@@ -1,7 +1,8 @@
+import { GuiaConversationSection } from "../components/guia/GuiaConversationSection";
 /**
- * Página comercial do Guia de Evolução de Enfermagem — fora do funil de
- * tarô. Estrutura e copy reconstroem a landing de referência já validada
- * em conversão (reference/manual2026.html, /manual2026/): Hero → 3 dores
+ * Página comercial do Guia de Evolução de Enfermagem. Estrutura e copy
+ * reconstroem a landing de referência já validada em conversão
+ * (reference/manual2026.html, /manual2026/): Hero → 3 dores
  * → carrossel de conteúdo → quiz (perguntas → perfil → resultado) →
  * oferta/preço/checkout → Pix → confirmação + downloads.
  *
@@ -16,12 +17,11 @@
  * ao backend.
  *
  * Visual: branco + verde-azulado profissional (paleta padrão do
- * Tailwind — teal/slate/emerald), tipografia sans (Manrope), sem nenhum
- * traço da identidade dark/dourada do tarô. Nenhuma alteração em
- * tailwind.config.js nem em src/index.css — só classes locais a este
- * arquivo, mais um pequeno ajuste de cor de fundo do <body> só enquanto
- * esta página está montada (ver useEffect abaixo), para não deixar
- * escapar o fundo escuro global em bounce/overscroll.
+ * Tailwind — teal/slate/emerald), tipografia sans (Manrope). A base global
+ * de index.css/tailwind.config.js já é clara — o pequeno ajuste de cor de
+ * fundo do <body> só enquanto esta página está montada (ver useEffect
+ * abaixo) é mantido por segurança contra bounce/overscroll (ex.: iOS
+ * Safari), mesmo sem um tema escuro global para escapar hoje.
  *
  * Cronômetro de urgência da página antiga: DELIBERADAMENTE não
  * reimplementado aqui. Não existe nenhuma regra comercial real por trás
@@ -44,6 +44,7 @@ import {
   Clock,
   Copy,
   Download,
+  FileText,
   HeartPulse,
   Hourglass,
   Loader2,
@@ -55,6 +56,7 @@ import {
   XCircle,
   Zap,
 } from "lucide-react";
+import { motion, useReducedMotion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { useDocumentMeta } from "@/lib/seo";
 import { useCheckoutAttempt } from "@/lib/checkoutAttempt";
@@ -88,8 +90,8 @@ const POLL_INTERVAL_MS = 5_000;
 const OFFER_SECTION_ID = "comprar";
 /**
  * Larguras de conteúdo locais a esta página — repetidas em classes em vez
- * de virarem classe global (@layer components), para não tocar index.css
- * nem afetar o tarô. PANEL_CONTAINER é só para as telas transacionais
+ * de virarem classe global (@layer components), para não tocar index.css.
+ * PANEL_CONTAINER é só para as telas transacionais
  * (Pix pendente / downloads liberados); as seções de marketing usam
  * larguras maiores (definidas em cada componente) para ter presença no
  * desktop.
@@ -190,9 +192,8 @@ export default function GuiaEvolucaoEnfermagemPage() {
     path: "/",
   });
 
-  // Fundo do <body> é escuro globalmente (tema do tarô, em src/index.css,
-  // não alterado). Só enquanto esta página está montada, força um fundo
-  // claro no <body> para não deixar o escuro escapar em bounce/overscroll
+  // Só enquanto esta página está montada, força um fundo claro no <body>
+  // como garantia extra contra qualquer flash escuro em bounce/overscroll
   // (ex.: iOS Safari) — desfeito automaticamente ao sair da página.
   React.useEffect(() => {
     const previous = document.body.style.backgroundColor;
@@ -226,11 +227,17 @@ export default function GuiaEvolucaoEnfermagemPage() {
   const [resuming, setResuming] = React.useState(true);
 
   // Guarda de disparo do Purchase: só existe valor real quando o pedido foi
-  // criado NESTA sessão (create-product-order devolveu order.amountCents).
-  // No fluxo de retomada (pedido pago encontrado ao recarregar a página),
-  // este valor permanece null e o Purchase NUNCA dispara — não há como
-  // obter o valor real confirmado sem alterar get-order-downloads, e
-  // inventar um valor no frontend é exatamente o que foi proibido.
+  // criado NESTA sessão (create-product-order devolveu order.publicId +
+  // order.amountCents). No fluxo de retomada (pedido pago encontrado ao
+  // recarregar a página), estes valores permanecem null e o Purchase NUNCA
+  // dispara — não há como obter o valor real confirmado sem alterar
+  // get-order-downloads, e inventar um valor no frontend é exatamente o
+  // que foi proibido. A deduplicação entre browser e CAPI (mesmo
+  // orderPublicId como eventID) e a proteção contra reenvio por
+  // polling/re-render vivem em trackGuiaPurchase (src/lib/guiaPixel.ts) —
+  // purchaseFiredRef aqui é só um atalho em memória para não reavaliar a
+  // guarda a cada re-render, não a fonte da deduplicação.
+  const orderPublicIdRef = React.useRef<string | null>(null);
   const orderAmountCentsRef = React.useRef<number | null>(null);
   const purchaseFiredRef = React.useRef(false);
 
@@ -309,10 +316,15 @@ export default function GuiaEvolucaoEnfermagemPage() {
   React.useEffect(() => {
     if (downloads === null) return;
     if (purchaseFiredRef.current) return;
+    const orderPublicId = orderPublicIdRef.current;
     const amountCents = orderAmountCentsRef.current;
-    if (amountCents === null) return; // fluxo de retomada — ver comentário acima do ref.
-    purchaseFiredRef.current = true;
-    trackGuiaPurchase(amountCents);
+    if (orderPublicId === null || amountCents === null) return; // fluxo de retomada — ver comentário acima dos refs.
+    // Só marca o atalho em memória se o Purchase foi realmente enviado
+    // (ou já tinha sido, via sessionStorage). Se o Pixel ainda não estiver
+    // disponível, purchaseFiredRef continua false e uma próxima
+    // atualização/polling pode tentar de novo.
+    const sent = trackGuiaPurchase({ orderPublicId, amountCents });
+    if (sent) purchaseFiredRef.current = true;
   }, [downloads]);
 
   const handleTurnstileToken = React.useCallback((token: string) => {
@@ -383,9 +395,12 @@ export default function GuiaEvolucaoEnfermagemPage() {
         publicId: outcome.order.publicId,
         checkoutAccessToken: attempt.checkoutAccessToken,
       });
-      // Único momento em que temos o valor REAL confirmado pelo backend
-      // para este pedido — guardado para o Purchase, disparado só quando
-      // o pagamento for de fato confirmado (ver useEffect acima).
+      // Único momento em que temos o public_id e o valor REAL confirmado
+      // pelo backend para este pedido — guardados para o Purchase,
+      // disparado só quando o pagamento for de fato confirmado (ver
+      // useEffect acima). orderPublicId é o MESMO public_id usado pelo
+      // backend como event_id na Conversions API.
+      orderPublicIdRef.current = outcome.order.publicId;
       orderAmountCentsRef.current = outcome.order.amountCents;
     }
   }
@@ -451,6 +466,7 @@ export default function GuiaEvolucaoEnfermagemPage() {
           <Hero />
           <PainSection />
           <ModulesSection />
+          <GuiaConversationSection />
           <QuizSection onProfileSelected={handleQuizProfileSelected} onResultCta={handleQuizResultCta} />
           <OfferSection>
             {showForm && (
@@ -526,8 +542,8 @@ function Hero() {
             <span className="text-teal-600">vá para casa em paz</span>
           </h1>
           <p className="max-w-[52ch] text-[16px] leading-relaxed text-slate-600 lg:text-[17.5px]">
-            Você cuida do paciente com todo carinho, mas sente aquele frio na barriga na hora de fazer a evolução?
-            Tenha em mãos roteiros simples e práticos para registrar seu plantão sem medo de errar.
+            Você cuida do paciente com todo o carinho, mas trava na hora de registrar? Aqui é só consultar:
+            manual ilustrado + modelos prontos por situação clínica para adaptar ao seu paciente, sem sair tarde do plantão.
           </p>
 
           {/* Benefícios — no mobile, "pills" empilhados e elevados (Anexo 2);
@@ -595,18 +611,18 @@ function Hero() {
 const PAIN_POINTS = [
   {
     icon: PenLine,
-    title: "O medo de travar",
-    text: "Chegar no final do turno cansado, olhar para o prontuário em branco e não lembrar o termo certo para descrever o que você acabou de fazer.",
+    title: "Travar na hora de escrever",
+    text: "Você termina o atendimento, abre o prontuário em branco e não sabe como começar nem qual termo usar para descrever o que acabou de fazer.",
   },
   {
     icon: AlertTriangle,
-    title: "Insegurança constante",
-    text: "O receio de esquecer de anotar algo importante, usar a palavra errada e acabar se complicando com a supervisão ou em alguma auditoria.",
+    title: "Será que esqueci algo?",
+    text: "Aquela dúvida que fica depois de registrar: será que faltou anotar uma informação importante ou usei a palavra errada?",
   },
   {
     icon: Hourglass,
     title: "Sair tarde do plantão",
-    text: "Ficar horas a mais no setor só porque você demorou para conseguir organizar as ideias e escrever tudo o que aconteceu com o paciente.",
+    text: "Passar do horário no setor só porque levou tempo demais para organizar as ideias e colocar no papel tudo o que aconteceu com o paciente.",
   },
 ];
 
@@ -673,8 +689,8 @@ function ModulesSection() {
             O que você vai <span className="text-teal-600">ter em mãos</span>
           </h2>
           <p className="mx-auto mt-3 max-w-[60ch] text-[15.5px] text-slate-600">
-            Um acervo completo de roteiros amigáveis para Clínica Médica, UTI e Emergência. É só consultar e adaptar
-            para o seu paciente.
+            Modelos de evolução e anotação separados por situação clínica — Clínica Médica, UTI e Emergência.
+            Bateu dúvida, é só abrir, ver a estrutura e adaptar ao seu paciente.
           </p>
         </div>
 
@@ -687,7 +703,7 @@ function ModulesSection() {
         >
           <span className="pointer-events-none absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-white/70 to-transparent" aria-hidden="true" />
           <Sparkles className="relative h-5 w-5 text-teal-600" aria-hidden="true" />
-          <span className="relative font-sans text-[1.05rem] font-extrabold text-teal-800">+132 modelos prontos</span>
+          <span className="relative font-sans text-[1.05rem] font-extrabold text-teal-800">+132 modelos para consultar</span>
         </div>
 
         <div className="mt-12 flex snap-x snap-mandatory gap-5 overflow-x-auto px-1 pb-6 [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: "none" }}>
@@ -905,7 +921,7 @@ function QuizSection({
               </p>
               <p className="text-left text-[15.5px] leading-relaxed text-slate-600">{guiaProfileMessages[profile].body}</p>
               <Button type="button" variant="outline" size="lg" full className={CTA_BUTTON_CLASS} onClick={onResultCta}>
-                Quero os modelos prontos agora
+                Quero os modelos por R$ 17,00
               </Button>
             </div>
           )}
@@ -918,10 +934,10 @@ function QuizSection({
 /* ────────────────────── Oferta principal / preço / compra ────────────────── */
 
 const OFFER_BENEFITS = [
-  "+132 modelos prontos, por situação clínica",
-  "Diferentes setores: Clínica Médica, UTI, Emergência",
-  "Material em PDF, consulta rápida no plantão",
-  "Organização didática, fácil de adaptar",
+  "Manual ilustrado: entenda como estruturar a evolução e a anotação",
+  "+132 modelos prontos por situação clínica, para consultar e adaptar",
+  "Setores do dia a dia: Clínica Médica, UTI e Emergência",
+  "Em PDF: consulta rápida pelo celular no plantão",
 ];
 
 function OfferSection({ children }: { children: React.ReactNode }) {
@@ -979,7 +995,7 @@ function OfferSection({ children }: { children: React.ReactNode }) {
             {guiaEvolucaoProduct.name}
           </h2>
           <p className="relative mt-3 text-[15.5px] leading-relaxed text-slate-600">
-            Escreva suas anotações com confiança, ganhe tempo livre e proteja o seu nome profissional.
+            Dois materiais que se completam: um para você entender como montar o registro e outro para consultar e adaptar na hora do plantão.
           </p>
 
           <ul className="relative mt-7 flex flex-col gap-3">
@@ -1009,10 +1025,10 @@ function OfferSection({ children }: { children: React.ReactNode }) {
 
           <div className="relative mt-6 flex flex-wrap items-center justify-center gap-5 text-[12.5px] font-semibold text-slate-500">
             <span className="flex items-center gap-1.5">
-              <Lock className="h-3.5 w-3.5" aria-hidden="true" /> Compra 100% segura
+              <Lock className="h-3.5 w-3.5" aria-hidden="true" /> Pagamento via Pix, 100% seguro
             </span>
             <span className="flex items-center gap-1.5">
-              <Zap className="h-3.5 w-3.5 text-teal-600" aria-hidden="true" /> Libera na hora com Pix
+              <Zap className="h-3.5 w-3.5 text-teal-600" aria-hidden="true" /> Liberado logo após a confirmação do Pix
             </span>
           </div>
         </div>
@@ -1080,7 +1096,7 @@ function CheckoutForm({
           onChange={(event) => setFirstName(event.target.value)}
           aria-invalid={Boolean(errors.name)}
           maxLength={80}
-          className="border-slate-300 bg-white text-slate-900 placeholder:text-slate-400 hover:border-teal-400 focus:border-teal-600 focus:bg-white"
+          className="border-slate-300 bg-white text-slate-900 placeholder:text-slate-400 shadow-[0_1px_2px_rgba(15,23,42,0.04)] hover:border-teal-400 focus:border-teal-600 focus:bg-white focus:ring-2 focus:ring-teal-500/20"
         />
         {errors.name && (
           <p role="alert" className="text-[13px] text-rose-600">
@@ -1103,7 +1119,7 @@ function CheckoutForm({
           onChange={(event) => setEmail(event.target.value)}
           aria-invalid={Boolean(errors.email)}
           maxLength={254}
-          className="border-slate-300 bg-white text-slate-900 placeholder:text-slate-400 hover:border-teal-400 focus:border-teal-600 focus:bg-white"
+          className="border-slate-300 bg-white text-slate-900 placeholder:text-slate-400 shadow-[0_1px_2px_rgba(15,23,42,0.04)] hover:border-teal-400 focus:border-teal-600 focus:bg-white focus:ring-2 focus:ring-teal-500/20"
         />
         {errors.email && (
           <p role="alert" className="text-[13px] text-rose-600">
@@ -1114,10 +1130,9 @@ function CheckoutForm({
 
       <div className="flex flex-col gap-3">
         <div className="flex flex-col gap-1">
-          <p className="text-[15px] font-bold text-slate-900">Complete seu material por apenas +R$10 cada</p>
+          <p className="text-[15px] font-bold text-slate-900">Complete seu material por + R$ 10,00 cada</p>
           <p className="text-[13px] leading-relaxed text-slate-500">
-            Leve conteúdos complementares para consultar no plantão, revisar nos estudos e aproveitar melhor seu
-            aprendizado.
+            Materiais extras para consultar no plantão e revisar nos estudos. Marque só o que quiser levar.
           </p>
         </div>
         {guiaEvolucaoBumps.map((bump) => {
@@ -1127,10 +1142,10 @@ function CheckoutForm({
               key={bump.slug}
               htmlFor={`bump-${bump.slug}`}
               className={cn(
-                "relative flex cursor-pointer items-start justify-between gap-3 rounded-2xl border p-3.5 transition-all duration-200",
+                "group relative flex cursor-pointer items-start justify-between gap-3 rounded-2xl border p-3.5 transition-all duration-200",
                 checked
-                  ? cn("border-teal-300 bg-teal-50/70", "shadow-[0_4px_14px_-6px_rgba(13,148,136,0.35)]")
-                  : "border-slate-200 bg-slate-50",
+                  ? "border-teal-300 bg-teal-50/70 shadow-[0_4px_14px_-6px_rgba(13,148,136,0.35)]"
+                  : "border-slate-200 bg-slate-50 hover:-translate-y-0.5 hover:border-teal-200 hover:bg-white hover:shadow-[0_6px_16px_-10px_rgba(15,23,42,0.25)]",
               )}
             >
               {checked && (
@@ -1162,9 +1177,10 @@ function CheckoutForm({
         })}
       </div>
 
-      <div className={cn("flex items-center justify-between rounded-2xl border border-teal-200 bg-teal-50 px-5 py-4", SHADOW_SOFT)}>
-        <span className="text-[13px] font-semibold uppercase tracking-[0.1em] text-slate-500">Total</span>
-        <span className="text-[1.3rem] font-extrabold text-teal-700">{formatCents(totalCents)}</span>
+      <div className={cn("relative flex items-center justify-between overflow-hidden rounded-2xl border border-teal-200 bg-gradient-to-b from-teal-50 to-white px-5 py-4", SHADOW_SOFT)}>
+        <span aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-white/70 to-transparent" />
+        <span className="relative text-[13px] font-semibold uppercase tracking-[0.1em] text-slate-500">Total</span>
+        <span className="relative font-sans text-[1.55rem] font-extrabold text-teal-700">{formatCents(totalCents)}</span>
       </div>
 
       {siteKey ? (
@@ -1210,9 +1226,99 @@ function CheckoutForm({
       )}
 
       <Button type="submit" variant="outline" size="lg" full disabled={submitting || !canSubmit} className={CTA_BUTTON_CLASS}>
-        {submitting ? "Gerando seu Pix..." : "Quero meu plantão mais tranquilo"}
+        {submitting ? "Gerando seu Pix..." : "Gerar meu Pix e receber o material"}
       </Button>
     </form>
+  );
+}
+
+/* ───────────────────── Suporte + animações (pós-compra) ──────────────────── */
+
+/**
+ * Link de suporte pelo WhatsApp da tela de download — número dedicado do
+ * atendimento do Guia (diferente de contact.whatsappNumber em
+ * src/config/site.ts, usado só pelo suporte de checkout via
+ * buildPixSupportWhatsAppUrl — ver aviso em src/config/site.ts), por isso
+ * montado diretamente aqui em vez de via src/lib/whatsapp.ts. Mensagem
+ * pré-preenchida e segura via encodeURIComponent; abre em nova aba. É um
+ * elemento SECUNDÁRIO — nunca compete com os botões de download.
+ */
+const GUIA_SUPPORT_WHATSAPP_URL = `https://wa.me/5521979199008?text=${encodeURIComponent(
+  "Olá! Preciso de ajuda para acessar meu material do Guia de Evolução de Enfermagem.",
+)}`;
+
+/** Sombra em camadas dos painéis transacionais (contato curto + difusa longa
+ *  + leve glow teal), no mesmo sistema da landing — nunca um shadow-xl chapado. */
+const PANEL_SHADOW =
+  "shadow-[0_2px_6px_rgba(15,23,42,0.05),0_28px_60px_-30px_rgba(13,148,136,0.4)]";
+
+type AppearTag = "div" | "li";
+
+/**
+ * Entrada suave (fade + leve subida + escala 0.98→1) no mount, reutilizando o
+ * framer-motion já presente no projeto. Desativada em prefers-reduced-motion
+ * (e o index.css global também zera durações de animação nesse modo).
+ */
+function Appear({
+  children,
+  className,
+  delay = 0,
+  y = 14,
+  as = "div",
+}: {
+  children: React.ReactNode;
+  className?: string;
+  delay?: number;
+  y?: number;
+  as?: AppearTag;
+}) {
+  const reduced = useReducedMotion();
+  if (reduced) {
+    const Tag = as;
+    return <Tag className={className}>{children}</Tag>;
+  }
+  const MotionTag = motion[as] as typeof motion.div;
+  return (
+    <MotionTag
+      className={className}
+      initial={{ opacity: 0, y, scale: 0.98 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ duration: 0.55, delay, ease: [0.22, 1, 0.36, 1] }}
+    >
+      {children}
+    </MotionTag>
+  );
+}
+
+/**
+ * Enfeites de fundo do pós-compra — puramente decorativos (aria-hidden), nunca
+ * cobrem texto/botão. Blobs suaves + poucos ícones que flutuam pouquíssimos
+ * pixels, bem devagar. Reduzidos no mobile (ícones só em sm+) e totalmente
+ * parados em prefers-reduced-motion.
+ */
+function PaidDecor() {
+  const reduced = useReducedMotion();
+  const float = (duration: number, dist: number) =>
+    reduced
+      ? {}
+      : { animate: { y: [0, -dist, 0] }, transition: { duration, repeat: Infinity, ease: "easeInOut" as const } };
+
+  return (
+    <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
+      <div className="absolute -left-20 -top-16 h-52 w-52 rounded-full bg-teal-200/25 blur-3xl" />
+      <div className="absolute -right-24 top-24 h-60 w-60 rounded-full bg-emerald-200/20 blur-3xl" />
+      <motion.span className="absolute left-6 top-24 hidden text-teal-300/50 sm:block" {...float(6, 8)}>
+        <FileText className="h-6 w-6" />
+      </motion.span>
+      <motion.span className="absolute right-9 top-40 hidden text-emerald-300/50 sm:block" {...float(7.5, 10)}>
+        <Check className="h-5 w-5" strokeWidth={2.5} />
+      </motion.span>
+      <motion.span className="absolute bottom-16 right-16 hidden text-teal-300/45 sm:block" {...float(8.5, 7)}>
+        <Sparkles className="h-5 w-5" />
+      </motion.span>
+      <span className="absolute bottom-24 left-10 h-1.5 w-1.5 rounded-full bg-teal-300/60" />
+      <span className="absolute right-1/3 top-14 h-1 w-1 rounded-full bg-emerald-300/70" />
+    </div>
   );
 }
 
@@ -1231,45 +1337,74 @@ function ResultPanel({
 
   if (result.kind === "pending") {
     return (
-      <div className="flex flex-col items-center gap-5 text-center">
-        <h2 className="font-sans text-[1.5rem] font-extrabold leading-tight text-slate-900">Falta pouco!</h2>
-        <p className="max-w-[42ch] text-[14px] leading-relaxed text-slate-600">
-          Escaneie o QR Code ou copie o código Pix abaixo para concluir o pagamento.
-        </p>
+      <Appear className={cn("relative overflow-hidden rounded-[28px] border border-slate-200 bg-white p-6 sm:p-9", PANEL_SHADOW)}>
+        <div aria-hidden="true" className="pointer-events-none absolute -right-16 -top-20 h-56 w-56 rounded-full bg-teal-100/60 blur-3xl" />
+        <div aria-hidden="true" className="pointer-events-none absolute -left-20 bottom-0 h-48 w-48 rounded-full bg-emerald-100/40 blur-3xl" />
 
-        {result.pix.qrCodeBase64 && (
-          <img
-            src={`data:image/png;base64,${result.pix.qrCodeBase64}`}
-            alt="QR Code Pix"
-            className="h-[220px] w-[220px] rounded-2xl border border-slate-200 bg-white p-2 shadow-sm"
-          />
-        )}
-
-        <div className="w-full text-left">
-          <Label htmlFor="pix-copia-cola" className="text-slate-500">
-            Pix copia e cola
-          </Label>
-          <textarea
-            id="pix-copia-cola"
-            readOnly
-            value={result.pix.qrCode}
-            rows={3}
-            className="mt-2 w-full resize-none rounded-2xl border border-slate-300 bg-slate-50 p-3 text-[12.5px] leading-relaxed text-slate-700"
-          />
-          <Button
-            type="button"
-            full
-            variant="outline"
-            className="mt-2.5 border-slate-300 bg-white text-slate-700 hover:border-teal-400 hover:bg-teal-50"
-            onClick={() => onCopyCode(result.pix.qrCode)}
+        <div className="relative flex flex-col items-center gap-5 text-center">
+          <span
+            role="status"
+            className="inline-flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-3.5 py-1.5 text-[12.5px] font-semibold text-amber-700"
           >
-            <Copy className="h-4 w-4" strokeWidth={1.8} aria-hidden="true" />
-            {copied ? "Copiado!" : "Copiar código"}
-          </Button>
-        </div>
+            <span className="relative flex h-2 w-2" aria-hidden="true">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-amber-500" />
+            </span>
+            <Clock className="h-3.5 w-3.5" aria-hidden="true" />
+            Aguardando confirmação do Pix
+          </span>
 
-        <OrderSummaryPanel order={order} statusLabel="Aguardando pagamento" />
-      </div>
+          <h2 className="font-sans text-[1.5rem] font-extrabold leading-tight text-slate-900 sm:text-[1.7rem]">
+            Pagamento quase concluído
+          </h2>
+          <p className="max-w-[42ch] text-[14.5px] leading-relaxed text-slate-600">
+            Escaneie o QR Code ou copie o código Pix para concluir o pagamento.
+          </p>
+
+          {result.pix.qrCodeBase64 && (
+            <div className={cn("rounded-3xl border border-slate-200 bg-white p-3", PANEL_SHADOW)}>
+              <img
+                src={`data:image/png;base64,${result.pix.qrCodeBase64}`}
+                alt="QR Code Pix"
+                className="h-[220px] w-[220px] rounded-2xl"
+              />
+            </div>
+          )}
+
+          <div className="w-full text-left">
+            <Label htmlFor="pix-copia-cola" className="text-slate-500">
+              Pix copia e cola
+            </Label>
+            <textarea
+              id="pix-copia-cola"
+              readOnly
+              value={result.pix.qrCode}
+              rows={3}
+              className="mt-2 w-full resize-none rounded-2xl border border-slate-300 bg-slate-50 p-3 text-[12.5px] leading-relaxed text-slate-700 focus:border-teal-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/20"
+            />
+            <Button
+              type="button"
+              full
+              variant="outline"
+              className={cn("mt-2.5", CTA_BUTTON_CLASS)}
+              onClick={() => onCopyCode(result.pix.qrCode)}
+            >
+              <Copy className="h-4 w-4" strokeWidth={1.8} aria-hidden="true" />
+              {copied ? "Código copiado!" : "Copiar código Pix"}
+            </Button>
+          </div>
+
+          <div className="flex w-full items-start gap-2.5 rounded-2xl border border-teal-100 bg-teal-50/60 px-4 py-3 text-left">
+            <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-teal-600" aria-hidden="true" />
+            <p className="text-[13px] leading-relaxed text-slate-600">
+              <span className="font-semibold text-slate-800">Não precisa enviar comprovante.</span> A confirmação
+              acontece automaticamente e o material é liberado assim que o Pix é confirmado.
+            </p>
+          </div>
+
+          <OrderSummaryPanel order={order} statusLabel="Aguardando pagamento" />
+        </div>
+      </Appear>
     );
   }
 
@@ -1277,14 +1412,19 @@ function ResultPanel({
   // a verificação automática (polling de get-order-downloads) continua
   // rodando em segundo plano até o pagamento ser confirmado.
   return (
-    <div className="flex flex-col items-center gap-5 text-center">
-      <Loader2 className="h-8 w-8 animate-spin text-teal-600" aria-hidden="true" />
-      <h2 className="font-sans text-[1.5rem] font-extrabold leading-tight text-slate-900">Preparando seu Pix...</h2>
-      <p className="max-w-[42ch] text-[14px] leading-relaxed text-slate-600">
-        Estamos confirmando os detalhes do seu pagamento. Isso pode levar alguns instantes.
-      </p>
-      <OrderSummaryPanel order={order} statusLabel="Aguardando pagamento" />
-    </div>
+    <Appear className={cn("relative overflow-hidden rounded-[28px] border border-slate-200 bg-white p-6 sm:p-9", PANEL_SHADOW)}>
+      <div aria-hidden="true" className="pointer-events-none absolute -right-16 -top-20 h-56 w-56 rounded-full bg-teal-100/60 blur-3xl" />
+      <div className="relative flex flex-col items-center gap-5 text-center">
+        <span className="grid h-14 w-14 place-items-center rounded-full border border-teal-100 bg-teal-50" aria-hidden="true">
+          <Loader2 className="h-7 w-7 animate-spin text-teal-600" />
+        </span>
+        <h2 className="font-sans text-[1.5rem] font-extrabold leading-tight text-slate-900">Preparando seu Pix...</h2>
+        <p className="max-w-[42ch] text-[14.5px] leading-relaxed text-slate-600">
+          Estamos confirmando os detalhes do seu pagamento. Isso pode levar alguns instantes.
+        </p>
+        <OrderSummaryPanel order={order} statusLabel="Aguardando pagamento" />
+      </div>
+    </Appear>
   );
 }
 
@@ -1311,36 +1451,86 @@ function OrderSummaryPanel({ order, statusLabel }: { order: ProductOrderSummary;
 
 function PaidPanel({ downloads }: { downloads: DownloadItem[] }) {
   return (
-    <div className="flex flex-col items-center gap-6 text-center">
-      <span
-        aria-hidden="true"
-        className="grid h-16 w-16 place-items-center rounded-full border border-emerald-200 bg-emerald-50 text-emerald-600"
-      >
-        <Check className="h-7 w-7" strokeWidth={1.8} />
-      </span>
-      <h2 className="font-sans text-[1.5rem] font-extrabold leading-tight text-slate-900">Pagamento confirmado ✅</h2>
-      <p className="max-w-[42ch] text-[14px] leading-relaxed text-slate-600">Seus materiais estão disponíveis.</p>
+    <Appear className={cn("relative overflow-hidden rounded-[28px] border border-slate-200 bg-white p-6 sm:p-9", PANEL_SHADOW)}>
+      <PaidDecor />
 
-      <div className="flex w-full flex-col gap-3">
-        {downloads.map((download) => (
-          <div
-            key={download.slug}
-            className="flex items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+      <div className="relative flex flex-col items-center gap-6 text-center">
+        {/* Ícone de sucesso com glow verde/teal e entrada em escala. */}
+        <Appear delay={0.05} y={0} className="relative">
+          <span aria-hidden="true" className="absolute inset-0 scale-150 rounded-full bg-emerald-300/40 blur-2xl" />
+          <span className="relative grid h-16 w-16 place-items-center rounded-full border border-emerald-200 bg-emerald-50 text-emerald-600 shadow-[0_2px_6px_rgba(15,23,42,0.05),0_16px_34px_-18px_rgba(16,185,129,0.6)]">
+            <Check className="h-8 w-8" strokeWidth={2} />
+          </span>
+        </Appear>
+
+        <div>
+          <h2 className="font-sans text-[1.6rem] font-extrabold leading-tight text-slate-900 sm:text-[1.9rem]">
+            Pagamento confirmado!
+          </h2>
+          <p className="mt-2 text-[14.5px] leading-relaxed text-slate-600">Seus materiais já estão liberados.</p>
+        </div>
+
+        <ul role="list" className="flex w-full flex-col gap-3.5 text-left">
+          {downloads.map((download, index) => (
+            <Appear
+              as="li"
+              key={download.slug}
+              delay={0.12 + index * 0.08}
+              className={cn(
+                "group relative flex flex-col gap-4 rounded-3xl border border-slate-200 bg-white p-4 transition-[transform,box-shadow] duration-300 sm:flex-row sm:items-center sm:p-5",
+                PANEL_SHADOW,
+                "sm:hover:-translate-y-0.5 sm:hover:shadow-[0_6px_14px_rgba(15,23,42,0.06),0_34px_66px_-30px_rgba(13,148,136,0.5)]",
+              )}
+            >
+              <div className="flex min-w-0 flex-1 items-center gap-4">
+                <span className="relative grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-teal-50 text-teal-600 ring-1 ring-teal-100">
+                  <FileText className="h-6 w-6" strokeWidth={1.9} aria-hidden="true" />
+                  <span
+                    aria-hidden="true"
+                    className="absolute -left-2 -top-2 grid h-5 w-5 place-items-center rounded-full bg-teal-600 text-[10px] font-extrabold text-white shadow-sm"
+                  >
+                    {String(index + 1).padStart(2, "0")}
+                  </span>
+                </span>
+                <div className="min-w-0">
+                  <p className="text-[14.5px] font-bold leading-snug text-slate-900">{download.name}</p>
+                  <p className="mt-1 flex items-center gap-2 text-[12px] text-slate-500">
+                    <span className="rounded bg-teal-50 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-teal-700">
+                      PDF
+                    </span>
+                    Consulta rápida no plantão
+                  </p>
+                </div>
+              </div>
+              <Button asChild size="sm" variant="outline" className={cn("w-full shrink-0 sm:w-auto", CTA_BUTTON_CLASS)}>
+                <a href={download.url} target="_blank" rel="noopener noreferrer" download>
+                  <Download className="h-4 w-4" strokeWidth={1.8} aria-hidden="true" />
+                  Baixar material
+                </a>
+              </Button>
+            </Appear>
+          ))}
+        </ul>
+
+        <p className="text-[12px] leading-relaxed text-slate-500">
+          Os links de download expiram após um tempo — se precisar, recarregue esta página para gerar novos.
+        </p>
+
+        {/* Suporte — secundário, nunca compete com os botões de download. */}
+        <div className="mt-1 w-full border-t border-slate-100 pt-5">
+          <p className="text-[13px] text-slate-500">Precisa de ajuda com o acesso?</p>
+          <a
+            href={GUIA_SUPPORT_WHATSAPP_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-2 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-[13.5px] font-semibold text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-colors hover:border-teal-300 hover:bg-teal-50 hover:text-teal-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500/30"
           >
-            <span className="text-[14px] font-medium text-slate-900">{download.name}</span>
-            <Button asChild size="sm" variant="outline" className={CTA_BUTTON_CLASS}>
-              <a href={download.url} target="_blank" rel="noopener noreferrer" download>
-                <Download className="h-4 w-4" strokeWidth={1.8} aria-hidden="true" />
-                Baixar
-              </a>
-            </Button>
-          </div>
-        ))}
+            <MessageCircle className="h-4 w-4 text-teal-600" strokeWidth={1.9} aria-hidden="true" />
+            Falar com o suporte
+          </a>
+        </div>
       </div>
-      <p className="text-[12px] text-slate-500">
-        Os links de download expiram após um tempo — se precisar, recarregue esta página para gerar novos.
-      </p>
-    </div>
+    </Appear>
   );
 }
 

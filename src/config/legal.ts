@@ -1,6 +1,6 @@
 /**
  * Conteúdo das páginas legais — Guia de Evolução de Enfermagem
- * (FSlobo Enfermagem), fora do funil de tarô.
+ * (FSLobo Enfermagem).
  *
  * Identidade do fornecedor (LEGAL_BUSINESS_NAME, LEGAL_CNPJ, LEGAL_ADDRESS,
  * LEGAL_EMAIL, LEGAL_WHATSAPP*, LEGAL_SITE_URL) são dados reais, fornecidos
@@ -9,12 +9,11 @@
  * apresentação pública básica do fornecedor.
  *
  * Este arquivo usa LEGAL_BRAND_NAME e as constantes LEGAL_* acima em vez de
- * `brand`/`contact` de src/config/site.ts — aqueles valores ainda são
- * consumidos por páginas antigas do funil de tarô (Header, Footer,
- * NotFound, admin etc.) que não devem ser alteradas nesta etapa. Da mesma
- * forma, NÃO usa `commercial.deliveryTime` ("em até 24 horas úteis") —
- * esse prazo é do fluxo de leitura de tarô e não corresponde à entrega
- * digital imediata do Guia.
+ * `brand`/`contact` de src/config/site.ts — aquele arquivo mantém só o
+ * essencial para src/lib/whatsapp.ts (ver comentário lá). Da mesma forma,
+ * este arquivo não usa `commercial.deliveryTime` — não existe prazo de
+ * entrega estimado aqui: a entrega digital do Guia é imediata após a
+ * confirmação do pagamento.
  */
 import { commercial } from "./site";
 

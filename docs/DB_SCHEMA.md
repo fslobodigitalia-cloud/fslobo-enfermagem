@@ -1,4 +1,11 @@
-# Esquema do banco — Entre Nós Tarô
+# Esquema do banco
+
+> ⚠️ **Pendência registrada:** este documento ainda descreve o schema
+> herdado do projeto de tarô, incluindo a tabela `tarot_cards`. Essa tabela
+> (e qualquer outro resíduo de tarô no banco) será analisada e decidida
+> diretamente no Supabase em uma etapa futura — nada foi alterado em
+> migrations ou no banco nesta limpeza. Este documento não foi reescrito
+> ainda para refletir só o schema em uso pela FSLobo Enfermagem.
 
 Este documento explica, em português simples, o que cada tabela guarda, o
 que cada status significa e como a segurança (GRANT e RLS) funciona.

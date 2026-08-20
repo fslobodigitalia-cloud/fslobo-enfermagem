@@ -1,6 +1,6 @@
 /**
  * Catálogo do Guia de Evolução de Enfermagem (produto principal) e seus
- * order bumps opcionais — Fase 4 (frontend), fora do funil de tarô.
+ * order bumps opcionais — Fase 4 (frontend).
  *
  * Estes valores são só para EXIBIÇÃO/UX (preço mostrado na página, total
  * calculado ao marcar bumps). A fonte real de verdade para o valor
@@ -35,7 +35,7 @@ export const guiaEvolucaoBumps: DigitalBump[] = [
   {
     slug: "guia-ilustrado-enfermagem",
     name: "Guia Ilustrado de Enfermagem",
-    description: "Transforme conteúdos difíceis em consultas rápidas e visuais para o dia a dia.",
+    description: "Conteúdos difíceis viram consulta rápida e visual para o dia a dia.",
     priceCents: 1000,
     priceLabel: "R$ 10,00",
   },

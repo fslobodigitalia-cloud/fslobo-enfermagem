@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Guia Prático: Anotação e Evolução de Enfermagem</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        /* PALETA CLEAN COM ALTO CONTRASTE E PROFUNDIDADE */
+        :root {
+            --primary: #0ca692;         
+            --primary-hover: #098b79;   
+            --primary-dark: #066659;    
+            --primary-light: #eafbf9;   
+            --primary-gradient: linear-gradient(135deg, #0ca692 0%, #088c7a 100%);
+            
+            --text-dark: #0f172a;       
+            --text-main: #334155;       
+            --text-light: #64748b;      
+            
+            --bg-white: #ffffff;        
+            --bg-body: #e2e8f0;         
+            --border-light: #cbd5e1;    
+            
+            --success-green: #10b981;
+            --error-red: #ef4444;
+
+            /* SISTEMA DE SOMBRAS REALISTAS (PROFUNDIDADE) */
+            --shadow-sm: 0 2px 4px rgba(15, 23, 42, 0.05);
+            --shadow-md: 0 4px 6px -1px rgba(15, 23, 42, 0.1), 0 2px 4px -1px rgba(15, 23, 42, 0.06);
+            --shadow-lg: 0 10px 15px -3px rgba(15, 23, 42, 0.1), 0 4px 6px -2px rgba(15, 23, 42, 0.05);
+            --shadow-xl: 0 20px 25px -5px rgba(15, 23, 42, 0.15), 0 10px 10px -5px rgba(15, 23, 42, 0.08);
+            --shadow-float: 0 30px 40px -10px rgba(12, 166, 146, 0.2);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        html, body { width: 100%; overflow-x: hidden; scroll-behavior: smooth; }
+
+        body {
+            font-family: 'Montserrat', sans-serif;
+            background-color: var(--bg-body);
+            color: var(--text-main);
+            line-height: 1.6;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* ANIMAÇÕES DE SCROLL */
+        .scroll-hidden { opacity: 0; transform: translateY(40px); transition: all 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94); }
+        .scroll-show { opacity: 1; transform: translateY(0); }
+
+        /* CRONÔMETRO FLUTUANTE */
+        .premium-timer-bar {
+            position: fixed; top: 0; left: 0; width: 100%; z-index: 9999;
+            background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border-light);
+            display: flex; justify-content: center; align-items: center; padding: 12px 20px; 
+            box-shadow: var(--shadow-md); gap: 20px;
+        }
+        .timer-text { color: var(--text-dark); font-size: 1rem; font-weight: 700; display: flex; align-items: center; gap: 10px; }
+        .timer-text i { color: var(--primary); animation: pulse-timer 1.5s infinite; }
+        .timer-countdown { display: flex; gap: 8px; align-items: center; }
+        .timer-box { 
+            background: var(--bg-white); border: 1px solid var(--border-light); box-shadow: var(--shadow-sm);
+            border-radius: 8px; padding: 4px 12px; display: flex; flex-direction: column; align-items: center; min-width: 50px; 
+        }
+        .timer-num { font-size: 1.1rem; font-weight: 900; color: var(--primary); line-height: 1; }
+        .timer-label { font-size: 0.6rem; text-transform: uppercase; color: var(--text-light); margin-top: 2px; font-weight: 700; }
+        .timer-colon { color: var(--text-light); font-weight: bold; }
+
+        /* HERO COM EFEITO DE CAMADAS (GLASSMORPHISM) */
+        .hero {
+            position: relative; 
+            width: 100%; 
+            min-height: 100vh; 
+            min-height: 100svh;
+            display: flex; justify-content: center;
+            align-items: center; padding: 140px 20px 80px 20px; 
+            background: url('fundo-hero.jpg') center/cover no-repeat fixed;
+        }
+        .hero::before {
+            content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(226, 232, 240, 0.7); backdrop-filter: blur(5px);
+        }
+        
+        .hero-container { 
+            max-width: 950px; z-index: 2; position: relative;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 60px 50px; border-radius: 24px;
+            box-shadow: var(--shadow-xl); border: 1px solid #ffffff;
+            text-align: center;
+        }
+
+        .hero-badge-modern {
+            display: inline-block; background: var(--primary-light); color: var(--primary);
+            padding: 8px 24px; border-radius: 100px; font-weight: 800; font-size: 0.85rem; text-transform: uppercase;
+            letter-spacing: 1px; margin-bottom: 25px; border: 1px solid rgba(12, 166, 146, 0.3);
+            box-shadow: var(--shadow-sm);
+        }
+        .hero-content h1 { font-size: 3.5rem; font-weight: 900; line-height: 1.15; margin-bottom: 20px; letter-spacing: -1px; color: var(--text-dark); }
+        .hero-content h1 span { color: var(--primary); position: relative; }
+        .hero-content h1 span::after {
+            content: ''; position: absolute; bottom: 5px; left: 0; width: 100%; height: 8px;
+            background: var(--primary-light); z-index: -1; border-radius: 4px;
+        }
+        .hero-sub { font-size: 1.25rem; margin-bottom: 40px; max-width: 800px; margin-left: auto; margin-right: auto; color: var(--text-main); font-weight: 500; }
+        
+        .hero-trust-bar { display: flex; justify-content: center; gap: 20px; flex-wrap: wrap; margin-top: 30px; }
+        .trust-item { 
+            display: flex; align-items: center; gap: 12px; 
+            background: var(--bg-body); border: 1px solid var(--border-light);
+            padding: 12px 25px; border-radius: 100px;
+            transition: all 0.3s ease; box-shadow: inset 0 2px 4px rgba(255,255,255,0.5), var(--shadow-sm);
+        }
+        .trust-item i { font-size: 1.4rem; color: var(--primary); }
+        .trust-item span { font-weight: 700; font-size: 0.95rem; color: var(--text-dark); }
+
+        /* TÍTULOS */
+        .section-title { font-size: 2.5rem; color: var(--text-dark); margin-bottom: 15px; font-weight: 900; text-align: center; letter-spacing: -1px; }
+        .section-title span { color: var(--primary); }
+        .section-subtitle { text-align: center; font-size: 1.15rem; color: var(--text-main); margin-bottom: 60px; max-width: 750px; margin-left: auto; margin-right: auto; font-weight: 500; }
+
+        /* SEÇÃO DOR - CARTÕES FLUTUANTES */
+        .pain-section { padding: 100px 20px; position: relative; z-index: 5; }
+        .pain-grid { max-width: 1100px; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 30px; }
+        .pain-card { 
+            background: var(--bg-white); border: 1px solid var(--border-light); 
+            padding: 40px 30px; border-radius: 20px; 
+            box-shadow: var(--shadow-md); position: relative; top: 0;
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .pain-card::after {
+            content: ''; position: absolute; bottom: 0; left: 0; width: 100%; height: 6px;
+            background: var(--primary); border-radius: 0 0 20px 20px;
+        }
+        .pain-card:hover { top: -10px; box-shadow: var(--shadow-xl); border-color: var(--primary); }
+        .pain-card i { font-size: 3rem; color: var(--primary); margin-bottom: 20px; text-shadow: 2px 4px 10px rgba(12,166,146,0.3); }
+        .pain-card h3 { font-size: 1.4rem; margin-bottom: 15px; font-weight: 800; color: var(--text-dark); }
+        .pain-card p { color: var(--text-main); font-size: 1.05rem; line-height: 1.6; }
+
+        /* CARROSSEL - CARTÕES COM PROFUNDIDADE */
+        .modules-section { padding: 100px 20px; background: var(--bg-white); border-top: 1px solid var(--border-light); border-bottom: 1px solid var(--border-light); } 
+        .carousel-wrapper { position: relative; max-width: 1200px; margin: 20px auto 0; padding: 20px 0; }
+        .carousel-container {
+            display: flex; overflow-x: auto; gap: 30px; padding: 20px 10px 50px 10px;
+            scroll-snap-type: x mandatory; scrollbar-width: none;
+        }
+        .carousel-container::-webkit-scrollbar { display: none; }
+        .carousel-card {
+            flex: 0 0 300px; scroll-snap-align: center; background: var(--bg-white); 
+            border-radius: 16px; box-shadow: var(--shadow-md);
+            overflow: hidden; transition: all 0.4s ease; border: 1px solid var(--border-light);
+        }
+        .carousel-card img { width: 100%; height: auto; display: block; object-fit: cover; }
+        .carousel-card:hover { transform: translateY(-10px) scale(1.02); box-shadow: var(--shadow-float); border-color: var(--primary); }
+        .swipe-hint { color: var(--text-light); font-size: 0.9rem; display: flex; align-items: center; justify-content: center; gap: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
+        .swipe-hint i { animation: moveSide 1.5s infinite; color: var(--primary); font-size: 1.1rem; }
+
+        /* QUIZ - ESTRUTURA ATUALIZADA */
+        .quiz-section { padding: 120px 20px; }
+        .quiz-container { 
+            max-width: 850px; margin: 0 auto; background: var(--bg-white); border-radius: 24px; padding: 50px; 
+            box-shadow: var(--shadow-xl); border: 1px solid var(--border-light); position: relative; z-index: 2;
+        }
+        .quiz-container::before {
+            content: ''; position: absolute; top: -10px; left: 2%; width: 96%; height: 100%;
+            background: rgba(255,255,255,0.6); border-radius: 24px; z-index: -1; box-shadow: var(--shadow-md); border: 1px solid var(--border-light);
+        }
+        .quiz-header { text-align: center; margin-bottom: 40px; }
+        #quiz-progress { font-weight: 700; color: var(--primary-hover); text-transform: uppercase; letter-spacing: 1px; font-size: 0.85rem; margin-bottom: 20px; display: inline-block; background: var(--primary-light); padding: 8px 20px; border-radius: 100px; box-shadow: inset 0 2px 4px rgba(255,255,255,0.8), var(--shadow-sm); }
+        #quiz-question { font-size: 1.5rem; font-weight: 800; color: var(--text-dark); line-height: 1.4; }
+        .quiz-options { display: flex; flex-direction: column; gap: 15px; }
+        
+        .quiz-btn { 
+            background: var(--bg-white); border: 2px solid var(--border-light); padding: 20px 25px; border-radius: 16px; 
+            cursor: pointer; text-align: left; font-weight: 600; font-family: inherit; font-size: 1.1rem;
+            transition: all 0.2s ease; color: var(--text-dark); box-shadow: var(--shadow-sm);
+            position: relative; top: 0;
+        }
+        .quiz-btn:hover { background: var(--primary-light); border-color: var(--primary); box-shadow: var(--shadow-md); top: -2px; }
+        .quiz-btn.correct { background: var(--success-green); color: #fff; border-color: var(--success-green); box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4); }
+        .quiz-btn.wrong { background: var(--error-red); color: #fff; border-color: var(--error-red); box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4); }
+        .feedback-box { display: none; margin-top: 30px; padding: 25px; border-radius: 16px; border-left: 6px solid var(--primary); background: var(--bg-body); box-shadow: inset 0 2px 4px rgba(0,0,0,0.03); }
+
+        /* QUIZ - ESTILOS DO PERFIL E RESULTADO */
+        .profile-buttons { display: grid; grid-template-columns: 1fr; gap: 15px; margin-top: 20px; }
+        @media(min-width: 600px) { .profile-buttons { grid-template-columns: repeat(2, 1fr); } }
+        
+        .btn-profile {
+            width: 100%; border: 2px solid var(--border-light); background: var(--bg-white); 
+            padding: 20px; border-radius: 16px; cursor: pointer; font-weight: 700; color: var(--text-dark); 
+            transition: all 0.3s ease; display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 1.05rem;
+        }
+        .btn-profile:hover { border-color: var(--primary); background: var(--primary-light); transform: translateY(-3px); }
+        .btn-profile i { font-size: 1.3rem; color: var(--primary); }
+
+        .quiz-performance {
+            background: #f0fdf4; border: 2px solid #bbf7d0; padding: 15px; border-radius: 15px;
+            margin-bottom: 25px; font-weight: 700; color: var(--primary); font-size: 1.1rem;
+        }
+
+        /* CTA FINAL - ALTO CONTRASTE PARA DESTAQUE */
+        .final-cta { padding: 120px 20px; display: flex; justify-content: center; position: relative; }
+        .cta-premium-card {
+            background: var(--primary-gradient);
+            padding: 80px 60px; border-radius: 30px; text-align: center; color: var(--bg-white);
+            max-width: 950px; width: 100%; position: relative;
+            box-shadow: var(--shadow-float); border: 4px solid rgba(255,255,255,0.2);
+            overflow: hidden;
+        }
+        .cta-premium-card::before {
+            content: ''; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 60%);
+            z-index: 1; pointer-events: none;
+        }
+        .cta-premium-card > * { position: relative; z-index: 2; }
+
+        .cta-badge-modern {
+            display: inline-block; background: rgba(255,255,255,0.2); color: var(--bg-white); padding: 8px 24px;
+            border-radius: 100px; font-weight: 800; font-size: 0.85rem; text-transform: uppercase;
+            letter-spacing: 2px; margin-bottom: 30px; backdrop-filter: blur(5px); box-shadow: var(--shadow-sm);
+        }
+        .cta-premium-card h2 { font-size: 3rem; margin-bottom: 15px; font-weight: 900; line-height: 1.1; letter-spacing: -1px; text-shadow: 0 4px 10px rgba(0,0,0,0.2); }
+        .cta-premium-card .sub { font-size: 1.2rem; color: rgba(255,255,255,0.9); margin-bottom: 45px; font-weight: 500; max-width: 700px; margin-left: auto; margin-right: auto; }
+        
+        .cta-benefits-modern {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px;
+            max-width: 800px; margin: 0 auto 40px; text-align: left;
+        }
+        .benefit-item { display: flex; align-items: center; gap: 12px; font-size: 1.1rem; font-weight: 600; background: rgba(0,0,0,0.15); padding: 15px 20px; border-radius: 12px; }
+        .benefit-item i { color: #4ade80; font-size: 1.3rem; }
+
+        .price-container-premium {
+            background: var(--bg-white); color: var(--text-dark); border-radius: 20px; padding: 30px 40px;
+            display: inline-block; margin-bottom: 40px; box-shadow: var(--shadow-lg); transform: scale(1.05);
+        }
+        .old-price-modern { font-size: 1.1rem; text-decoration: line-through; color: var(--text-light); display: block; margin-bottom: 5px; font-weight: 700; }
+        .new-price-modern { font-size: 4.5rem; font-weight: 900; line-height: 1; display: flex; align-items: flex-start; justify-content: center; }
+        .new-price-modern span { font-size: 2rem; color: var(--primary); margin-top: 8px; margin-right: 6px; font-weight: 800; }
+
+        /* BOTÃO 3D COM ALTA PROFUNDIDADE */
+        .btn-cta {
+            display: inline-block; background: #fbbf24;
+            color: #78350f; text-decoration: none; font-weight: 900; border-radius: 100px; text-transform: uppercase; 
+            transition: all 0.2s ease; border: none; cursor: pointer; text-align: center;
+            box-shadow: 0 8px 0 #b45309, 0 15px 20px rgba(0,0,0,0.3);
+            position: relative; top: 0;
+        }
+        .btn-cta:active { top: 8px; box-shadow: 0 0 0 #b45309, 0 5px 10px rgba(0,0,0,0.2); }
+        .btn-premium-matador {
+            width: 100%; max-width: 600px; font-size: 1.2rem !important; padding: 22px 40px !important;
+            letter-spacing: 1px; z-index: 5; margin-bottom: 10px;
+        }
+
+        .security-row { margin-top: 30px; display: flex; justify-content: center; gap: 25px; font-size: 0.95rem; font-weight: 600; color: rgba(255,255,255,0.8); }
+
+        /* RESPONSIVIDADE */
+        @media (max-width: 768px) {
+            .hero-container { padding: 40px 20px; border-radius: 16px; margin-top: 60px;}
+            .hero-content h1 { font-size: 2.2rem; }
+            .hero-sub { font-size: 1.05rem; }
+            .hero-trust-bar { flex-direction: column; align-items: stretch; }
+            .trust-item { justify-content: center; }
+            .section-title { font-size: 1.8rem; }
+            .pain-card { padding: 30px 20px; }
+            .quiz-container { padding: 30px 20px; border-radius: 16px; }
+            .quiz-btn { padding: 15px; font-size: 1rem; }
+            .cta-premium-card { padding: 50px 20px; border-radius: 20px; border-width: 2px; }
+            .cta-premium-card h2 { font-size: 2.2rem; }
+            .price-container-premium { padding: 20px; border-radius: 16px; transform: scale(1); }
+            .new-price-modern { font-size: 3.5rem; }
+            .btn-premium-matador { font-size: 1.05rem !important; padding: 18px !important; }
+            .security-row { flex-direction: column; gap: 10px; }
+        }
+
+        @keyframes pulse-timer { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        @keyframes moveSide { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(8px); } }
+    </style>
+
+    <!-- Meta Pixel Code -->
+    <script>
+    !function(f,b,e,v,n,t,s)
+    {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+    n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+    if(!f._fbq)f._fbq=n;
+    n.push=n;n.loaded=!0;n.version='2.0';
+    n.queue=[];
+    t=b.createElement(e);t.async=!0;
+    t.src=v;
+    s=b.getElementsByTagName(e)[0];
+    s.parentNode.insertBefore(t,s)}
+    (window, document,'script',
+    'https://connect.facebook.net/en_US/fbevents.js');
+
+    fbq('init', '1646677629634348');
+    fbq('track', 'PageView');
+    fbq('track', 'ViewContent');
+    </script>
+    <noscript>
+    <img height="1" width="1" style="display:none"
+    src="https://www.facebook.com/tr?id=1646677629634348&ev=PageView&noscript=1"/>
+    </noscript>
+</head>
+<body>
+
+    <div class="premium-timer-bar">
+        <div class="timer-text"><i class="fas fa-clock"></i> Condição Especial Encerra em:</div>
+        <div class="timer-countdown">
+            <div class="timer-box"><span class="timer-num" id="timer-hours">00</span><span class="timer-label">Horas</span></div>
+            <span class="timer-colon">:</span>
+            <div class="timer-box"><span class="timer-num" id="timer-minutes">00</span><span class="timer-label">Min</span></div>
+            <span class="timer-colon">:</span>
+            <div class="timer-box"><span class="timer-num" id="timer-seconds">00</span><span class="timer-label">Seg</span></div>
+        </div>
+    </div>
+
+    <header class="hero">
+        <div class="hero-container scroll-show">
+            <div class="hero-content">
+                <div class="hero-badge-modern">Feito de Colega para Colega</div>
+                <h1>Saiba Exatamente o que Escrever no Prontuário e <span>Vá Para Casa em Paz</span></h1>
+                <p class="hero-sub">Você cuida do paciente com todo carinho, mas sente aquele frio na barriga na hora de fazer a evolução? Tenha em mãos roteiros simples e práticos para registrar seu plantão sem medo de errar.</p>
+                
+                <div class="hero-trust-bar">
+                    <div class="trust-item"><i class="fas fa-heartbeat"></i><span>Fácil de Entender</span></div>
+                    <div class="trust-item"><i class="fas fa-clipboard-check"></i><span>Seguro para a Carreira</span></div>
+                    <div class="trust-item"><i class="fas fa-clock"></i><span>Poupa seu Tempo</span></div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <section class="pain-section">
+        <h2 class="section-title scroll-hidden">Não Leve Preocupação <span>Para Casa</span></h2>
+        <p class="section-subtitle scroll-hidden">A rotina do hospital já é pesada. Você não precisa transformar a anotação em mais um peso:</p>
+        <div class="pain-grid">
+            <div class="pain-card scroll-hidden">
+                <i class="fas fa-pen-alt"></i>
+                <h3>O Medo de Travar</h3>
+                <p>Chegar no final do turno cansado, olhar para o prontuário em branco e não lembrar o termo certo para descrever o que você acabou de fazer.</p>
+            </div>
+            <div class="pain-card scroll-hidden" style="transition-delay: 0.1s;">
+                <i class="fas fa-exclamation-triangle"></i>
+                <h3>Insegurança Constante</h3>
+                <p>O receio de esquecer de anotar algo importante, usar a palavra errada e acabar se complicando com a supervisão ou em alguma auditoria.</p>
+            </div>
+            <div class="pain-card scroll-hidden" style="transition-delay: 0.2s;">
+                <i class="fas fa-hourglass-half"></i>
+                <h3>Sair Tarde do Plantão</h3>
+                <p>Ficar horas a mais no setor só porque você demorou para conseguir organizar as ideias e escrever tudo o que aconteceu com o paciente.</p>
+            </div>
+        </div>
+    </section>
+
+    <section class="modules-section">
+        <div class="scroll-hidden">
+            <h2 class="section-title">O Que Você Vai <span>Ter em Mãos:</span></h2>
+            <p class="section-subtitle">Um acervo completo de roteiros amigáveis para Clínica Médica, UTI e Emergência. É só consultar e adaptar para o seu paciente.</p>
+        </div>
+        <div class="carousel-wrapper scroll-hidden">
+            <div class="carousel-container">
+                <div class="carousel-card"><img src="modulo-1.jpg" alt="Modelo 1"></div>
+                <div class="carousel-card"><img src="modulo-2.jpg" alt="Modelo 2"></div>
+                <div class="carousel-card"><img src="modulo-3.jpg" alt="Modelo 3"></div>
+                <div class="carousel-card"><img src="modulo-4.jpg" alt="Modelo 4"></div>
+                <div class="carousel-card"><img src="modulo-5.jpg" alt="Modelo 5"></div>
+            </div>
+            <div class="swipe-hint"><i class="fas fa-arrow-right"></i> Arraste para ver o conteúdo</div>
+        </div>
+    </section>
+
+    <!-- NOVA SEÇÃO DE QUIZ -->
+    <section class="quiz-section">
+        <div class="scroll-hidden">
+            <h2 class="section-title">Será Que Você Está <span>Registrando Certo?</span></h2>
+            <p class="section-subtitle">Pequenos detalhes fazem toda a diferença na proteção do seu COREN. Faça o teste rápido:</p>
+        </div>
+        
+        <div class="quiz-container scroll-hidden">
+            
+            <!-- PASSO 1: PERGUNTAS -->
+            <div id="quiz-box">
+                <div class="quiz-header">
+                    <span id="quiz-progress"><i class="fas fa-list-ul" style="margin-right: 6px;"></i> Preparando...</span>
+                    <div id="quiz-question">Carregando...</div>
+                </div>
+                <div class="quiz-options" id="quiz-options"></div>
+                
+                <div id="quiz-explanation" class="feedback-box">
+                    <div id="feedback-title" style="font-weight: 800; font-size: 1.1rem; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;"></div>
+                    <div id="feedback-text" style="color: var(--text-main); line-height: 1.6; font-size: 1.05rem;"></div>
+                    <button id="next-btn" class="btn-cta" style="width: 100%; margin-top: 20px; padding: 15px; font-size: 1.1rem;" onclick="nextQuestion()">Próxima Questão <i class="fas fa-arrow-right" style="margin-left: 6px;"></i></button>
+                </div>
+            </div>
+
+            <!-- PASSO 2: COLETAR PERFIL -->
+            <div id="quiz-profile-box" style="display: none; text-align: center;">
+                <h3 style="font-size: 1.8rem; color: var(--text-dark); margin-bottom: 15px;">
+                    🎯 Você acertou <strong id="quiz-score-display" style="color: var(--primary);">0</strong> de <span id="quiz-total-display">5</span> questões!
+                </h3>
+                
+                <div id="quiz-performance" class="quiz-performance"></div>
+                
+                <p style="margin-bottom: 25px; color: var(--text-main); font-size: 1.05rem;">Responda apenas uma pergunta rápida para receber uma análise personalizada do seu resultado.</p>
+                
+                <h4 style="color: var(--text-dark); margin-bottom: 15px; font-size: 1.2rem;">Em qual etapa da sua jornada na enfermagem você está?</h4>
+                <div class="profile-buttons">
+                    <button class="btn-profile" data-profile="tecnico"><i class="fas fa-user-nurse"></i> Técnico(a) de Enfermagem</button>
+                    <button class="btn-profile" data-profile="estudante-tecnico"><i class="fas fa-book-reader"></i> Estudante de Técnico</button>
+                    <button class="btn-profile" data-profile="graduado"><i class="fas fa-user-doctor"></i> Enfermeiro(a) Graduado(a)</button>
+                    <button class="btn-profile" data-profile="estudante-graduacao"><i class="fas fa-user-graduate"></i> Estudante de Enfermagem</button>
+                </div>
+            </div>
+
+            <!-- PASSO 3: RESULTADO FINAL E CTA -->
+            <div id="quiz-result-box" style="display: none; text-align: center;">
+                <div id="result-message" style="text-align: left; margin-bottom: 30px;"></div>
+                <a href="#comprar" class="btn-cta btn-premium-matador rastrear-interesse">QUERO OS MODELOS PRONTOS AGORA</a>
+            </div>
+
+        </div>
+    </section>
+
+    <section class="final-cta" id="comprar">
+        <div class="cta-premium-card scroll-hidden">
+            <div class="cta-badge-modern"><i class="fas fa-star" style="margin-right: 6px;"></i> Acesso Imediato</div>
+            <h2>Traga Mais Leveza Para o Seu Plantão</h2>
+            <p class="sub">Escreva suas anotações com confiança, ganhe tempo livre e proteja o seu nome profissional. É o carinho que você tem com o paciente refletido no papel.</p>
+
+            <div class="cta-benefits-modern">
+                <div class="benefit-item"><i class="fas fa-check-circle"></i> Roteiros simples e fáceis de usar</div>
+                <div class="benefit-item"><i class="fas fa-check-circle"></i> Palavras certas para não dar erro</div>
+                <div class="benefit-item"><i class="fas fa-check-circle"></i> Modelos para várias áreas do hospital</div>
+                <div class="benefit-item"><i class="fas fa-shield-alt"></i> 7 Dias de Garantia (Risco Zero)</div>
+            </div>
+
+            <div class="price-container-premium">
+                <span class="old-price-modern">De R$ 47,90 por apenas:</span>
+                <div class="new-price-modern"><span>R$</span>17,00</div>
+                <div style="margin-top: 10px; color: var(--text-light); font-weight: 700; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1px;">Pagamento Único. Sem mensalidade.</div>
+            </div>
+
+            <br>
+            <a href="https://sun.eduzz.com/89AQBQE8WD" target="_blank" class="btn-cta btn-premium-matador rastrear-checkout">QUERO MEU PLANTÃO MAIS TRANQUILO</a>
+
+            <div class="security-row">
+                <span><i class="fas fa-lock" style="margin-right: 6px;"></i> Compra 100% Segura</span>
+                <span><i class="fab fa-pix" style="color: #4ade80; margin-right: 6px; font-size: 1.2rem;"></i> Libera na hora com Pix</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- SCRIPTS -->
+    <script>
+        // CRONÔMETRO
+        function startTimer() {
+            let endTime = localStorage.getItem('enf_timer_premium') || (new Date().getTime() + 7200000);
+            localStorage.setItem('enf_timer_premium', endTime);
+            setInterval(() => {
+                let dist = endTime - new Date().getTime();
+                if (dist < 0) {
+                    endTime = new Date().getTime() + 7200000;
+                    localStorage.setItem('enf_timer_premium', endTime);
+                    dist = 7200000;
+                }
+                document.getElementById("timer-hours").innerText = Math.floor(dist / 3600000).toString().padStart(2, '0');
+                document.getElementById("timer-minutes").innerText = Math.floor((dist % 3600000) / 60000).toString().padStart(2, '0');
+                document.getElementById("timer-seconds").innerText = Math.floor((dist % 60000) / 1000).toString().padStart(2, '0');
+            }, 1000);
+        }
+
+        // ==========================================
+        // QUIZ - LÓGICA E DADOS (5 Questões sobre Anotações e Evolução)
+        // ==========================================
+        const quizData = [
+            { 
+                q: "Qual profissional da equipe de enfermagem tem a competência privativa de realizar a Evolução de Enfermagem?", 
+                options: ["Técnico de Enfermagem", "Enfermeiro", "Auxiliar de Enfermagem", "Qualquer membro da equipe"], 
+                answer: 1, 
+                explanation: "A Evolução de Enfermagem é uma atividade privativa do Enfermeiro. O Técnico ou Auxiliar realiza a Anotação de Enfermagem." 
+            },
+            { 
+                q: "Em caso de erro durante a anotação manual no prontuário, qual a conduta correta?", 
+                options: ["Usar corretivo líquido", "Riscar a palavra até ficar ilegível", "Utilizar a palavra 'digo' entre vírgulas", "Arrancar a folha"], 
+                answer: 2, 
+                explanation: "Nunca rasure o prontuário. O correto é colocar a palavra errada entre vírgulas, seguida da expressão 'digo', e então escrever o termo correto." 
+            },
+            { 
+                q: "O que NÃO deve constar em uma Anotação de Enfermagem segura?", 
+                options: ["Sinais vitais e medidas aferidas", "Termos vagos como 'passa bem' ou 'sem queixas'", "Horário exato da ocorrência", "Condutas tomadas após uma intercorrência"], 
+                answer: 1, 
+                explanation: "Termos genéricos como 'passa bem' não possuem valor clínico ou legal. Deve-se descrever de forma objetiva os fatos e dados observados no paciente." 
+            },
+            { 
+                q: "Sobre o registro de recusa de medicação pelo paciente, é correto afirmar:", 
+                options: ["Não é necessário anotar, basta devolver o remédio à farmácia", "Deve-se circular o horário e ignorar", "Anotar o motivo, orientar o paciente e notificar o enfermeiro/médico", "Obrigar o paciente a tomar para não prejudicar o registro"], 
+                answer: 2, 
+                explanation: "É um direito do paciente recusar terapias. A enfermagem deve anotar a recusa, o motivo relatado, a orientação prestada sobre os riscos e comunicar a chefia/médico responsável." 
+            },
+            { 
+                q: "Para garantir o seu respaldo legal, o registro no prontuário físico deve obrigatoriamente ser finalizado com:", 
+                options: ["Apenas o primeiro nome e um visto", "Assinatura e número do CPF", "Apenas a rubrica", "Identificação legível (nome, Coren e categoria), preferencialmente com carimbo"], 
+                answer: 3, 
+                explanation: "Segundo o COFEN, é obrigatório constar a identificação clara do profissional que executou a ação, contendo nome, categoria e número do COREN." 
+            }
+        ];
+
+        let currentQ = 0; 
+        let score = 0;
+
+        const quizBox = document.getElementById('quiz-box');
+        const quizProfileBox = document.getElementById('quiz-profile-box');
+        const quizResultBox = document.getElementById('quiz-result-box');
+
+        function loadQuestion() {
+            document.getElementById('quiz-explanation').style.display = 'none';
+            document.getElementById('quiz-progress').innerHTML = `<i class="fas fa-list-ul" style="margin-right: 6px;"></i> Pergunta ${currentQ + 1} de ${quizData.length}`;
+            document.getElementById('quiz-question').innerText = quizData[currentQ].q;
+            
+            const options = document.getElementById('quiz-options');
+            options.innerHTML = '';
+            
+            quizData[currentQ].options.forEach((opt, i) => {
+                const btn = document.createElement('button');
+                btn.className = 'quiz-btn'; 
+                btn.innerText = opt;
+                btn.onclick = () => checkAnswer(i, btn);
+                options.appendChild(btn);
+            });
+        }
+
+        function checkAnswer(selectedIndex, btnElement) {
+            const q = quizData[currentQ];
+            const optionsContainer = document.getElementById('quiz-options');
+            const btns = optionsContainer.querySelectorAll('button');
+            
+            btns.forEach(b => b.style.pointerEvents = 'none');
+            
+            if (selectedIndex === q.answer) { 
+                btnElement.classList.add('correct'); 
+                score++; 
+                document.getElementById('feedback-title').innerHTML = '<i class="fas fa-check-circle" style="color: var(--success-green);"></i> Resposta Correta!';
+            } else { 
+                btnElement.classList.add('wrong'); 
+                btns[q.answer].classList.add('correct'); 
+                document.getElementById('feedback-title').innerHTML = '<i class="fas fa-times-circle" style="color: var(--error-red);"></i> Incorreto.';
+            }
+            
+            document.getElementById('feedback-text').innerText = q.explanation;
+            document.getElementById('quiz-explanation').style.display = 'block';
+
+            const nextBtn = document.getElementById('next-btn');
+            if (currentQ === quizData.length - 1) {
+                nextBtn.innerHTML = 'Ver Meu Resultado <i class="fas fa-flag-checkered" style="margin-left: 6px;"></i>';
+            } else {
+                nextBtn.innerHTML = 'Próxima Questão <i class="fas fa-arrow-right" style="margin-left: 6px;"></i>';
+            }
+        }
+
+        function nextQuestion() { 
+            if (currentQ < quizData.length - 1) {
+                currentQ++; 
+                loadQuestion(); 
+            } else {
+                showProfileBox();
+            }
+        }
+        
+        function showProfileBox() {
+            quizBox.style.display = 'none';
+            quizProfileBox.style.display = 'block';
+            
+            document.getElementById('quiz-score-display').innerText = score;
+            document.getElementById('quiz-total-display').innerText = quizData.length;
+
+            // Análise Rápida de Desempenho
+            let performanceMsg = "";
+            if (score <= 2) {
+                performanceMsg = "Sinal de Alerta: Você precisa fortalecer a sua segurança teórica urgente para não comprometer o seu COREN.";
+            } else if (score <= 4) {
+                performanceMsg = "Base boa, mas pequenos detalhes ainda podem te dar dor de cabeça em uma auditoria. Guias prontos vão te ajudar muito.";
+            } else {
+                performanceMsg = "Excelente desempenho! Agora o seu foco deve ser padronizar as anotações para ganhar velocidade no plantão.";
+            }
+            document.getElementById('quiz-performance').innerText = performanceMsg;
+        }
+
+        // Lidar com o clique nos botões de perfil
+        document.querySelectorAll('.btn-profile').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const perfil = this.getAttribute('data-profile');
+                quizProfileBox.style.display = 'none';
+                quizResultBox.style.display = 'block';
+                
+                generateFinalMessage(perfil);
+            });
+        });
+
+        function generateFinalMessage(perfil) {
+            let msgTitle = "";
+            let msgBody = "";
+
+            if (perfil === "tecnico") {
+                msgTitle = "Respaldo e Agilidade para o Técnico";
+                msgBody = "Como Técnico, a Anotação de Enfermagem é o seu principal escudo legal. É o documento que prova o excelente cuidado que você prestou. Nossos roteiros garantem que você escreva os termos certos rapidamente, sem precisar pensar do zero no fim do plantão.";
+            } else if (perfil === "estudante-tecnico") {
+                msgTitle = "Começando a Carreira com Segurança";
+                msgBody = "Aprender a fazer Anotações corretas agora vai te poupar muitas broncas no estágio e garantir elogios no seu primeiro emprego. Com os nossos modelos em mãos, você não vai sofrer do 'branco' na hora de escrever no prontuário.";
+            } else if (perfil === "graduado") {
+                msgTitle = "Direto ao Ponto para o Enfermeiro";
+                msgBody = "A sua Evolução direciona toda a conduta da equipe técnica e é o seu maior documento de defesa. Sabemos que a correria é enorme. Com os modelos pré-estruturados, você garante uma evolução impecável em minutos, poupando a sua mente para a clínica.";
+            } else if (perfil === "estudante-graduacao") {
+                msgTitle = "Brilhe nos Estágios de Enfermagem";
+                msgBody = "Fazer Evoluções de Enfermagem costuma dar muito frio na barriga dos estudantes. Ter esses roteiros amigáveis salvos com você vai te dar a confiança necessária para escrever como um profissional experiente desde o primeiro dia de estágio.";
+            }
+
+            document.getElementById('result-message').innerHTML = `
+                <h3 style="font-size: 1.6rem; color: var(--text-dark); margin-bottom: 15px; font-weight: 800;">${msgTitle}</h3>
+                <div style="background:#f0fdf4; border: 2px solid #bbf7d0; padding:15px; border-radius:12px; margin-bottom:20px; font-weight:700; color: var(--primary);">
+                    🎯 Seu desempenho final: ${score}/${quizData.length} questões
+                </div>
+                <p style="font-size: 1.1rem;">${msgBody}</p>
+                <p style="margin-top: 20px; font-weight: 700; color: var(--text-dark);">Garanta o seu acesso abaixo e tenha os modelos na palma da mão.</p>
+            `;
+
+            // Enviar evento de Lead para o Facebook Pixel
+            if (typeof fbq !== 'undefined') {
+                fbq('track', 'Lead', {
+                    value: 17,
+                    currency: 'BRL'
+                });
+            }
+        }
+
+        // INIT
+        document.addEventListener('DOMContentLoaded', () => {
+            startTimer(); 
+            loadQuestion();
+            
+            // Scroll Animation
+            const obs = new IntersectionObserver(entries => {
+                entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('scroll-show'); });
+            }, { threshold: 0.15 });
+            document.querySelectorAll('.scroll-hidden').forEach(el => obs.observe(el));
+
+            // Track Checkout click
+            document.querySelectorAll('.rastrear-checkout').forEach(botao => {
+                botao.addEventListener('click', function() {
+                    if (typeof fbq !== 'undefined') {
+                        fbq('track', 'InitiateCheckout', {
+                            value: 17,
+                            currency: 'BRL'
+                        });
+                    }
+                });
+            });
+
+            // Track Interest click (Quiz result to Offer)
+            document.querySelectorAll('.rastrear-interesse').forEach(botao => {
+                botao.addEventListener('click', function() {
+                    if (typeof fbq !== 'undefined') {
+                        fbq('trackCustom', 'QuizInterest');
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

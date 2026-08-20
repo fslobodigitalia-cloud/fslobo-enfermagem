@@ -114,15 +114,78 @@ export function trackGuiaInitiateCheckout(totalCents: number): void {
   send("track", "InitiateCheckout", { value: centsToReais(totalCents), currency: "BRL" });
 }
 
+/** Prefixo da chave de sessionStorage que marca um pedido como já enviado ao Pixel. */
+const PURCHASE_SENT_PREFIX = "meta_purchase_sent_";
+
+function hasPurchaseBeenSent(orderPublicId: string): boolean {
+  try {
+    return window.sessionStorage.getItem(PURCHASE_SENT_PREFIX + orderPublicId) === "1";
+  } catch {
+    // sessionStorage indisponível (modo privado, cookies bloqueados etc.) —
+    // trata como "ainda não enviado"; a dedup real acontece no CAPI via
+    // eventID, então o pior caso aqui é um evento de browser a mais, nunca
+    // uma perda de conversão.
+    return false;
+  }
+}
+
+function markPurchaseSent(orderPublicId: string): void {
+  try {
+    window.sessionStorage.setItem(PURCHASE_SENT_PREFIX + orderPublicId, "1");
+  } catch {
+    // Sem persistência disponível — segue sem marcar, ver hasPurchaseBeenSent.
+  }
+}
+
+export interface TrackGuiaPurchaseInput {
+  /** SEMPRE o public_id do pedido (order.publicId) — o mesmo valor usado
+   * pelo backend como event_id na Conversions API. Nunca um UUID novo,
+   * Date.now(), checkout_request_id, txid da Efí ou id interno do banco. */
+  orderPublicId: string;
+  /** SEMPRE order.amountCents devolvido por create-product-order — nunca
+   * recalculado/estimado no frontend. */
+  amountCents: number;
+}
+
 /**
- * Pagamento CONFIRMADO — só deve ser chamada quando get-order-downloads
- * já devolveu status "paid" (nunca em pending_payment, nunca no clique
- * do botão, nunca ao gerar o QR Code). amountCents deve ser sempre
- * order.amountCents devolvido por create-product-order na criação do
- * pedido (nunca recalculado no frontend). O chamador é responsável por
- * garantir uma única invocação por pedido (ver purchaseFiredRef em
- * GuiaEvolucaoEnfermagemPage.tsx).
+ * Pagamento CONFIRMADO — único ponto do frontend que pode disparar
+ * fbq('track', 'Purchase', ...). Só deve ser chamada quando
+ * get-order-downloads já devolveu status "paid" (nunca em
+ * pending_payment, nunca no clique do botão, nunca ao gerar o QR Code).
+ *
+ * Deduplicação com o Purchase que o backend já envia via Conversions API:
+ *  1. eventID = orderPublicId — EXATAMENTE o mesmo public_id usado pelo
+ *     backend como event_id, para a Meta deduplicar os dois envios do
+ *     mesmo evento (browser + servidor);
+ *  2. sessionStorage guarda, por public_id, que este pedido já disparou
+ *     Purchase neste navegador — sobrevive a polling, re-render, remount
+ *     (React StrictMode) e reabertura da tela de downloads dentro da
+ *     mesma aba. Só é marcado DEPOIS de o fbq real ser chamado: se o
+ *     pixel não estiver disponível (bloqueador, script ainda carregando),
+ *     nada é marcado e uma tentativa futura pode disparar normalmente.
+ *
+ * Retorno: true só quando o Purchase foi (ou já tinha sido) realmente
+ * enviado pelo fbq — false em qualquer outro caso (dados inválidos, ou
+ * fbq indisponível no momento da chamada). O chamador deve usar esse
+ * retorno para decidir se pode marcar sua própria guarda de "já
+ * disparado": se vier false, uma tentativa futura (ex.: próximo tick do
+ * polling) deve poder chamar de novo.
  */
-export function trackGuiaPurchase(amountCents: number): void {
-  send("track", "Purchase", { value: centsToReais(amountCents), currency: "BRL" });
+export function trackGuiaPurchase({ orderPublicId, amountCents }: TrackGuiaPurchaseInput): boolean {
+  if (typeof window === "undefined") return false;
+  if (typeof orderPublicId !== "string" || orderPublicId.length === 0) return false;
+  if (typeof amountCents !== "number" || !Number.isFinite(amountCents) || amountCents <= 0) return false;
+  if (hasPurchaseBeenSent(orderPublicId)) return true;
+  if (typeof window.fbq !== "function") return false; // não marca como enviado sem realmente disparar
+
+  const value = centsToReais(amountCents);
+  const currency = "BRL";
+  window.fbq("track", "Purchase", { value, currency }, { eventID: orderPublicId });
+  markPurchaseSent(orderPublicId);
+
+  if (import.meta.env.DEV) {
+    console.debug("[guiaPixel] Purchase enviado", { eventID: orderPublicId, value, currency });
+  }
+
+  return true;
 }

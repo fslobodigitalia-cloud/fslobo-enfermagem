@@ -725,6 +725,34 @@ function buildSignatureManifest(dataId: string, requestId: string, ts: string): 
   return `id:${dataId};request-id:${requestId};ts:${ts};`;
 }
 
+/**
+ * Instrumentação TEMPORÁRIA, SOMENTE diagnóstico (incidente invalid_signature_
+ * mismatch em produção, 2026-08-15) — NUNCA usada para decidir se uma
+ * notificação é aceita ou rejeitada; essa decisão já foi tomada, antes desta
+ * função existir na pilha de chamada, por WebhookSignatureValidator.validate()
+ * do SDK oficial. Recalcula HMAC-SHA256 hex de um manifesto EXATAMENTE como
+ * `computeHmacHex` fazia antes de ser removida deste arquivo (mesmo
+ * algoritmo, Web Crypto, nunca hash reversível) — usada só para comparar
+ * (em memória, nunca logada) contra o v1 recebido, para saber se uma
+ * diferença de CASE em data.id explicaria o mismatch. Chamadora sempre
+ * envolve isto em try/catch próprio; qualquer falha aqui nunca muda a
+ * resposta 401 já decidida.
+ */
+async function computeHmacHexDiagnosticOnly(secret: string, value: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw",
+    encoder.encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const signature = await crypto.subtle.sign("HMAC", key, encoder.encode(value));
+  return Array.from(new Uint8Array(signature))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
 // ═════════════════════════ payment_events (claim + update) ═════════════════
 
 /**
@@ -1053,25 +1081,84 @@ Deno.serve(async (req: Request) => {
     return errorResponse(401, "invalid_signature", "Assinatura ausente ou incompleta.");
   }
 
+  // dataId: a PRIMEIRA tentativa usa queryDataId exatamente como recebido
+  // (sem transformação) — mesmo comportamento de sempre. Confirmado por
+  // instrumentação de diagnóstico em incidente real (2026-08-15) que
+  // notificações reais de Order às vezes chegam com data.id em maiúsculas
+  // (query) mas foram assinadas pelo Mercado Pago usando a forma em
+  // minúsculas — por isso o fallback abaixo. Fora da validação de
+  // assinatura, queryDataId NUNCA é alterado em nenhum outro lugar deste
+  // arquivo: GET /v1/orders/{id}, comparação com body.data.id,
+  // mercado_pago_order_id e vínculo do pedido sempre usam o valor original.
+  let signatureError: unknown = null;
   try {
-    // dataId: passado exatamente como recebido na query (sem .toLowerCase()
-    // nem qualquer outra transformação) — confirmado em teste end-to-end
-    // real (Pix pago, webhook v13 retornou 200, pedido mudou para paid) que
-    // este é o valor esperado pelo WebhookSignatureValidator do SDK oficial
-    // para Orders API. queryDataId nunca é alterado em nenhum outro lugar
-    // deste arquivo: GET /v1/orders/{id}, comparação com body.data.id,
-    // mercado_pago_order_id e vínculo do pedido sempre usam o mesmo valor
-    // original.
     WebhookSignatureValidator.validate({
       xSignature: xSignatureHeader,
       xRequestId,
       dataId: queryDataId,
       secret: MERCADO_PAGO_WEBHOOK_SECRET,
     });
-  } catch (caught) {
-    if (caught instanceof InvalidWebhookSignatureError) {
+  } catch (firstCaught) {
+    signatureError = firstCaught;
+  }
+
+  // Fallback: SOMENTE quando a primeira tentativa falhou por assinatura
+  // inválida (nunca para outro tipo de erro) E queryDataId realmente tem
+  // alguma letra maiúscula (senão a segunda chamada seria idêntica à
+  // primeira, sem sentido tentar de novo). A segunda chamada é OUTRA
+  // invocação do MESMO WebhookSignatureValidator.validate() do SDK oficial —
+  // não é bypass nem validação alternativa: as duas exigem HMAC válido com
+  // MERCADO_PAGO_WEBHOOK_SECRET; só o case de data.id passado ao SDK muda.
+  if (signatureError instanceof InvalidWebhookSignatureError && queryDataId.toLowerCase() !== queryDataId) {
+    try {
+      WebhookSignatureValidator.validate({
+        xSignature: xSignatureHeader,
+        xRequestId,
+        dataId: queryDataId.toLowerCase(),
+        secret: MERCADO_PAGO_WEBHOOK_SECRET,
+      });
+      signatureError = null; // segunda tentativa passou — assinatura aceita.
+    } catch (secondCaught) {
+      signatureError = secondCaught;
+    }
+  }
+
+  if (signatureError !== null) {
+    if (signatureError instanceof InvalidWebhookSignatureError) {
+      // ── Diagnóstico TEMPORÁRIO, sem nenhum efeito na decisão de segurança
+      //    (já tomada acima pelo SDK oficial, nas até duas tentativas — esta
+      //    função responde 401 aqui de qualquer forma, com ou sem sucesso
+      //    neste bloco). Objetivo: continuar observando se ainda há
+      //    divergência de CASE não coberta pelo fallback. NUNCA loga
+      //    manifesto, hash calculado, v1 recebido, x-signature, x-request-id,
+      //    secret ou data.id completo — só os 3 booleanos abaixo. Qualquer
+      //    falha aqui (ts/v1 ausente do header, erro de crypto) é engolida
+      //    silenciosamente; os campos ficam undefined e somem do log.
+      let signatureMatchesExactCase: boolean | undefined;
+      let signatureMatchesLowercase: boolean | undefined;
+      let dataIdHasUppercase: boolean | undefined;
+      try {
+        const { ts, v1 } = parseXSignatureHeader(xSignatureHeader);
+        if (ts !== null && v1 !== null) {
+          dataIdHasUppercase = queryDataId !== queryDataId.toLowerCase();
+          const manifestExact = buildSignatureManifest(queryDataId, xRequestId, ts);
+          const manifestLower = buildSignatureManifest(queryDataId.toLowerCase(), xRequestId, ts);
+          const [hashExact, hashLower] = await Promise.all([
+            computeHmacHexDiagnosticOnly(MERCADO_PAGO_WEBHOOK_SECRET, manifestExact),
+            computeHmacHexDiagnosticOnly(MERCADO_PAGO_WEBHOOK_SECRET, manifestLower),
+          ]);
+          signatureMatchesExactCase = hashExact === v1;
+          signatureMatchesLowercase = hashLower === v1;
+        }
+      } catch {
+        // Sem diagnóstico desta vez — nunca afeta a resposta 401 abaixo.
+      }
+
       console.error("[mercado-pago-webhook] Assinatura HMAC não confere (SDK oficial).", {
         category: "invalid_signature_mismatch",
+        signatureMatchesExactCase,
+        signatureMatchesLowercase,
+        dataIdHasUppercase,
       });
       return errorResponse(401, "invalid_signature", "Assinatura inválida.");
     }
@@ -1082,10 +1169,14 @@ Deno.serve(async (req: Request) => {
     // qualquer outro dado sensível.
     console.error("[mercado-pago-webhook] Erro inesperado ao validar assinatura via SDK oficial.", {
       category: "signature_validation_unexpected_error",
-      error_type: caught instanceof Error ? caught.name : "unknown",
+      error_type: signatureError instanceof Error ? signatureError.name : "unknown",
     });
     return errorResponse(500, "signature_validation_error", "Não foi possível validar a notificação agora.");
   }
+  // signatureError === null a partir daqui: assinatura aceita, seja na
+  // primeira tentativa (case exato) ou no fallback (case minúsculo) — em
+  // ambos os casos queryDataId (case ORIGINAL) continua sendo o único valor
+  // usado no resto desta função.
 
   // ── Passo 6: só agora lê e faz parse do corpo.
   let rawBody: string;
