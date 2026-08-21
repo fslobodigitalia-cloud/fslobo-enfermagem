@@ -59,7 +59,12 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 const ALLOWED_ORIGIN = Deno.env.get("ALLOWED_ORIGIN");
 
 const MAX_BODY_BYTES = 2 * 1024; // 2 KB — corpo tem só dois campos, pequenos.
-const MAX_ITEMS = 5; // catálogo do MVP: 1 produto principal + 4 bumps, no máximo.
+// ALTERAÇÃO (etapa 1 do carrinho multiproduto): era 5 ("catálogo do MVP: 1
+// produto principal + 4 bumps, no máximo"). Alinhado ao limite real de
+// itens por pedido aceito por create_or_get_product_order_with_items_efi
+// (v_slug_count > 16 → erro). Nenhuma outra lógica desta função foi
+// alterada — autorização, signed URLs e status "paid" permanecem idênticos.
+const MAX_ITEMS = 16; // limite de itens (arquivos) por pedido.
 const SIGNED_URL_EXPIRES_IN_SECONDS = 900; // 15 minutos (requisito 7).
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

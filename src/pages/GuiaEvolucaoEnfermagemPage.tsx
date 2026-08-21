@@ -78,6 +78,8 @@ import {
 } from "@/config/guiaQuiz";
 import { buildPixSupportWhatsAppUrl } from "@/lib/whatsapp";
 import { initGuiaPixel, trackGuiaLead, trackGuiaQuizInterest, trackGuiaInitiateCheckout, trackGuiaPurchase } from "@/lib/guiaPixel";
+import { SiteHeader } from "@/components/layout/SiteHeader";
+import { SiteFooter } from "@/components/layout/SiteFooter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -180,16 +182,16 @@ function scrollToOffer() {
 }
 
 export default function GuiaEvolucaoEnfermagemPage() {
-  // Esta página é servida em duas rotas ("/" e "/guia-evolucao-enfermagem"
-  // — ver App.tsx), com o MESMO conteúdo. A URL canônica principal do
-  // Guia é a home ("/") — por isso o canonical/og:url é sempre "/",
-  // independentemente de qual rota renderizou a página, evitando
-  // conteúdo duplicado aos olhos do Google.
+  // Esta página é servida em "/guia-evolucao-enfermagem" (ver App.tsx) —
+  // por isso o canonical/og:url aponta para essa mesma rota. Correção:
+  // antes apontava para "/", de quando "/" ainda servia este componente
+  // diretamente; "/" agora serve o catálogo (MaterialsPage), então manter
+  // o canonical em "/" apontaria para a página errada aos olhos do Google.
   useDocumentMeta({
     title: "Guia de Evolução de Enfermagem | FSlobo Enfermagem",
     description:
       "Mais de 132 modelos prontos de evolução e anotação de enfermagem para consulta prática no plantão e nos estudos. Material digital em PDF.",
-    path: "/",
+    path: "/guia-evolucao-enfermagem",
   });
 
   // Só enquanto esta página está montada, força um fundo claro no <body>
@@ -445,61 +447,68 @@ export default function GuiaEvolucaoEnfermagemPage() {
 
   if (resuming) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-white px-6">
-        <Loader2 className="h-6 w-6 animate-spin text-teal-600" aria-hidden="true" />
-      </main>
+      <div className="min-h-screen bg-white font-sans text-slate-900">
+        <SiteHeader />
+        <main className="flex min-h-[70vh] items-center justify-center px-6">
+          <Loader2 className="h-6 w-6 animate-spin text-teal-600" aria-hidden="true" />
+        </main>
+      </div>
     );
   }
 
   return (
-    <main className="min-h-screen bg-white font-sans text-slate-900">
-      {downloads !== null ? (
-        <div className={cn(PANEL_CONTAINER, "py-16")}>
-          <PaidPanel downloads={downloads} />
-        </div>
-      ) : showPixResult && result !== null ? (
-        <div className={cn(PANEL_CONTAINER, "py-16")}>
-          <ResultPanel result={result} copied={copied} onCopyCode={handleCopyCode} />
-        </div>
-      ) : (
-        <>
-          <Hero />
-          <PainSection />
-          <ModulesSection />
-          <GuiaConversationSection />
-          <QuizSection onProfileSelected={handleQuizProfileSelected} onResultCta={handleQuizResultCta} />
-          <OfferSection>
-            {showForm && (
-              <CheckoutForm
-                firstName={firstName}
-                setFirstName={setFirstName}
-                email={email}
-                setEmail={setEmail}
-                errors={errors}
-                selectedBumps={selectedBumps}
-                onToggleBump={toggleBump}
-                totalCents={totalCents}
-                submitting={submitting}
-                canSubmit={Boolean(turnstileToken) && !submitting && !turnstileFailed}
-                onSubmit={handleSubmit}
-                siteKey={siteKey}
-                turnstileRef={turnstileRef}
-                turnstileFailed={turnstileFailed}
-                turnstileMissing={turnstileMissing}
-                onTurnstileToken={handleTurnstileToken}
-                onTurnstileExpire={handleTurnstileExpire}
-                onTurnstileError={handleTurnstileError}
-                onRetryVerification={handleRetryVerification}
-                errorMessage={result?.kind === "error" && errorCategory === "input" ? errorMessageFor(result.code) : null}
-              />
-            )}
-            {result?.kind === "error" && errorCategory !== null && errorCategory !== "input" && (
-              <ErrorPanel code={result.code} category={errorCategory} />
-            )}
-          </OfferSection>
-        </>
-      )}
-    </main>
+    <div className="min-h-screen bg-white font-sans text-slate-900">
+      <SiteHeader />
+      <main>
+        {downloads !== null ? (
+          <div className={cn(PANEL_CONTAINER, "py-16")}>
+            <PaidPanel downloads={downloads} />
+          </div>
+        ) : showPixResult && result !== null ? (
+          <div className={cn(PANEL_CONTAINER, "py-16")}>
+            <ResultPanel result={result} copied={copied} onCopyCode={handleCopyCode} />
+          </div>
+        ) : (
+          <>
+            <Hero />
+            <PainSection />
+            <ModulesSection />
+            <GuiaConversationSection />
+            <QuizSection onProfileSelected={handleQuizProfileSelected} onResultCta={handleQuizResultCta} />
+            <OfferSection>
+              {showForm && (
+                <CheckoutForm
+                  firstName={firstName}
+                  setFirstName={setFirstName}
+                  email={email}
+                  setEmail={setEmail}
+                  errors={errors}
+                  selectedBumps={selectedBumps}
+                  onToggleBump={toggleBump}
+                  totalCents={totalCents}
+                  submitting={submitting}
+                  canSubmit={Boolean(turnstileToken) && !submitting && !turnstileFailed}
+                  onSubmit={handleSubmit}
+                  siteKey={siteKey}
+                  turnstileRef={turnstileRef}
+                  turnstileFailed={turnstileFailed}
+                  turnstileMissing={turnstileMissing}
+                  onTurnstileToken={handleTurnstileToken}
+                  onTurnstileExpire={handleTurnstileExpire}
+                  onTurnstileError={handleTurnstileError}
+                  onRetryVerification={handleRetryVerification}
+                  errorMessage={result?.kind === "error" && errorCategory === "input" ? errorMessageFor(result.code) : null}
+                />
+              )}
+              {result?.kind === "error" && errorCategory !== null && errorCategory !== "input" && (
+                <ErrorPanel code={result.code} category={errorCategory} />
+              )}
+            </OfferSection>
+          </>
+        )}
+      </main>
+      <SiteFooter />
+    </div>
   );
 }
 
@@ -511,56 +520,61 @@ const TRUST_ITEMS = [
   { icon: Clock, label: "Poupa seu tempo" },
 ];
 
+/**
+ * Fundo escuro do hero — navy profundo (mesmo tom do SiteFooter, #0a1622)
+ * com iluminação teal discreta em dois pontos e uma textura de grão quase
+ * imperceptível (nunca um gradiente chamativo). Só CSS, sem imagem.
+ */
+const HERO_NAVY_BG: React.CSSProperties = {
+  backgroundColor: "#0a1622",
+  backgroundImage:
+    "radial-gradient(60% 55% at 14% 8%, rgba(45,212,191,0.14), transparent 62%), radial-gradient(50% 45% at 100% 100%, rgba(13,148,136,0.12), transparent 60%), radial-gradient(rgba(255,255,255,0.035) 1px, transparent 1px)",
+  backgroundSize: "auto, auto, 26px 26px",
+};
+
 function Hero() {
   return (
-    <section
-      className="relative overflow-hidden bg-white px-3.5 pb-16 pt-14 sm:px-5 sm:pb-20 sm:pt-16 lg:pb-24 lg:pt-20"
-      style={TEXTURE_TEAL_BLOOM}
-    >
-      {/* Manchas de luz decorativas — só CSS (blur + opacidade baixa), nunca imagem. */}
-      <div className="pointer-events-none absolute -left-24 top-6 h-72 w-72 rounded-full bg-teal-100/30 blur-3xl" aria-hidden="true" />
-      <div className="pointer-events-none absolute -right-16 top-1/3 hidden h-80 w-80 rounded-full bg-teal-50/70 blur-3xl lg:block" aria-hidden="true" />
+    <section className="relative overflow-hidden px-3.5 pb-16 pt-14 text-white sm:px-5 sm:pb-20 sm:pt-16 lg:pb-24 lg:pt-20" style={HERO_NAVY_BG}>
+      {/* Fio de luz no topo/base — separa das seções claras vizinhas sem borda dura. */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/[0.08]" aria-hidden="true" />
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-white/[0.08]" aria-hidden="true" />
 
       <div className="relative mx-auto grid w-full max-w-[1180px] items-center gap-12 lg:grid-cols-[1.05fr_0.95fr] lg:gap-16">
-        {/* Coluna esquerda. No mobile (< lg), vira um grande card branco
-            elevado (sensação de camada sobre o fundo texturizado da seção
-            — referência de profundidade do Anexo 2, sem copiar cores nem
-            o cronômetro dele). No desktop (lg+), volta a ser texto solto
-            ao lado do mockup, exatamente como já aprovado. */}
+        {/* Coluna esquerda. No mobile (< lg), um painel translúcido elevado
+            sobre o navy (sensação de camada, não um card branco destoando
+            do fundo escuro). No desktop (lg+), texto solto ao lado do
+            mockup do produto. */}
         <div
           className={cn(
-            "flex flex-col items-center gap-6 rounded-[30px] border border-white bg-white p-6 text-center sm:p-8",
-            SHADOW_STRONG,
-            "lg:items-start lg:rounded-none lg:border-0 lg:bg-transparent lg:p-0 lg:text-left lg:shadow-none",
+            "flex flex-col items-center gap-6 rounded-[30px] border border-white/10 bg-white/[0.04] p-6 text-center backdrop-blur-sm sm:p-8",
+            "shadow-[0_2px_4px_rgba(0,0,0,0.2),0_28px_56px_-24px_rgba(0,0,0,0.5)]",
+            "lg:items-start lg:rounded-none lg:border-0 lg:bg-transparent lg:p-0 lg:text-left lg:shadow-none lg:backdrop-blur-none",
           )}
         >
-          <span className={cn("inline-flex items-center rounded-full border border-teal-200 bg-teal-50 px-4 py-1.5 text-[12px] font-bold uppercase tracking-wide text-teal-700", SHADOW_SOFT)}>
+          <span className="inline-flex items-center rounded-full border border-teal-400/30 bg-teal-400/10 px-4 py-1.5 text-[12px] font-bold uppercase tracking-wide text-teal-300">
             Feito de colega para colega
           </span>
-          <h1 className="font-sans text-[2.125rem] font-extrabold leading-[1.1] tracking-tight text-slate-900 sm:text-[2.5rem] lg:text-[3.25rem] xl:text-[3.75rem]">
+          <h1 className="font-sans text-[2.125rem] font-extrabold leading-[1.1] tracking-tight text-white sm:text-[2.5rem] lg:text-[3.25rem] xl:text-[3.75rem]">
             Saiba exatamente o que escrever no prontuário e{" "}
-            <span className="text-teal-600">vá para casa em paz</span>
+            <span className="text-teal-400">vá para casa em paz</span>
           </h1>
-          <p className="max-w-[52ch] text-[16px] leading-relaxed text-slate-600 lg:text-[17.5px]">
+          <p className="max-w-[52ch] text-[16px] leading-relaxed text-slate-300 lg:text-[17.5px]">
             Você cuida do paciente com todo o carinho, mas trava na hora de registrar? Aqui é só consultar:
             manual ilustrado + modelos prontos por situação clínica para adaptar ao seu paciente, sem sair tarde do plantão.
           </p>
 
-          {/* Benefícios — no mobile, "pills" empilhados e elevados (Anexo 2);
-              no desktop, os badges compactos que já estavam aprovados. */}
+          {/* Benefícios — no mobile, "pills" empilhados; no desktop, badges
+              compactos. Mesma hierarquia de antes, adaptada ao fundo escuro. */}
           <div className="flex w-full flex-col gap-3 lg:hidden">
             {TRUST_ITEMS.map(({ icon: Icon, label }) => (
               <div
                 key={label}
-                className={cn(
-                  "flex min-h-[56px] items-center gap-3 rounded-2xl border border-teal-100 bg-gradient-to-b from-teal-50/70 to-white px-5 py-3.5 text-left",
-                  SHADOW_SOFT,
-                )}
+                className="flex min-h-[56px] items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.04] px-5 py-3.5 text-left"
               >
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-teal-600 shadow-sm">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/10 text-teal-300">
                   <Icon className="h-[18px] w-[18px]" strokeWidth={2} aria-hidden="true" />
                 </span>
-                <span className="text-[14.5px] font-bold text-slate-800">{label}</span>
+                <span className="text-[14.5px] font-bold text-white">{label}</span>
               </div>
             ))}
           </div>
@@ -568,9 +582,9 @@ function Hero() {
             {TRUST_ITEMS.map(({ icon: Icon, label }) => (
               <span
                 key={label}
-                className={cn("flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-[13px] font-semibold text-slate-700", SHADOW_SOFT)}
+                className="flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.05] px-4 py-2 text-[13px] font-semibold text-slate-200"
               >
-                <Icon className="h-4 w-4 text-teal-600" strokeWidth={2} aria-hidden="true" />
+                <Icon className="h-4 w-4 text-teal-300" strokeWidth={2} aria-hidden="true" />
                 {label}
               </span>
             ))}
@@ -581,14 +595,15 @@ function Hero() {
           </Button>
         </div>
 
-        {/* Coluna direita — capa real do produto. Só no desktop (lg+):
-            o Anexo 2 pede a remoção da capa no hero mobile. */}
+        {/* Coluna direita — composição editorial do produto (capa real, sem
+            depender de cover_url do catálogo: este hero é próprio da página
+            e usa o asset dedicado do Guia). Só no desktop (lg+). */}
         <div className="relative hidden lg:flex lg:justify-end">
-          <div className="pointer-events-none absolute inset-0 -z-10 scale-110 rounded-[40px] bg-teal-100/40 blur-3xl" aria-hidden="true" />
+          <div className="pointer-events-none absolute inset-0 -z-10 scale-110 rounded-[40px] bg-teal-400/15 blur-3xl" aria-hidden="true" />
           <div
             className={cn(
-              "relative flex aspect-[3/4] w-full max-w-[380px] items-center justify-center overflow-hidden rounded-[32px] border border-white bg-white p-3",
-              SHADOW_STRONG,
+              "relative flex aspect-[3/4] w-full max-w-[380px] items-center justify-center overflow-hidden rounded-[32px] border border-white/15 bg-white p-3",
+              "shadow-[0_8px_16px_rgba(0,0,0,0.25),0_40px_80px_-28px_rgba(0,0,0,0.55)]",
             )}
           >
             <img
@@ -944,7 +959,7 @@ function OfferSection({ children }: { children: React.ReactNode }) {
   const priceDigits = guiaEvolucaoProduct.priceLabel.replace("R$", "").trim();
 
   return (
-    <section id={OFFER_SECTION_ID} className="relative scroll-mt-6 bg-white px-5 py-20 sm:py-28" style={TEXTURE_TEAL_BLOOM}>
+    <section id={OFFER_SECTION_ID} className="relative scroll-mt-[76px] bg-white px-5 py-20 sm:py-28" style={TEXTURE_TEAL_BLOOM}>
       <div className="relative mx-auto grid w-full max-w-[1100px] gap-10 lg:grid-cols-[0.85fr_1.15fr] lg:gap-14">
         {/* Coluna esquerda — mockup + prova, fixa ao rolar no desktop. */}
         <div className="flex flex-col items-center gap-6 lg:sticky lg:top-10 lg:items-start lg:self-start">

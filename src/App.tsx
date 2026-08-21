@@ -2,7 +2,11 @@ import * as React from "react";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { captureCampaignParams } from "@/lib/utmTracking";
 import { pendingConfigFields } from "@/config/site";
+import { CartProvider } from "@/context/CartContext";
 
+import MaterialsPage from "@/pages/MaterialsPage";
+import ProductPage from "@/pages/ProductPage";
+import CartPage from "@/pages/CartPage";
 import GuiaEvolucaoEnfermagemPage from "@/pages/GuiaEvolucaoEnfermagemPage";
 import Privacy from "@/pages/Privacy";
 import Terms from "@/pages/Terms";
@@ -35,20 +39,30 @@ export default function App() {
 
   return (
     <BrowserRouter>
-      <Routes>
-        {/* Home pública = a mesma landing do Guia de Evolução de
-            Enfermagem, servida também em /guia-evolucao-enfermagem (mesmo
-            componente, duas rotas) — ver canonical fixo em "/" dentro de
-            GuiaEvolucaoEnfermagemPage.tsx. */}
-        <Route path="/" element={<GuiaEvolucaoEnfermagemPage />} />
-        <Route path="/guia-evolucao-enfermagem" element={<GuiaEvolucaoEnfermagemPage />} />
-        <Route path="/privacidade" element={<Privacy />} />
-        <Route path="/termos" element={<Terms />} />
-        <Route path="/entrega" element={<Delivery />} />
-        <Route path="/reembolso" element={<Refund />} />
+      {/* CartProvider envolve todas as rotas: o carrinho (estado +
+          localStorage, ver src/context/CartContext.tsx) precisa sobreviver
+          à navegação entre "/", "/produto/:slug" e "/carrinho", e o
+          SiteHeader (usado por essas páginas e também pelo Guia) lê o
+          contador/drawer do carrinho independentemente da rota atual. */}
+      <CartProvider>
+        <Routes>
+          {/* A Home institucional separada foi removida: "/" e "/materiais"
+              servem o mesmo componente (MaterialsPage), o catálogo passou a
+              ser a página principal do site. Ver canonical fixo em "/" dentro
+              de MaterialsPage.tsx. */}
+          <Route path="/" element={<MaterialsPage />} />
+          <Route path="/materiais" element={<MaterialsPage />} />
+          <Route path="/produto/:slug" element={<ProductPage />} />
+          <Route path="/carrinho" element={<CartPage />} />
+          <Route path="/guia-evolucao-enfermagem" element={<GuiaEvolucaoEnfermagemPage />} />
+          <Route path="/privacidade" element={<Privacy />} />
+          <Route path="/termos" element={<Terms />} />
+          <Route path="/entrega" element={<Delivery />} />
+          <Route path="/reembolso" element={<Refund />} />
 
-        <Route path="*" element={<NotFound />} />
-      </Routes>
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </CartProvider>
     </BrowserRouter>
   );
 }
