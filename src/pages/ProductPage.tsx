@@ -1,40 +1,43 @@
+import * as React from "react";
 import { Link, useParams } from "react-router-dom";
-import {
-  BadgeCheck,
-  Check,
-  ChevronRight,
-  Download,
-  FileText,
-  HelpCircle,
-  Loader2,
-  Package,
-  RefreshCw,
-  ShieldCheck,
-  ShoppingCart,
-  Sparkles,
-  Users,
-  Zap,
-} from "lucide-react";
+import { BadgeCheck, Check, Download, HelpCircle, Loader2, RefreshCw, ShoppingCart, Zap } from "lucide-react";
 import { useDocumentMeta } from "@/lib/seo";
 import { withCampaignQuery } from "@/lib/utmTracking";
 import { useProductCatalog } from "@/hooks/useProductCatalog";
 import { formatPriceCents, type PublicCatalogProduct } from "@/lib/catalogQueries";
 import { useCart } from "@/context/CartContext";
 import { trackCartAddToCart } from "@/lib/cartPixel";
+import { trackTikTokAddToCart, trackTikTokViewContent } from "@/lib/tiktokPixel";
+import { getProductPageContent } from "@/config/productPageContent";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { SiteFooter } from "@/components/layout/SiteFooter";
 import { Button } from "@/components/ui/button";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { ProductMockup } from "@/components/product/ProductMockup";
 import { ProductCard } from "@/components/catalog/ProductCard";
+import { ProductEditorialHero } from "@/components/product/ProductEditorialHero";
+import { ProductPurchaseCard } from "@/components/product/ProductPurchaseCard";
+import { ProductInfoGrid } from "@/components/product/ProductInfoGrid";
 
 /**
- * Página de produto — Etapa 2 (redesign de e-commerce premium). O
- * checkout inline (<ProductCheckout>, antes embutido nesta página) foi
- * removido: comprar agora leva ao carrinho (/carrinho), que concentra todo
- * o fluxo de pagamento — único ou multiproduto — numa única rota. O
- * componente antigo (src/components/product/ProductCheckout.tsx) não foi
- * apagado nem alterado, só deixou de ser importado aqui.
+ * Página de produto — SISTEMA PADRÃO DE PÁGINAS DE PRODUTO ("redesign
+ * medicamentos-na-pratica" generalizado para todo o catálogo normal).
+ *
+ * TODA página /produto/:slug — atual ou futura, qualquer categoria — usa a
+ * mesma identidade visual: ProductEditorialHero (hero sem vídeo, painel
+ * visual abstrato + marquee) + ProductPurchaseCard (card de compra premium)
+ * + ProductInfoGrid (grid visual de informações). Não existe mais branch
+ * "if slug === X" — o que muda por produto é só o CONTEÚDO, resolvido por
+ * getProductPageContent() (src/config/productPageContent.ts), que sempre
+ * devolve algo utilizável mesmo para um produto sem entrada curada (nunca
+ * quebra por um produto novo do CRM).
+ *
+ * EXCEÇÃO: /guia-evolucao-enfermagem é uma landing própria, servida por
+ * outra rota (GuiaEvolucaoEnfermagemPage, ver App.tsx) — este arquivo não a
+ * renderiza e não foi alterado por causa dela. Se o produto
+ * "guia-evolucao-enfermagem" for acessado via /produto/:slug (rota
+ * diferente), ele passa pelo mesmo sistema padrão que qualquer outro
+ * produto sem conteúdo curado (fallback automático) — não há tratamento
+ * especial aqui, de propósito, para nunca confundir as duas rotas.
  *
  * Dados continuam vindo exclusivamente da RPC pública
  * (get_active_product_catalog, via useProductCatalog()) — nenhum dado de
@@ -42,8 +45,6 @@ import { ProductCard } from "@/components/catalog/ProductCard";
  * escrevem em CartContext (localStorage) e nunca enviam preço a lugar
  * nenhum: a cobrança real (src/pages/CartPage.tsx) sempre manda só slugs.
  */
-
-const CHECKOUT_SECTION_ID = "comprar";
 
 const GENERIC_FAQ = [
   {
@@ -57,34 +58,6 @@ const GENERIC_FAQ = [
   {
     q: "O acesso expira?",
     a: "Não. Depois de liberado, o material fica disponível para download sem prazo de expiração.",
-  },
-];
-
-/**
- * Benefícios e público — texto genérico, verdadeiro para qualquer material
- * do catálogo (não fabricado por produto): a RPC pública não traz campos
- * de "destaques"/"para quem é" por produto, só nome, descrição,
- * categoria, preço e capa.
- */
-const GENERIC_HIGHLIGHTS = ["Acesso digital", "Liberação automática após pagamento", "Consulte quando precisar"];
-
-const CONTENT_BLOCKS = (description: string) => [
-  { icon: Sparkles, title: "Sobre este material", body: description },
-  { icon: FileText, title: "Conteúdo do material", body: description },
-  {
-    icon: Users,
-    title: "Para quem é",
-    body: "Para estudantes, técnicos e enfermeiros que buscam objetividade no estudo e na rotina profissional.",
-  },
-  {
-    icon: Package,
-    title: "O que você recebe",
-    body: "Arquivo em PDF, com acesso liberado automaticamente após a confirmação do pagamento.",
-  },
-  {
-    icon: Zap,
-    title: "Acesso e entrega",
-    body: "Pagamento via Pix, com liberação automática do acesso assim que a confirmação chega. Sem envio físico — a entrega é sempre digital.",
   },
 ];
 
@@ -169,6 +142,23 @@ export default function ProductPage() {
     path: `/produto/${slug}`,
   });
 
+  // ViewContent (TikTok) — dispara quando um produto REAL termina de
+  // carregar (nunca em loading/erro/"não encontrado"). Precisa vir antes
+  // dos `return` condicionais abaixo (regra dos hooks: mesma quantidade de
+  // hooks em toda renderização); a guarda `if (!product)` fica dentro do
+  // efeito. trackTikTokViewContent() já se protege sozinho contra disparo
+  // duplicado (StrictMode) para o mesmo slug — ver src/lib/tiktokPixel.ts.
+  React.useEffect(() => {
+    if (!product) return;
+    trackTikTokViewContent({
+      slug: product.slug,
+      name: product.name,
+      category: product.category,
+      priceCents: product.priceCents,
+      currency: product.currency,
+    });
+  }, [product]);
+
   if (status === "loading") return <LoadingState />;
   if (status === "error") return <ErrorState onRetry={retry} />;
   if (!product) return <NotFoundState />;
@@ -176,6 +166,7 @@ export default function ProductPage() {
   const description = product.description ?? product.shortDescription ?? "Material digital para estudo e prática de enfermagem.";
   const priceLabel = formatPriceCents(product.priceCents, product.currency);
   const inCart = cart.hasItem(product.slug);
+  const content = getProductPageContent(product);
 
   function addProductToCart() {
     if (!product) return;
@@ -188,6 +179,16 @@ export default function ProductPage() {
         category: product.category,
       });
       trackCartAddToCart({ slug: product.slug, priceCents: product.priceCents });
+      // Chamada IRMÃ do trackCartAddToCart acima — mesmo ponto exato, mesma
+      // condição de guarda (só quando o produto realmente entra no
+      // carrinho). Nunca substitui o Meta, nunca é chamada de outro lugar.
+      trackTikTokAddToCart({
+        slug: product.slug,
+        name: product.name,
+        category: product.category,
+        priceCents: product.priceCents,
+        currency: product.currency,
+      });
     }
   }
 
@@ -201,143 +202,18 @@ export default function ProductPage() {
       <SiteHeader />
 
       <main>
-        {/* Breadcrumb discreto */}
-        <div className="border-b border-slate-100">
-          <div className="mx-auto flex w-full max-w-[1200px] flex-wrap items-center gap-1.5 px-5 py-3.5 text-[12.5px] text-slate-400 sm:px-6">
-            <Link to={withCampaignQuery("/")} className="transition-colors hover:text-teal-700">
-              Início
-            </Link>
-            {product.category && (
-              <>
-                <ChevronRight className="h-3 w-3" strokeWidth={2} aria-hidden="true" />
-                <span>{product.category}</span>
-              </>
-            )}
-            <ChevronRight className="h-3 w-3" strokeWidth={2} aria-hidden="true" />
-            <span className="font-semibold text-slate-600">{product.name}</span>
-          </div>
-        </div>
+        <ProductEditorialHero product={product} content={content} />
 
-        {/* ─────────────────────────── Primeira dobra ─────────────────────────── */}
-        <section id={CHECKOUT_SECTION_ID} className="scroll-mt-20 py-8 sm:py-12">
-          <div className="mx-auto grid w-full max-w-[1200px] grid-cols-1 gap-10 px-5 sm:px-6 lg:grid-cols-[1.15fr_0.85fr] lg:items-center lg:gap-14">
-            {/* Esquerda — mockup 3D da capa */}
-            <ProductMockup coverUrl={product.coverUrl} name={product.name} category={product.category} />
+        <ProductPurchaseCard
+          product={product}
+          description={description}
+          priceLabel={priceLabel}
+          inCart={inCart}
+          onAddToCart={handleAddToCart}
+          onBuyNowClick={addProductToCart}
+        />
 
-            {/* Direita — informações e compra */}
-            <div className="flex flex-col gap-5">
-              {product.category && (
-                <span className="w-fit text-[12px] font-bold uppercase tracking-[0.14em] text-teal-700">
-                  {product.category}
-                </span>
-              )}
-              <h1 className="text-[2rem] font-extrabold leading-[1.12] tracking-tight text-slate-900 sm:text-[2.4rem]">
-                {product.name}
-              </h1>
-              {(product.shortDescription ?? product.description) && (
-                <p className="max-w-[54ch] text-[15.5px] leading-relaxed text-slate-600">
-                  {product.shortDescription ?? product.description}
-                </p>
-              )}
-
-              <hr className="my-1 border-slate-200" />
-
-              <div className="flex flex-col gap-2">
-                <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-teal-50 px-3 py-1 text-[11.5px] font-bold uppercase tracking-wide text-teal-700">
-                  <FileText className="h-3.5 w-3.5" strokeWidth={2} aria-hidden="true" /> Material digital
-                </span>
-                <div className="flex items-baseline gap-2">
-                  <span className="text-[2.5rem] font-extrabold leading-none tracking-tight text-slate-900">{priceLabel}</span>
-                </div>
-                <span className="text-[13.5px] font-medium text-slate-500">Pagamento único via Pix</span>
-              </div>
-
-              <ul role="list" className="flex flex-col gap-2">
-                {GENERIC_HIGHLIGHTS.map((item) => (
-                  <li key={item} className="flex items-center gap-2 text-[14px] font-medium text-slate-700">
-                    <Check className="h-4 w-4 shrink-0 text-teal-600" strokeWidth={2.5} aria-hidden="true" />
-                    {item}
-                  </li>
-                ))}
-              </ul>
-
-              <div className="mt-2 hidden flex-col gap-3 sm:flex-row sm:gap-3 lg:flex">
-                <Button size="lg" full className="sm:w-auto sm:flex-1" onClick={handleAddToCart}>
-                  {inCart ? (
-                    <>
-                      <Check className="h-[18px] w-[18px]" strokeWidth={2.2} aria-hidden="true" />
-                      Adicionado ao carrinho
-                    </>
-                  ) : (
-                    <>
-                      <ShoppingCart className="h-[18px] w-[18px]" strokeWidth={2} aria-hidden="true" />
-                      Adicionar ao carrinho
-                    </>
-                  )}
-                </Button>
-                <Button asChild variant="outline" size="lg" full className="sm:w-auto sm:flex-1">
-                  <Link to={withCampaignQuery("/carrinho")} onClick={addProductToCart}>
-                    Comprar agora
-                  </Link>
-                </Button>
-              </div>
-
-              {/* Mobile: CTAs empilhados (a barra sticky inferior cobre o "Adicionar ao carrinho" fixo; aqui ficam os dois, para quem não rolou até a barra ainda existir). */}
-              <div className="mt-2 flex flex-col gap-3 lg:hidden">
-                <Button size="lg" full onClick={handleAddToCart}>
-                  {inCart ? (
-                    <>
-                      <Check className="h-[18px] w-[18px]" strokeWidth={2.2} aria-hidden="true" />
-                      Adicionado ao carrinho
-                    </>
-                  ) : (
-                    <>
-                      <ShoppingCart className="h-[18px] w-[18px]" strokeWidth={2} aria-hidden="true" />
-                      Adicionar ao carrinho
-                    </>
-                  )}
-                </Button>
-                <Button asChild variant="outline" size="lg" full>
-                  <Link to={withCampaignQuery("/carrinho")} onClick={addProductToCart}>
-                    Comprar agora
-                  </Link>
-                </Button>
-              </div>
-
-              <div className="mt-1 flex items-center gap-2 text-[12.5px] text-slate-400">
-                <ShieldCheck className="h-4 w-4 text-teal-600" strokeWidth={1.9} aria-hidden="true" />
-                Liberação automática após a confirmação do Pix
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* ─────────────────────── Conteúdo do produto ─────────────────────── */}
-        <section className="border-t border-slate-200 py-14 sm:py-16">
-          <div className="mx-auto w-full max-w-[820px] px-5 sm:px-6">
-            <div className="overflow-hidden rounded-[28px] border border-slate-200">
-              {CONTENT_BLOCKS(description).map(({ icon: Icon, title, body }, index) => (
-                <div
-                  key={title}
-                  className={index % 2 === 0 ? "bg-white p-6 sm:p-8" : "bg-slate-50 p-6 sm:p-8"}
-                >
-                  <div className="flex items-start gap-4">
-                    <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-teal-50 text-teal-600">
-                      <Icon className="h-5 w-5" strokeWidth={1.8} aria-hidden="true" />
-                    </span>
-                    <div className="min-w-0">
-                      <h2 className="text-[1.05rem] font-extrabold text-slate-900">{title}</h2>
-                      <p className="mt-1.5 text-[14.5px] leading-relaxed text-slate-600">{body}</p>
-                    </div>
-                  </div>
-                  {index < CONTENT_BLOCKS(description).length - 1 && (
-                    <div className="mt-6 border-t border-slate-200/70" aria-hidden="true" />
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
+        <ProductInfoGrid content={content} />
 
         {/* FAQ */}
         <section className="border-t border-slate-200 bg-slate-50 py-14 sm:py-16">

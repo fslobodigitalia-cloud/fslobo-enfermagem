@@ -112,11 +112,11 @@ export const privacyPolicy: LegalDocument = {
       ],
     },
     {
-      heading: "5. Medição (Meta Pixel)",
+      heading: "5. Medição (Meta Pixel e TikTok Pixel)",
       paragraphs: [
-        "Usamos o Meta Pixel para entender o desempenho das campanhas de divulgação deste site. Ele é carregado automaticamente ao acessar esta página.",
-        "Quando ativo, enviamos ao provedor de anúncios apenas informações comerciais agregadas relacionadas à intenção de compra e ao pedido: valor e moeda.",
-        "Nunca enviamos ao provedor de anúncios: seu nome, seu e-mail, suas respostas do teste rápido de conhecimento ou qualquer outro dado pessoal.",
+        "Usamos o Meta Pixel e o TikTok Pixel para entender a navegação, a interação e o desempenho das campanhas de divulgação deste site. Eles são carregados automaticamente ao acessar esta página.",
+        "Quando ativos, enviamos aos provedores de anúncios apenas informações comerciais agregadas relacionadas à navegação e à intenção de compra: produto visualizado/adicionado ao carrinho, valor e moeda.",
+        "Nunca enviamos a esses provedores: seu nome, seu e-mail, suas respostas do teste rápido de conhecimento ou qualquer outro dado pessoal.",
       ],
     },
     {
@@ -126,15 +126,15 @@ export const privacyPolicy: LegalDocument = {
       ],
     },
     {
-      heading: "7. Pagamento (Mercado Pago)",
+      heading: "7. Pagamento via Pix (Efí)",
       paragraphs: [
-        "O pagamento é processado pelo Mercado Pago, via Pix. Não temos acesso a dados bancários ou de conta — o Mercado Pago processa a transação de forma independente, segundo a própria política de privacidade dele.",
+        "O pagamento é processado pela Efí, via Pix. Não temos acesso a dados bancários ou de conta — a Efí processa a transação de forma independente, segundo a própria política de privacidade dela.",
       ],
     },
     {
       heading: "8. Compartilhamento",
       paragraphs: [
-        "Não vendemos dados pessoais. O compartilhamento ocorre apenas com provedores necessários à operação: o Mercado Pago (processamento do pagamento via Pix), o serviço de hospedagem e infraestrutura do site e, quando ativo, o provedor de medição de campanhas (Meta).",
+        "Não vendemos dados pessoais. O compartilhamento ocorre apenas com provedores necessários à operação: a Efí (processamento do pagamento via Pix), o serviço de hospedagem e infraestrutura do site e, quando ativos, os provedores de medição de campanhas (Meta e TikTok).",
       ],
     },
     {
@@ -194,7 +194,7 @@ export const termsOfUse: LegalDocument = {
       list: [
         "Você escolhe o produto principal (Guia de Evolução de Enfermagem) e, se desejar, os materiais complementares oferecidos na mesma tela.",
         "Você informa nome e e-mail e confirma a verificação de segurança do checkout.",
-        `O pagamento é feito por ${commercial.paymentMethod}, processado pelo Mercado Pago.`,
+        `O pagamento é feito por ${commercial.paymentMethod}, processado pela Efí.`,
         "Após a confirmação do pagamento, o sistema libera automaticamente o acesso aos materiais comprados para download.",
       ],
     },

@@ -3,11 +3,16 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { captureCampaignParams } from "@/lib/utmTracking";
 import { pendingConfigFields } from "@/config/site";
 import { CartProvider } from "@/context/CartContext";
+import { ScrollToTop } from "@/components/layout/ScrollToTop";
 
 import MaterialsPage from "@/pages/MaterialsPage";
 import ProductPage from "@/pages/ProductPage";
 import CartPage from "@/pages/CartPage";
 import GuiaEvolucaoEnfermagemPage from "@/pages/GuiaEvolucaoEnfermagemPage";
+import ToolsHubPage from "@/pages/tools/ToolsHubPage";
+import CalculadoraEnfermagemPage from "@/pages/tools/CalculadoraEnfermagemPage";
+import ChecklistPlantaoPage from "@/pages/tools/ChecklistPlantaoPage";
+import DicasPlantaoPage from "@/pages/tools/DicasPlantaoPage";
 import Privacy from "@/pages/Privacy";
 import Terms from "@/pages/Terms";
 import Delivery from "@/pages/Delivery";
@@ -45,6 +50,10 @@ export default function App() {
           SiteHeader (usado por essas páginas e também pelo Guia) lê o
           contador/drawer do carrinho independentemente da rota atual. */}
       <CartProvider>
+        {/* Precisa estar dentro do <BrowserRouter> (usa useLocation) — não
+            depende do carrinho, só está aqui dentro por conveniência de
+            posicionamento. Ver src/components/layout/ScrollToTop.tsx. */}
+        <ScrollToTop />
         <Routes>
           {/* A Home institucional separada foi removida: "/" e "/materiais"
               servem o mesmo componente (MaterialsPage), o catálogo passou a
@@ -54,6 +63,10 @@ export default function App() {
           <Route path="/materiais" element={<MaterialsPage />} />
           <Route path="/produto/:slug" element={<ProductPage />} />
           <Route path="/carrinho" element={<CartPage />} />
+          <Route path="/ferramentas" element={<ToolsHubPage />} />
+          <Route path="/ferramentas/calculadora-enfermagem" element={<CalculadoraEnfermagemPage />} />
+          <Route path="/ferramentas/checklist-plantao" element={<ChecklistPlantaoPage />} />
+          <Route path="/ferramentas/dicas-de-plantao" element={<DicasPlantaoPage />} />
           <Route path="/guia-evolucao-enfermagem" element={<GuiaEvolucaoEnfermagemPage />} />
           <Route path="/privacidade" element={<Privacy />} />
           <Route path="/termos" element={<Terms />} />

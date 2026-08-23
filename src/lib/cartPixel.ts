@@ -14,10 +14,14 @@
  * tiver carregado o script nesta mesma sessão de navegação (SPA, módulos
  * carregados uma única vez).
  *
- * Escopo desta etapa (Etapa 2): somente AddToCart e InitiateCheckout, por
- * instrução explícita. Nenhum Purchase é disparado por este módulo — o
- * Purchase do carrinho fica para uma etapa futura, deliberadamente fora
- * daqui.
+ * trackCartPurchase() segue EXATAMENTE a mesma estratégia já validada em
+ * produção por trackGuiaPurchase() (src/lib/guiaPixel.ts, não alterado por
+ * este arquivo): eventID = order.public_id (o mesmo valor que o webhook
+ * efi-webhook-prod já usa como event_id no Purchase da Conversions API —
+ * é essa igualdade, e só ela, que permite a Meta deduplicar os dois
+ * envios do mesmo evento), guarda em sessionStorage por public_id
+ * (sobrevive a polling/re-render/StrictMode/reabertura da tela dentro da
+ * mesma aba) e só marca como enviado DEPOIS de o fbq real ter disparado.
  */
 
 const PIXEL_ID = "1646677629634348";
@@ -113,4 +117,83 @@ export function trackCartInitiateCheckout(checkoutRequestId: string, totalCents:
   } catch {
     // ver nota acima.
   }
+}
+
+/** Mesmo prefixo já usado por src/lib/guiaPixel.ts — nunca colide entre os
+ * dois fluxos porque a chave inclui orderPublicId, um UUID gerado pelo
+ * backend por pedido (nunca reaproveitado entre um pedido do Guia e um
+ * pedido do carrinho). */
+const PURCHASE_SENT_PREFIX = "meta_purchase_sent_";
+
+function hasCartPurchaseBeenSent(orderPublicId: string): boolean {
+  try {
+    return window.sessionStorage.getItem(PURCHASE_SENT_PREFIX + orderPublicId) === "1";
+  } catch {
+    // sessionStorage indisponível — trata como "ainda não enviado"; a
+    // dedup real acontece no CAPI via eventID, então o pior caso aqui é um
+    // evento de browser a mais, nunca uma perda de conversão.
+    return false;
+  }
+}
+
+function markCartPurchaseSent(orderPublicId: string): void {
+  try {
+    window.sessionStorage.setItem(PURCHASE_SENT_PREFIX + orderPublicId, "1");
+  } catch {
+    // Sem persistência disponível — segue sem marcar, ver hasCartPurchaseBeenSent.
+  }
+}
+
+export interface TrackCartPurchaseInput {
+  /** SEMPRE order.publicId devolvido por create-product-order-efi-prod —
+   * o MESMO valor usado pelo backend como event_id no Purchase enviado
+   * pela Conversions API (efi-webhook-prod). Nunca um UUID novo, nunca
+   * checkout_request_id, nunca txid da Efí, nunca id interno do banco. */
+  orderPublicId: string;
+  /** SEMPRE order.amountCents devolvido por create-product-order-efi-prod
+   * (soma de products.price_cents feita no backend) — nunca o subtotal do
+   * CartContext/localStorage. */
+  amountCents: number;
+  /** Slugs efetivamente associados ao pedido (order.items.map(i => i.slug),
+   * da resposta de criação do pedido) — nunca os slugs atuais do carrinho
+   * (que podem já ter mudado quando o Purchase dispara). */
+  productSlugs: string[];
+}
+
+/**
+ * Pagamento CONFIRMADO — único ponto do frontend que pode disparar
+ * fbq('track', 'Purchase', ...) para o carrinho. Só deve ser chamada
+ * quando get-order-downloads já devolveu status "paid" (nunca em
+ * pending_payment, nunca no clique de "Continuar para pagamento", nunca ao
+ * gerar o QR Code).
+ *
+ * Retorno: true só quando o Purchase foi (ou já tinha sido) realmente
+ * enviado pelo fbq — false em qualquer outro caso (dados inválidos, ou fbq
+ * indisponível no momento da chamada). O chamador deve usar esse retorno
+ * para decidir se pode marcar sua própria guarda de "já disparado": se vier
+ * false, uma tentativa futura (ex.: próximo tick do polling) deve poder
+ * chamar de novo — mesmo contrato de trackGuiaPurchase().
+ */
+export function trackCartPurchase({ orderPublicId, amountCents, productSlugs }: TrackCartPurchaseInput): boolean {
+  if (typeof window === "undefined") return false;
+  if (typeof orderPublicId !== "string" || orderPublicId.length === 0) return false;
+  if (typeof amountCents !== "number" || !Number.isFinite(amountCents) || amountCents <= 0) return false;
+  if (!Array.isArray(productSlugs) || productSlugs.length === 0) return false;
+  if (hasCartPurchaseBeenSent(orderPublicId)) return true;
+  if (typeof window.fbq !== "function") return false; // não marca como enviado sem realmente disparar
+
+  const value = centsToReais(amountCents);
+  window.fbq(
+    "track",
+    "Purchase",
+    { value, currency: "BRL", content_ids: productSlugs, content_type: "product" },
+    { eventID: orderPublicId },
+  );
+  markCartPurchaseSent(orderPublicId);
+
+  if (import.meta.env.DEV) {
+    console.debug("[cartPixel] Purchase enviado", { eventID: orderPublicId, value, content_ids: productSlugs });
+  }
+
+  return true;
 }

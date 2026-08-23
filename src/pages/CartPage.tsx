@@ -13,7 +13,8 @@ import {
 } from "@/lib/productCheckout";
 import { getOrderDownloads, type DownloadItem } from "@/lib/orderDownloads";
 import { saveOrderAccess, readOrderAccess, clearOrderAccess } from "@/lib/orderAccess";
-import { trackCartInitiateCheckout } from "@/lib/cartPixel";
+import { trackCartInitiateCheckout, trackCartPurchase } from "@/lib/cartPixel";
+import { trackTikTokInitiateCheckout, trackTikTokPurchase } from "@/lib/tiktokPixel";
 import { buildPixSupportWhatsAppUrl } from "@/lib/whatsapp";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { SiteFooter } from "@/components/layout/SiteFooter";
@@ -122,6 +123,31 @@ export default function CartPage() {
   const [downloads, setDownloads] = React.useState<DownloadItem[] | null>(null);
   const [resuming, setResuming] = React.useState(true);
 
+  // Guarda de disparo do Purchase — mesmo padrão de
+  // GuiaEvolucaoEnfermagemPage.tsx (não alterado): só existe valor real
+  // quando o pedido foi criado NESTA sessão (createProductOrder devolveu
+  // order.publicId/amountCents/items). No fluxo de retomada (pedido pago
+  // encontrado ao recarregar a página — ver useEffect de retomada acima),
+  // estes refs permanecem null e o Purchase NUNCA dispara: não há como
+  // obter o valor/itens reais confirmados sem alterar get-order-downloads,
+  // e inventar esses dados no frontend é exatamente o que foi proibido. A
+  // deduplicação entre browser e CAPI (mesmo orderPublicId como eventID) e
+  // a proteção contra reenvio por polling/re-render vivem em
+  // trackCartPurchase (src/lib/cartPixel.ts) — purchaseFiredRef aqui é só
+  // um atalho em memória para não reavaliar a guarda a cada re-render.
+  const orderPublicIdRef = React.useRef<string | null>(null);
+  const orderAmountCentsRef = React.useRef<number | null>(null);
+  const orderSlugsRef = React.useRef<string[] | null>(null);
+  const purchaseFiredRef = React.useRef(false);
+  // Espelham exatamente os mesmos dados acima, só que também guardam o
+  // nome de cada item e a moeda real — necessários para trackTikTokPurchase
+  // (contents com content_name, currency = order.currency). Preenchidos no
+  // MESMO ponto de submitOrder, a partir da MESMA resposta de
+  // createProductOrder — nunca uma segunda fonte de dados.
+  const orderCurrencyRef = React.useRef<string | null>(null);
+  const orderItemsRef = React.useRef<{ slug: string; name: string }[] | null>(null);
+  const tiktokPurchaseFiredRef = React.useRef(false);
+
   const siteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY;
   const errorCategory = result?.kind === "error" ? classifyCheckoutErrorCode(result.code) : null;
   const showResultPanel = result !== null && result.kind !== "error" && downloads === null;
@@ -183,6 +209,45 @@ export default function CartPage() {
     clearCart();
   }, [downloads, clearCart]);
 
+  // ── Purchase: dispara exatamente uma vez, no exato instante em que
+  //    "paid" é confirmado (downloads deixa de ser null) DENTRO desta
+  //    sessão — nunca ao adicionar ao carrinho, nunca ao abrir /carrinho,
+  //    nunca ao clicar "Continuar para pagamento", nunca ao gerar o Pix,
+  //    nunca enquanto pending_payment. purchaseFiredRef garante que um
+  //    re-render (ou o StrictMode do React em dev, que re-executa efeitos)
+  //    nunca duplica o evento — mesmo mecanismo de
+  //    GuiaEvolucaoEnfermagemPage.tsx, não alterado por este arquivo.
+  React.useEffect(() => {
+    if (downloads === null) return;
+    if (purchaseFiredRef.current) return;
+    const orderPublicId = orderPublicIdRef.current;
+    const amountCents = orderAmountCentsRef.current;
+    const productSlugs = orderSlugsRef.current;
+    if (orderPublicId === null || amountCents === null || productSlugs === null) return; // fluxo de retomada — ver comentário acima dos refs.
+    // Só marca o atalho em memória se o Purchase foi realmente enviado (ou
+    // já tinha sido, via sessionStorage). Se o Pixel ainda não estiver
+    // disponível, purchaseFiredRef continua false e uma próxima
+    // atualização/polling pode tentar de novo.
+    const sent = trackCartPurchase({ orderPublicId, amountCents, productSlugs });
+    if (sent) purchaseFiredRef.current = true;
+
+    // Chamada IRMÃ da acima, mesmo instante lógico (downloads confirmados),
+    // nunca dentro de trackCartPurchase, nunca substitui o Meta. event_id
+    // = orderPublicId — o MESMO valor usado pelo Purchase da TikTok Events
+    // API em efi-webhook-prod (não alterado por este arquivo). Guarda
+    // própria (tiktokPurchaseFiredRef) independente da guarda do Meta: uma
+    // falha/atraso de um pixel nunca impede o outro de tentar de novo no
+    // próximo re-render.
+    if (!tiktokPurchaseFiredRef.current) {
+      const currency = orderCurrencyRef.current;
+      const orderItems = orderItemsRef.current;
+      if (currency !== null && orderItems !== null) {
+        const tiktokSent = trackTikTokPurchase({ orderPublicId, amountCents, currency, items: orderItems });
+        if (tiktokSent) tiktokPurchaseFiredRef.current = true;
+      }
+    }
+  }, [downloads]);
+
   const handleTurnstileToken = React.useCallback((token: string) => {
     setTurnstileToken(token);
     setTurnstileMissing(false);
@@ -216,6 +281,14 @@ export default function CartPage() {
       subtotalCents,
       items.map((item) => item.slug),
     );
+    // Chamada IRMÃ da acima — mesmo ponto exato, mesmo valor de exibição
+    // (subtotalCents/CartContext). Nunca reaproveitado depois como fonte
+    // de verdade para Purchase (fase futura). Nunca substitui o Meta.
+    trackTikTokInitiateCheckout(
+      subtotalCents,
+      "BRL",
+      items.map((item) => ({ slug: item.slug, name: item.name, priceCents: item.priceCents })),
+    );
 
     setSubmitting(true);
     setTurnstileMissing(false);
@@ -239,6 +312,17 @@ export default function CartPage() {
         publicId: outcome.order.publicId,
         checkoutAccessToken: attempt.checkoutAccessToken,
       });
+      // Único momento em que temos o public_id, o valor REAL confirmado
+      // pelo backend e os slugs efetivamente associados a este pedido —
+      // guardados para o Purchase, disparado só quando o pagamento for de
+      // fato confirmado (ver useEffect acima). orderPublicId é o MESMO
+      // public_id usado pelo backend como event_id na Conversions API
+      // (efi-webhook-prod, não alterado).
+      orderPublicIdRef.current = outcome.order.publicId;
+      orderAmountCentsRef.current = outcome.order.amountCents;
+      orderSlugsRef.current = outcome.order.items.map((item) => item.slug);
+      orderCurrencyRef.current = outcome.order.currency;
+      orderItemsRef.current = outcome.order.items.map((item) => ({ slug: item.slug, name: item.name }));
     }
   }
 

@@ -7,6 +7,7 @@ import { SiteHeader } from "@/components/layout/SiteHeader";
 import { SiteFooter } from "@/components/layout/SiteFooter";
 import { ProductCard } from "@/components/catalog/ProductCard";
 import { HomeFAQ } from "@/components/home/HomeFAQ";
+import { ToolsSection } from "@/components/tools/ToolsSection";
 
 /**
  * Catálogo — Fase 2: consome exclusivamente a RPC pública
@@ -23,7 +24,60 @@ import { HomeFAQ } from "@/components/home/HomeFAQ";
 
 const CATALOG_SECTION_ID = "catalogo";
 const ALL_CATEGORY = "Todos";
-const GRID_CLASS = "grid grid-cols-1 gap-7 sm:grid-cols-2 lg:grid-cols-3";
+// Mobile: 2 colunas (correção visual mobile) — igual ao que já era usado a
+// partir de sm/lg, só o valor base (<640px) mudou de 1 para 2 colunas. gap
+// menor no mobile (12px) para caber confortavelmente 2 cards por linha;
+// sm/lg preservam exatamente o gap de 28px que já existia.
+const GRID_CLASS = "grid grid-cols-2 gap-3 sm:grid-cols-2 sm:gap-7 lg:grid-cols-3";
+
+/** Itens do marquee do hero mobile — sequência duplicada no JSX (ver
+ * HeroMarquee) para o loop ficar contínuo, sem tranco ao reiniciar. */
+const MARQUEE_ITEMS = [
+  "Acesso digital",
+  "Consulta no celular",
+  "Pagamento via Pix",
+  "Liberação automática",
+  "Material em PDF",
+  "Acesso imediato",
+];
+
+/**
+ * Marquee horizontal infinito — substitui, só no mobile (`sm:hidden`), a
+ * linha estática "Acesso digital • Consulta no celular • ...". A lista é
+ * renderizada duas vezes seguidas dentro de uma faixa com `width: max-content`
+ * e a animação `animate-marquee` (keyframe em tailwind.config.js) desloca
+ * -50% — exatamente a largura de UMA cópia da lista, então o instante em
+ * que o loop "reinicia" (100% → 0%) é visualmente idêntico ao quadro
+ * anterior, sem nenhum salto perceptível. `motion-reduce:animate-none`
+ * (variante nativa do Tailwind, sem CSS extra) desliga a animação para
+ * quem tem prefers-reduced-motion. Mask-image nas laterais dá o
+ * acabamento "premium" (texto surge/some suavemente, não corta em seco) —
+ * degrada bem em navegadores sem suporte (some o fade, mas nada quebra).
+ */
+function HeroMarquee() {
+  const items = [...MARQUEE_ITEMS, ...MARQUEE_ITEMS];
+  const maskImage =
+    "linear-gradient(to right, transparent, black 28px, black calc(100% - 28px), transparent)";
+
+  return (
+    <div
+      className="relative mt-1 overflow-hidden py-2 sm:hidden"
+      style={{ WebkitMaskImage: maskImage, maskImage }}
+      aria-hidden="true"
+    >
+      <div className="flex w-max animate-marquee items-center motion-reduce:animate-none">
+        {items.map((item, index) => (
+          <span key={`${item}-${index}`} className="flex shrink-0 items-center gap-3 px-4">
+            <span className="whitespace-nowrap text-[12px] font-semibold tracking-[0.03em] text-slate-200/85">
+              {item}
+            </span>
+            <span aria-hidden="true" className="h-[3px] w-[3px] shrink-0 rounded-full bg-teal-300/50" />
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 /** Grão extremamente sutil, gerado só em CSS (sem imagem externa). */
 const GRAIN: React.CSSProperties = {
@@ -112,7 +166,7 @@ export default function MaterialsPage() {
 
       <main>
         {/* ─────────────────────────── Hero fotográfico ─────────────────────────── */}
-        <section className="relative h-[440px] overflow-hidden sm:h-[500px] lg:h-[540px]">
+        <section className="relative h-[480px] overflow-hidden sm:h-[500px] lg:h-[540px]">
           {/* Base — fica visível se /images/hero-materiais-enfermagem.webp
               ainda não existir ou falhar ao carregar (a camada de imagem
               abaixo simplesmente não pinta nada por cima). */}
@@ -151,16 +205,48 @@ export default function MaterialsPage() {
           />
           <div className="pointer-events-none absolute inset-0 mix-blend-overlay" style={GRAIN} />
 
-          <div className="relative mx-auto flex h-full w-full max-w-[1200px] items-center px-5 sm:px-6">
-            <div className="flex max-w-[680px] flex-col gap-5">
-              <span className="text-[11.5px] font-bold uppercase tracking-[0.16em] text-teal-300">
+          {/*
+            Cadeia de segurança de largura no mobile, ponta a ponta:
+              ROW    (flex row):    w-full max-w-[1200px] min-w-0 px-5
+              COLUMN (flex column): w-full max-w-[680px]  min-w-0
+              H1/P:                 w-full max-w-full     min-w-0 break-words
+            `w-full` em CADA nível é o que importa de verdade: fixa a
+            largura em um valor DEFINIDO (100% do pai) em vez de deixar o
+            item calcular sua própria largura "sob demanda" a partir do
+            conteúdo — é essa segunda forma (largura implícita/intrínseca)
+            que, dentro de flexbox, pode ficar maior que o espaço real
+            disponível quando o conteúdo é longo (o H1 é um item de um
+            flex-column; sem `w-full`, ele tende a ocupar a largura que o
+            texto "pede", não a que o container realmente tem). `min-w-0`
+            complementa isso removendo o piso mínimo automático que o
+            Flexbox aplicaria por padrão a um item com overflow visível.
+            `max-w-full`/`max-w-[680px]` seguem só como teto, nunca
+            largura-fonte. Com isso a largura do H1 e do parágrafo é
+            SEMPRE literalmente igual à do container (nunca maior), então
+            a quebra de linha do texto acontece dentro do espaço real —
+            não há mais nenhum caminho para o texto "vazar" e ser cortado
+            pelo overflow-hidden da <section>.
+          */}
+          <div className="relative mx-auto flex h-full w-full min-w-0 max-w-[1200px] items-center px-5 sm:px-6">
+            <div className="flex w-full min-w-0 max-w-[680px] flex-col gap-5">
+              <span className="block w-full max-w-full text-[11.5px] font-bold uppercase tracking-[0.16em] text-teal-300">
                 Materiais digitais de enfermagem
               </span>
-              <h1 className="text-[2.75rem] font-extrabold leading-[1.08] tracking-tight text-white sm:text-[3.4rem] lg:text-[3.85rem]">
+              {/* clamp() com teto mais conservador (2.2rem) do que a
+                  primeira tentativa — folga maior de propósito para nunca
+                  chegar perto do limite do container mesmo em fontes/
+                  navegadores com métricas de glifo levemente diferentes.
+                  overflow-wrap:anywhere é o último recurso (só entra em
+                  ação se break-words/word-break normal não bastar para
+                  uma palavra específica) — nem break-words nem
+                  overflow-wrap:anywhere disparam aqui em uso normal, já
+                  que a largura do H1 agora é sempre real (ver nota acima),
+                  mas ficam como rede de segurança. */}
+              <h1 className="w-full max-w-full min-w-0 break-words text-[clamp(1.9rem,8.5vw,2.2rem)] font-extrabold leading-[1.12] tracking-tight text-white [overflow-wrap:anywhere] sm:text-[3.4rem] sm:leading-[1.08] sm:[overflow-wrap:normal] lg:text-[3.85rem]">
                 Materiais de enfermagem para estudar com{" "}
                 <span className="text-teal-200">clareza</span> e consultar na prática.
               </h1>
-              <p className="max-w-[590px] text-[16px] leading-relaxed text-slate-200/90 sm:text-[17px]">
+              <p className="w-full max-w-full min-w-0 text-[15px] leading-relaxed text-slate-200/90 sm:max-w-[590px] sm:text-[17px]">
                 Guias visuais e conteúdos objetivos para estudantes, técnicos e enfermeiros —
                 organizados para facilitar o estudo e a rotina profissional.
               </p>
@@ -176,7 +262,10 @@ export default function MaterialsPage() {
                 </button>
               </div>
 
-              <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[13px] text-slate-300/80">
+              {/* Mobile: marquee infinito (ver HeroMarquee acima). Desktop
+                  (sm+): linha estática original, sem nenhuma mudança. */}
+              <HeroMarquee />
+              <div className="mt-1 hidden flex-wrap items-center gap-x-2.5 gap-y-1 text-[13px] text-slate-300/80 sm:flex">
                 <span>Acesso digital</span>
                 <span aria-hidden="true">•</span>
                 <span>Consulta no celular</span>
@@ -187,13 +276,19 @@ export default function MaterialsPage() {
           </div>
         </section>
 
+        {/* Ferramentas gratuitas — logo após a Hero, antes do catálogo. */}
+        <ToolsSection />
+
         {/* ──────────────────────── Catálogo (fundo slate claro) ─────────────────────── */}
         {/* pt define a separação clara com o Hero — nenhum elemento deste
             bloco sobrepõe a seção escura acima. */}
-        <section id={CATALOG_SECTION_ID} className="bg-[#f5f7f9] pb-16 pt-7 sm:pb-24 sm:pt-12 lg:pt-14">
+        <section id={CATALOG_SECTION_ID} className="bg-[#f5f7f9] pb-16 pt-10 sm:pb-24 sm:pt-12 lg:pt-14">
           <div className="mx-auto w-full max-w-[1200px] px-5 sm:px-6">
-            {/* Toolbar — 100% dentro da seção clara, superfície discreta. */}
-            <div className="rounded-[20px] border border-slate-200/70 bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.03),0_6px_16px_-10px_rgba(15,23,42,0.08)] sm:p-6">
+            {/* Toolbar — 100% dentro da seção clara, superfície discreta.
+                p-5 (20px) no mobile garante que o primeiro/último chip de
+                categoria nunca fica colado na borda do cartão; sm:p-6
+                preserva exatamente o desktop. */}
+            <div className="rounded-[20px] border border-slate-200/70 bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.03),0_6px_16px_-10px_rgba(15,23,42,0.08)] sm:p-6">
               <span className="text-[13px] font-bold text-slate-900 sm:mb-4 sm:block">Explore por categoria</span>
 
               <div className="-mx-1 mt-3.5 flex gap-2 overflow-x-auto px-1 py-0.5 [scrollbar-width:none] sm:mt-0 sm:flex-wrap sm:overflow-visible [&::-webkit-scrollbar]:hidden">
