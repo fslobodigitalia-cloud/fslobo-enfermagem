@@ -2,14 +2,21 @@
  * Catálogo do Guia de Evolução de Enfermagem (produto principal) e seus
  * order bumps opcionais — Fase 4 (frontend).
  *
- * Estes valores são só para EXIBIÇÃO/UX (preço mostrado na página, total
- * calculado ao marcar bumps). A fonte real de verdade para o valor
- * cobrado é sempre public.products, lida pela RPC
- * create_or_get_product_order_with_items() no momento da compra — o
- * frontend nunca envia preço, só os slugs marcados. Se o catálogo mudar no
- * banco (preço, produto ativo/inativo), este arquivo precisa ser
- * atualizado manualmente para continuar refletindo a mesma coisa — não há
- * leitura dinâmica do catálogo nesta etapa.
+ * A fonte real de verdade para o valor cobrado é sempre public.products,
+ * lida pela RPC create_or_get_product_order_with_items() no momento da
+ * compra — o frontend nunca envia preço, só os slugs marcados.
+ *
+ * guiaEvolucaoProduct.priceCents/priceLabel: desde a correção de preço
+ * (2026-08), GuiaEvolucaoEnfermagemPage NÃO usa mais esses dois campos
+ * para exibição — o preço mostrado na página vem do catálogo público
+ * (RPC get_active_product_catalog(), via useProductCatalog(), mesma fonte
+ * de /materiais e /produto/:slug), então mudanças de preço no banco/CRM
+ * aparecem sozinhas, sem precisar editar código. priceCents aqui
+ * permanece só como FALLBACK para os poucos instantes antes do catálogo
+ * responder, ou se a consulta falhar — mantenha sincronizado com o preço
+ * real de vez em quando, mas nunca é a fonte usada em condições normais.
+ * guiaEvolucaoBumps abaixo continua sem leitura dinâmica (fora do escopo
+ * desta correção).
  *
  * legislacao-sus-ilustrada existe no banco (active=false) mas NUNCA
  * aparece aqui de propósito — produto removido da oferta.
@@ -18,8 +25,8 @@
 export const guiaEvolucaoProduct = {
   slug: "guia-evolucao-enfermagem",
   name: "Guia de Evolução de Enfermagem",
-  priceCents: 1700,
-  priceLabel: "R$ 17,00",
+  priceCents: 1000,
+  priceLabel: "R$ 10,00",
 };
 
 export interface DigitalBump {

@@ -65,6 +65,7 @@ import {
 } from "@/lib/productCheckout";
 import { getOrderDownloads, type DownloadItem } from "@/lib/orderDownloads";
 import { saveOrderAccess, readOrderAccess, clearOrderAccess } from "@/lib/orderAccess";
+import { useProductCatalog } from "@/hooks/useProductCatalog";
 import { guiaEvolucaoProduct, guiaEvolucaoBumps, formatCents } from "@/config/digitalProducts";
 import {
   guiaQuizQuestions,
@@ -209,6 +210,20 @@ export default function GuiaEvolucaoEnfermagemPage() {
 
   const { attempt } = useCheckoutAttempt(guiaEvolucaoProduct.slug);
 
+  // Preço exibido: lido do MESMO catálogo público (RPC
+  // get_active_product_catalog(), via useProductCatalog()) já usado por
+  // /materiais e /produto/:slug — nunca uma segunda fonte. Assim que o
+  // preço mudar no banco (CRM), a página reflete automaticamente, sem
+  // precisar editar código. guiaEvolucaoProduct.priceCents (config
+  // estático) só entra como fallback nos poucos instantes antes do
+  // catálogo responder, ou se a consulta falhar — nunca é usado para
+  // calcular a cobrança real, que continua exclusivamente no backend
+  // (create_or_get_product_order_with_items()).
+  const catalog = useProductCatalog();
+  const guiaCatalogProduct =
+    catalog.status === "success" ? catalog.products.find((p) => p.slug === guiaEvolucaoProduct.slug) ?? null : null;
+  const guiaPriceCents = guiaCatalogProduct?.priceCents ?? guiaEvolucaoProduct.priceCents;
+
   const [firstName, setFirstName] = React.useState("");
   const [email, setEmail] = React.useState("");
   const [selectedBumps, setSelectedBumps] = React.useState<Set<string>>(new Set());
@@ -247,7 +262,7 @@ export default function GuiaEvolucaoEnfermagemPage() {
   const showPixResult = result !== null && result.kind !== "error" && downloads === null;
 
   const totalCents =
-    guiaEvolucaoProduct.priceCents +
+    guiaPriceCents +
     guiaEvolucaoBumps.filter((b) => selectedBumps.has(b.slug)).reduce((sum, b) => sum + b.priceCents, 0);
 
   // ── Retomada: se já existe um pedido salvo (localStorage) para este
@@ -434,7 +449,7 @@ export default function GuiaEvolucaoEnfermagemPage() {
   }
 
   function handleQuizProfileSelected() {
-    trackGuiaLead(guiaEvolucaoProduct.priceCents);
+    trackGuiaLead(guiaPriceCents);
   }
 
   function handleQuizResultCta() {
@@ -470,8 +485,8 @@ export default function GuiaEvolucaoEnfermagemPage() {
             <Hero />
             <ModulesSection />
             <GuiaConversationSection />
-            <QuizSection onProfileSelected={handleQuizProfileSelected} onResultCta={handleQuizResultCta} />
-            <OfferSection>
+            <QuizSection onProfileSelected={handleQuizProfileSelected} onResultCta={handleQuizResultCta} priceCents={guiaPriceCents} />
+            <OfferSection priceCents={guiaPriceCents}>
               {showForm && (
                 <CheckoutForm
                   firstName={firstName}
@@ -790,9 +805,11 @@ type QuizPhase = "questions" | "profile" | "result";
 function QuizSection({
   onProfileSelected,
   onResultCta,
+  priceCents,
 }: {
   onProfileSelected: () => void;
   onResultCta: () => void;
+  priceCents: number;
 }) {
   const [phase, setPhase] = React.useState<QuizPhase>("questions");
   const [index, setIndex] = React.useState(0);
@@ -995,7 +1012,7 @@ function QuizSection({
               </p>
               <p className="text-left text-[15.5px] leading-relaxed text-slate-600">{guiaProfileMessages[profile].body}</p>
               <Button type="button" variant="outline" size="lg" full className={CTA_BUTTON_CLASS} onClick={onResultCta}>
-                Quero os modelos por R$ 17,00
+                Quero os modelos por {formatCents(priceCents)}
               </Button>
             </div>
           )}
@@ -1028,8 +1045,8 @@ const OFFER_NAVY_BG: React.CSSProperties = {
     "radial-gradient(60% 50% at 15% 0%, rgba(13,148,136,0.16), transparent 60%), radial-gradient(50% 45% at 100% 100%, rgba(16,185,129,0.12), transparent 60%)",
 };
 
-function OfferSection({ children }: { children: React.ReactNode }) {
-  const priceDigits = guiaEvolucaoProduct.priceLabel.replace("R$", "").trim();
+function OfferSection({ children, priceCents }: { children: React.ReactNode; priceCents: number }) {
+  const priceDigits = formatCents(priceCents).replace("R$", "").trim();
 
   return (
     <section id={OFFER_SECTION_ID} className="relative scroll-mt-[76px] overflow-hidden px-5 py-16 sm:py-28" style={OFFER_NAVY_BG}>
