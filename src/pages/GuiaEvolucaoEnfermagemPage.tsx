@@ -37,7 +37,6 @@ import { GuiaConversationSection } from "../components/guia/GuiaConversationSect
  */
 import * as React from "react";
 import {
-  AlertTriangle,
   ArrowRight,
   Check,
   CheckCircle2,
@@ -46,17 +45,15 @@ import {
   Download,
   FileText,
   HeartPulse,
-  Hourglass,
   Loader2,
   Lock,
   MessageCircle,
-  PenLine,
   ShieldCheck,
   Sparkles,
   XCircle,
   Zap,
 } from "lucide-react";
-import { motion, useReducedMotion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { useDocumentMeta } from "@/lib/seo";
 import { useCheckoutAttempt } from "@/lib/checkoutAttempt";
@@ -101,17 +98,17 @@ const OFFER_SECTION_ID = "comprar";
 const PANEL_CONTAINER = "mx-auto w-full max-w-[640px] px-5";
 
 /**
- * Sistema de sombra em 3 níveis — só para esta página (classes locais,
+ * Sistema de sombra em 2 níveis — só para esta página (classes locais,
  * repetidas via constante em vez de virar @layer components global).
  * Sempre em camadas (uma sombra de contato curta + uma difusa longa),
  * nunca uma sombra preta única e pesada. SOFT para elementos secundários
  * (badges, ícones, cards do carrossel), MEDIUM para blocos de conteúdo
- * (quiz, dores), STRONG só para os pontos de maior destaque (mockup do
- * produto, card de checkout).
+ * (quiz, preço). Os pontos de maior destaque (vídeo do produto, card de
+ * checkout) usam sombras dedicadas mais fortes, escritas inline onde
+ * aparecem, coerentes com o fundo escuro que os envolve.
  */
 const SHADOW_SOFT = "shadow-[0_2px_4px_rgba(15,23,42,0.04),0_8px_20px_-14px_rgba(15,23,42,0.12)]";
 const SHADOW_MEDIUM = "shadow-[0_4px_8px_rgba(15,23,42,0.05),0_20px_40px_-20px_rgba(15,23,42,0.16)]";
-const SHADOW_STRONG = "shadow-[0_8px_16px_rgba(15,23,42,0.06),0_30px_60px_-24px_rgba(15,23,42,0.22)]";
 
 /**
  * Botão CTA "premium": sombra de contato + realce interno sutil no topo
@@ -471,7 +468,6 @@ export default function GuiaEvolucaoEnfermagemPage() {
         ) : (
           <>
             <Hero />
-            <PainSection />
             <ModulesSection />
             <GuiaConversationSection />
             <QuizSection onProfileSelected={handleQuizProfileSelected} onResultCta={handleQuizResultCta} />
@@ -521,20 +517,115 @@ const TRUST_ITEMS = [
 ];
 
 /**
- * Fundo escuro do hero — navy profundo (mesmo tom do SiteFooter, #0a1622)
- * com iluminação teal discreta em dois pontos e uma textura de grão quase
- * imperceptível (nunca um gradiente chamativo). Só CSS, sem imagem.
+ * Camada de contraste sobre o vídeo de fundo da Hero — mesmo tom navy do
+ * SiteFooter (#0a1622), com as duas luzes teal discretas que já existiam
+ * no fundo sólido anterior (identidade visual preservada). Gradiente
+ * vertical mais escuro no topo/base (onde ficam badge/título e CTA) e
+ * mais transparente no meio, + vinheta lateral — forte o bastante para os
+ * textos ficarem perfeitamente legíveis, sem apagar por completo o
+ * movimento do vídeo por trás. Só CSS, sem imagem.
  */
-const HERO_NAVY_BG: React.CSSProperties = {
-  backgroundColor: "#0a1622",
+const HERO_VIDEO_OVERLAY: React.CSSProperties = {
   backgroundImage:
-    "radial-gradient(60% 55% at 14% 8%, rgba(45,212,191,0.14), transparent 62%), radial-gradient(50% 45% at 100% 100%, rgba(13,148,136,0.12), transparent 60%), radial-gradient(rgba(255,255,255,0.035) 1px, transparent 1px)",
-  backgroundSize: "auto, auto, 26px 26px",
+    "linear-gradient(180deg, rgba(10,22,34,0.82) 0%, rgba(10,22,34,0.6) 45%, rgba(10,22,34,0.88) 100%), linear-gradient(90deg, rgba(10,22,34,0.6) 0%, rgba(10,22,34,0) 22%, rgba(10,22,34,0) 78%, rgba(10,22,34,0.6) 100%), radial-gradient(60% 55% at 14% 8%, rgba(45,212,191,0.16), transparent 62%), radial-gradient(50% 45% at 100% 100%, rgba(13,148,136,0.14), transparent 60%)",
 };
 
-function Hero() {
+/**
+ * Setores/áreas da enfermagem exibidos na faixa contínua ao final da Hero —
+ * puramente ilustrativo (o Guia cobre Clínica Médica, UTI e Emergência;
+ * as demais áreas aqui são só contexto visual da profissão, não promessa
+ * de conteúdo específico para cada setor).
+ */
+const SPECIALTY_AREAS = [
+  "Clínica Médica",
+  "Clínica Cirúrgica",
+  "Urgência e Emergência",
+  "UTI / CTI",
+  "Pronto Atendimento",
+  "Centro Cirúrgico",
+  "Pediatria",
+  "Obstetrícia",
+  "Maternidade",
+  "Cardiologia",
+  "Oncologia",
+  "Nefrologia",
+  "Ortopedia",
+  "Saúde Mental",
+  "Atenção Primária",
+  "Home Care",
+];
+
+/**
+ * Faixa/carrossel horizontal infinito de setores, ao final da Hero. Loop
+ * puramente em CSS (duas cópias da mesma lista, translateX de 0 a -50%) —
+ * sem JS, sem layout shift, sem depender de framer-motion para o
+ * movimento contínuo. A cópia duplicada é aria-hidden (mesmo conteúdo
+ * textual repetido só para o efeito visual de loop); a lista real (para
+ * leitores de tela) é a primeira. prefers-reduced-motion é respeitado via
+ * media query no <style> local — para o movimento sem depender de JS.
+ */
+function SpecialtyMarquee() {
   return (
-    <section className="relative overflow-hidden px-3.5 pb-16 pt-14 text-white sm:px-5 sm:pb-20 sm:pt-16 lg:pb-24 lg:pt-20" style={HERO_NAVY_BG}>
+    <div
+      className="relative left-1/2 mt-12 w-screen -translate-x-1/2 overflow-hidden border-t border-white/10 py-5 [mask-image:linear-gradient(to_right,transparent,black_6%,black_94%,transparent)] sm:mt-16"
+      aria-label="Áreas e setores da enfermagem"
+    >
+      <div className="guia-marquee-track flex w-max items-center">
+        {[0, 1].map((copyIndex) => (
+          <ul
+            key={copyIndex}
+            aria-hidden={copyIndex === 1 ? "true" : undefined}
+            className="flex shrink-0 items-center gap-8 pr-8"
+          >
+            {SPECIALTY_AREAS.map((area) => (
+              <li
+                key={area}
+                className="flex shrink-0 items-center gap-8 whitespace-nowrap text-[12.5px] font-bold uppercase tracking-[0.08em] text-slate-300/85"
+              >
+                {area}
+                <span className="h-1 w-1 shrink-0 rounded-full bg-teal-400/50" aria-hidden="true" />
+              </li>
+            ))}
+          </ul>
+        ))}
+      </div>
+      <style>{`
+        .guia-marquee-track { animation: guia-marquee-scroll 38s linear infinite; }
+        @keyframes guia-marquee-scroll {
+          from { transform: translateX(0); }
+          to { transform: translateX(-50%); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .guia-marquee-track { animation: none; }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+function Hero() {
+  // Vídeo de fundo só entra em prefers-reduced-motion: reduce nunca é
+  // renderizado — o overlay + backgroundColor do <section> (navy sólido)
+  // cobrem esse caso sozinhos, sem precisar pausar/tocar vídeo nenhum.
+  const reducedMotion = useReducedMotion();
+
+  return (
+    <section className="relative overflow-hidden px-3.5 pb-16 pt-14 text-white sm:px-5 sm:pb-20 sm:pt-16 lg:pb-24 lg:pt-20" style={{ backgroundColor: "#0a1622" }}>
+      {!reducedMotion && (
+        <video
+          className="pointer-events-none absolute inset-0 h-full w-full object-cover"
+          src="/guia-evolucao/hero-enfermagem.mp4"
+          autoPlay
+          muted
+          loop
+          playsInline
+          aria-hidden="true"
+        />
+      )}
+      {/* Camada de contraste — sempre presente (com ou sem vídeo), garante
+          leitura dos textos em qualquer cenário. */}
+      <div className="pointer-events-none absolute inset-0" style={HERO_VIDEO_OVERLAY} aria-hidden="true" />
+
       {/* Fio de luz no topo/base — separa das seções claras vizinhas sem borda dura. */}
       <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/[0.08]" aria-hidden="true" />
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-white/[0.08]" aria-hidden="true" />
@@ -617,67 +708,8 @@ function Hero() {
           </div>
         </div>
       </div>
-    </section>
-  );
-}
 
-/* ─────────────────────────────── Três dores ──────────────────────────────── */
-
-const PAIN_POINTS = [
-  {
-    icon: PenLine,
-    title: "Travar na hora de escrever",
-    text: "Você termina o atendimento, abre o prontuário em branco e não sabe como começar nem qual termo usar para descrever o que acabou de fazer.",
-  },
-  {
-    icon: AlertTriangle,
-    title: "Será que esqueci algo?",
-    text: "Aquela dúvida que fica depois de registrar: será que faltou anotar uma informação importante ou usei a palavra errada?",
-  },
-  {
-    icon: Hourglass,
-    title: "Sair tarde do plantão",
-    text: "Passar do horário no setor só porque levou tempo demais para organizar as ideias e colocar no papel tudo o que aconteceu com o paciente.",
-  },
-];
-
-function PainSection() {
-  return (
-    <section className="relative bg-slate-50 px-5 py-20 sm:py-24" style={TEXTURE_DOTS}>
-      <div className="mx-auto w-full max-w-[1180px]">
-        <div className="mx-auto max-w-[640px] text-center">
-          <span className={cn("inline-flex items-center rounded-full border border-teal-200 bg-white px-4 py-1.5 text-[12px] font-bold uppercase tracking-wide text-teal-700", SHADOW_SOFT)}>
-            Por que isso pesa tanto
-          </span>
-          <h2 className="mt-4 font-sans text-[1.9rem] font-extrabold tracking-tight text-slate-900 sm:text-[2.35rem] lg:text-[2.65rem]">
-            Não leve preocupação <span className="text-teal-600">para casa</span>
-          </h2>
-          <p className="mx-auto mt-3 max-w-[56ch] text-[15.5px] text-slate-600">
-            A rotina do hospital já é pesada. Você não precisa transformar a anotação em mais um peso:
-          </p>
-        </div>
-
-        <div className="mt-14 grid gap-6 lg:grid-cols-3 lg:gap-8">
-          {PAIN_POINTS.map(({ icon: Icon, title, text }) => (
-            <div
-              key={title}
-              className={cn(
-                "relative overflow-hidden rounded-[28px] border border-slate-200/80 bg-white p-8 transition-all duration-200 hover:-translate-y-1",
-                SHADOW_SOFT,
-                "hover:shadow-[0_4px_8px_rgba(15,23,42,0.05),0_28px_50px_-22px_rgba(15,23,42,0.22)]",
-              )}
-            >
-              {/* Detalhe teal muito sutil no fundo do card, para não deixar o bloco totalmente plano. */}
-              <div className="pointer-events-none absolute -right-8 -top-10 h-32 w-32 rounded-full bg-teal-50/70 blur-2xl" aria-hidden="true" />
-              <span className={cn("relative flex h-14 w-14 items-center justify-center rounded-2xl bg-teal-50 text-teal-600", SHADOW_SOFT)}>
-                <Icon className="h-7 w-7" strokeWidth={1.75} aria-hidden="true" />
-              </span>
-              <h3 className="relative mt-6 font-sans text-[1.2rem] font-bold text-slate-900">{title}</h3>
-              <p className="relative mt-2.5 text-[15px] leading-relaxed text-slate-600">{text}</p>
-            </div>
-          ))}
-        </div>
-      </div>
+      <SpecialtyMarquee />
     </section>
   );
 }
@@ -690,11 +722,14 @@ const MODULE_PAGES = [
   { src: "/guia-evolucao/modulo-3.webp", alt: "Página de exemplo do Guia de Evolução de Enfermagem — modelo 3, roteiro de anotação de enfermagem" },
   { src: "/guia-evolucao/modulo-4.webp", alt: "Página de exemplo do Guia de Evolução de Enfermagem — modelo 4, roteiro de anotação de enfermagem" },
   { src: "/guia-evolucao/modulo-5.webp", alt: "Página de exemplo do Guia de Evolução de Enfermagem — modelo 5, roteiro de anotação de enfermagem" },
+  { src: "/guia-evolucao/modulo-6.webp", alt: "Página de exemplo do Guia de Evolução de Enfermagem — modelo 6, roteiro de anotação de enfermagem" },
+  { src: "/guia-evolucao/modulo-7.webp", alt: "Página de exemplo do Guia de Evolução de Enfermagem — modelo 7, roteiro de anotação de enfermagem" },
+  { src: "/guia-evolucao/modulo-8.webp", alt: "Página de exemplo do Guia de Evolução de Enfermagem — modelo 8, roteiro de anotação de enfermagem" },
 ];
 
 function ModulesSection() {
   return (
-    <section className="relative bg-white px-5 py-20 sm:py-24" style={TEXTURE_TEAL_BLOOM}>
+    <section className="relative bg-white px-5 py-12 sm:py-24" style={TEXTURE_TEAL_BLOOM}>
       <div className="mx-auto w-full max-w-[1180px]">
         <div className="mx-auto max-w-[640px] text-center">
           <span className={cn("inline-flex items-center rounded-full border border-teal-200 bg-teal-50 px-4 py-1.5 text-[12px] font-bold uppercase tracking-wide text-teal-700", SHADOW_SOFT)}>
@@ -703,16 +738,12 @@ function ModulesSection() {
           <h2 className="mt-4 font-sans text-[1.9rem] font-extrabold tracking-tight text-slate-900 sm:text-[2.35rem] lg:text-[2.65rem]">
             O que você vai <span className="text-teal-600">ter em mãos</span>
           </h2>
-          <p className="mx-auto mt-3 max-w-[60ch] text-[15.5px] text-slate-600">
-            Modelos de evolução e anotação separados por situação clínica — Clínica Médica, UTI e Emergência.
-            Bateu dúvida, é só abrir, ver a estrutura e adaptar ao seu paciente.
-          </p>
         </div>
 
         {/* Prova visual central do produto, antes do carrossel — badge com leve brilho de superfície. */}
         <div
           className={cn(
-            "relative mx-auto mt-10 flex w-fit items-center gap-3 overflow-hidden rounded-full border border-teal-200 bg-gradient-to-b from-teal-50 to-white px-6 py-3",
+            "relative mx-auto mt-6 flex w-fit items-center gap-3 overflow-hidden rounded-full border border-teal-200 bg-gradient-to-b from-teal-50 to-white px-6 py-3 sm:mt-10",
             SHADOW_SOFT,
           )}
         >
@@ -721,7 +752,7 @@ function ModulesSection() {
           <span className="relative font-sans text-[1.05rem] font-extrabold text-teal-800">+132 modelos para consultar</span>
         </div>
 
-        <div className="mt-12 flex snap-x snap-mandatory gap-5 overflow-x-auto px-1 pb-6 [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: "none" }}>
+        <div className="mt-8 flex snap-x snap-mandatory gap-5 overflow-x-auto px-1 pb-6 [&::-webkit-scrollbar]:hidden sm:mt-12" style={{ scrollbarWidth: "none" }}>
           {MODULE_PAGES.map((page, i) => (
             <div
               key={page.src}
@@ -813,7 +844,7 @@ function QuizSection({
               Será que você está <span className="text-teal-600">registrando certo?</span>
             </h2>
             <p className="mx-auto mt-3 max-w-[52ch] text-[15.5px] text-slate-600">
-              Pequenos detalhes fazem toda a diferença na proteção do seu COREN. Faça o teste rápido:
+              Pequenos detalhes fazem toda a diferença na qualidade e segurança do seu registro profissional. Faça o teste rápido:
             </p>
           </div>
         )}
@@ -837,39 +868,67 @@ function QuizSection({
                     style={{ width: `${progressPercent}%` }}
                   />
                 </div>
-                <p className="text-[1.25rem] font-bold leading-snug text-slate-900 sm:text-[1.4rem]">{question.question}</p>
               </div>
 
-              <div className="flex flex-col gap-3">
-                {question.options.map((option, i) => {
-                  const isCorrectOption = i === question.answerIndex;
-                  const isSelectedOption = i === selected;
-                  const answered = selected !== null;
-                  return (
-                    <button
-                      key={option}
-                      type="button"
-                      onClick={() => handleAnswer(i)}
-                      disabled={answered}
-                      className={cn(
-                        "flex items-center justify-between gap-3 rounded-2xl border-2 px-5 py-4 text-left text-[15.5px] font-semibold transition-all duration-200",
-                        !answered && cn("border-slate-200 bg-white text-slate-800 hover:-translate-y-0.5 hover:border-teal-400 hover:bg-teal-50/60", SHADOW_SOFT),
-                        answered && isCorrectOption && "border-emerald-500 bg-emerald-50 text-emerald-800 shadow-[0_4px_12px_-4px_rgba(16,185,129,0.35)]",
-                        answered && isSelectedOption && !isCorrectOption && "border-rose-400 bg-rose-50 text-rose-800 shadow-[0_4px_12px_-4px_rgba(244,63,94,0.3)]",
-                        answered && !isSelectedOption && !isCorrectOption && "border-slate-200 bg-white text-slate-400",
-                      )}
-                    >
-                      <span>{option}</span>
-                      {answered && isCorrectOption && (
-                        <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-600" aria-hidden="true" />
-                      )}
-                      {answered && isSelectedOption && !isCorrectOption && (
-                        <XCircle className="h-5 w-5 shrink-0 text-rose-600" aria-hidden="true" />
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
+              {/* AnimatePresence: cada pergunta entra com um fade + leve subida —
+                  reforça a sensação de "próxima etapa" sem ser chamativo.
+                  mode="wait" evita a pergunta nova sobrepor a anterior. */}
+              <AnimatePresence mode="wait" initial={false}>
+                <motion.div
+                  key={index}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+                  className="flex flex-col gap-6"
+                >
+                  <p className="text-[1.25rem] font-bold leading-snug text-slate-900 sm:text-[1.4rem]">{question.question}</p>
+
+                  <div className="flex flex-col gap-3">
+                    {question.options.map((option, i) => {
+                      const isCorrectOption = i === question.answerIndex;
+                      const isSelectedOption = i === selected;
+                      const answered = selected !== null;
+                      const letter = String.fromCharCode(65 + i);
+                      return (
+                        <button
+                          key={option}
+                          type="button"
+                          onClick={() => handleAnswer(i)}
+                          disabled={answered}
+                          className={cn(
+                            "flex items-center gap-3.5 rounded-2xl border-2 px-5 py-4 text-left text-[15.5px] font-semibold transition-all duration-200",
+                            !answered && cn("border-slate-200 bg-white text-slate-800 hover:-translate-y-0.5 hover:border-teal-400 hover:bg-teal-50/60", SHADOW_SOFT),
+                            answered && isCorrectOption && "border-emerald-500 bg-emerald-50 text-emerald-800 shadow-[0_4px_12px_-4px_rgba(16,185,129,0.35)]",
+                            answered && isSelectedOption && !isCorrectOption && "border-rose-400 bg-rose-50 text-rose-800 shadow-[0_4px_12px_-4px_rgba(244,63,94,0.3)]",
+                            answered && !isSelectedOption && !isCorrectOption && "border-slate-200 bg-white text-slate-400",
+                          )}
+                        >
+                          <span
+                            className={cn(
+                              "flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[13px] font-extrabold transition-colors duration-200",
+                              !answered && "bg-slate-100 text-slate-500",
+                              answered && isCorrectOption && "bg-emerald-500 text-white",
+                              answered && isSelectedOption && !isCorrectOption && "bg-rose-400 text-white",
+                              answered && !isSelectedOption && !isCorrectOption && "bg-slate-100 text-slate-400",
+                            )}
+                            aria-hidden="true"
+                          >
+                            {letter}
+                          </span>
+                          <span className="flex-1">{option}</span>
+                          {answered && isCorrectOption && (
+                            <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-600" aria-hidden="true" />
+                          )}
+                          {answered && isSelectedOption && !isCorrectOption && (
+                            <XCircle className="h-5 w-5 shrink-0 text-rose-600" aria-hidden="true" />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </motion.div>
+              </AnimatePresence>
 
               {selected !== null && (
                 <div className={cn("rounded-2xl border-l-4 border-teal-500 bg-teal-50/60 p-6", SHADOW_SOFT)}>
@@ -955,53 +1014,54 @@ const OFFER_BENEFITS = [
   "Em PDF: consulta rápida pelo celular no plantão",
 ];
 
+/**
+ * Fundo cinematográfico do checkout — mesmo navy profundo da Hero, com
+ * glows teal/emerald em camadas (mais presença que o TEXTURE_TEAL_BLOOM
+ * plano usado nas seções claras). Só CSS, sem imagem. O CARTÃO do
+ * formulário em si continua claro por cima (ver className mais abaixo) —
+ * é só o ENTORNO da seção que ganha profundidade, para não perder
+ * legibilidade nos campos/preço/bumps.
+ */
+const OFFER_NAVY_BG: React.CSSProperties = {
+  backgroundColor: "#0a1622",
+  backgroundImage:
+    "radial-gradient(60% 50% at 15% 0%, rgba(13,148,136,0.16), transparent 60%), radial-gradient(50% 45% at 100% 100%, rgba(16,185,129,0.12), transparent 60%)",
+};
+
 function OfferSection({ children }: { children: React.ReactNode }) {
   const priceDigits = guiaEvolucaoProduct.priceLabel.replace("R$", "").trim();
 
   return (
-    <section id={OFFER_SECTION_ID} className="relative scroll-mt-[76px] bg-white px-5 py-20 sm:py-28" style={TEXTURE_TEAL_BLOOM}>
+    <section id={OFFER_SECTION_ID} className="relative scroll-mt-[76px] overflow-hidden px-5 py-16 sm:py-28" style={OFFER_NAVY_BG}>
+      {/* Fio de luz no topo — separa da seção clara anterior sem borda dura, mesmo tratamento da Hero. */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/[0.08]" aria-hidden="true" />
+      {/* Vinheta lateral sutil, só para os cantos não ficarem "mortos". */}
+      <div aria-hidden="true" className="pointer-events-none absolute -left-24 top-1/3 h-72 w-72 rounded-full bg-teal-400/10 blur-3xl" />
+      <div aria-hidden="true" className="pointer-events-none absolute -right-20 bottom-10 h-80 w-80 rounded-full bg-emerald-400/10 blur-3xl" />
+
       <div className="relative mx-auto grid w-full max-w-[1100px] gap-10 lg:grid-cols-[0.85fr_1.15fr] lg:gap-14">
-        {/* Coluna esquerda — mockup + prova, fixa ao rolar no desktop. */}
-        <div className="flex flex-col items-center gap-6 lg:sticky lg:top-10 lg:items-start lg:self-start">
-          <div className="relative">
-            <div className="pointer-events-none absolute inset-0 -z-10 scale-110 rounded-[40px] bg-teal-100/40 blur-3xl" aria-hidden="true" />
-            <div
-              className={cn(
-                "relative flex aspect-[3/4] w-full max-w-[320px] items-center justify-center overflow-hidden rounded-[28px] border border-white bg-white p-3",
-                SHADOW_STRONG,
-              )}
-            >
-              <img
-                src="/guia-evolucao/capa-guia.webp"
-                alt="Capa do Guia de Evolução de Enfermagem, material digital com modelos prontos de anotação e evolução de enfermagem"
-                width={1086}
-                height={1448}
-                loading="lazy"
-                className="h-full w-full rounded-[20px] object-contain"
-              />
-            </div>
-          </div>
-          <div className="grid w-full max-w-[320px] grid-cols-3 gap-3 text-center">
-            <div className={cn("rounded-2xl border border-slate-200 bg-slate-50 px-3 py-4", SHADOW_SOFT)}>
-              <span className="block font-sans text-[1.2rem] font-extrabold text-teal-700">+132</span>
-              <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Modelos</span>
-            </div>
-            <div className={cn("rounded-2xl border border-slate-200 bg-slate-50 px-3 py-4", SHADOW_SOFT)}>
-              <span className="block font-sans text-[1.2rem] font-extrabold text-teal-700">PDF</span>
-              <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Formato</span>
-            </div>
-            <div className={cn("rounded-2xl border border-slate-200 bg-slate-50 px-3 py-4", SHADOW_SOFT)}>
-              <span className="block font-sans text-[1.2rem] font-extrabold text-teal-700">Na hora</span>
-              <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Acesso</span>
-            </div>
+        {/* Coluna esquerda — vídeo do produto, fixa ao rolar no desktop. Moldura
+            com glow por trás, coerente com o fundo escuro (o <video> em si —
+            src, controls, playsInline — não muda). */}
+        <div className="relative lg:sticky lg:top-10 lg:self-start">
+          <div className="pointer-events-none absolute inset-0 -z-10 scale-105 rounded-[32px] bg-teal-400/15 blur-2xl" aria-hidden="true" />
+          <div className={cn("overflow-hidden rounded-[28px] border border-white/15", "shadow-[0_8px_16px_rgba(0,0,0,0.25),0_40px_80px_-28px_rgba(0,0,0,0.55)]")}>
+            <video
+              src="/guia-evolucao/video-guia-evolucao.mp4"
+              controls
+              playsInline
+              className="block aspect-[3/4] w-full object-cover"
+            />
           </div>
         </div>
 
         {/* Coluna direita — nome, benefícios, preço, bumps, checkout: o ponto
             mais "premium" da página — produto + checkout dentro de um bloco
-            seguro e valioso. */}
-        <div className={cn("relative overflow-hidden rounded-[28px] border border-slate-200 bg-white p-7 sm:p-10", SHADOW_STRONG)}>
+            seguro e valioso. Cartão claro (legibilidade máxima) sobre o fundo
+            escuro do entorno — é isso que dá a profundidade em camadas. */}
+        <div className={cn("relative overflow-hidden rounded-[28px] border border-white/10 bg-white p-6 sm:p-10", "shadow-[0_8px_16px_rgba(0,0,0,0.2),0_40px_90px_-30px_rgba(0,0,0,0.6)]")}>
           <div className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-teal-50/80 blur-3xl" aria-hidden="true" />
+          <div className="pointer-events-none absolute -bottom-20 -left-16 h-56 w-56 rounded-full bg-emerald-50/70 blur-3xl" aria-hidden="true" />
 
           <span className={cn("relative inline-flex items-center gap-2 rounded-full bg-teal-50 px-4 py-1.5 text-[12px] font-bold uppercase tracking-wide text-teal-700", SHADOW_SOFT)}>
             <Sparkles className="h-3.5 w-3.5" aria-hidden="true" /> Acesso imediato
@@ -1025,13 +1085,22 @@ function OfferSection({ children }: { children: React.ReactNode }) {
             ))}
           </ul>
 
-          <div className={cn("relative mt-8 flex flex-col items-center gap-1 rounded-2xl border border-teal-100 bg-teal-50/60 py-7 text-center", SHADOW_SOFT)}>
-            <span className="text-[13px] font-semibold text-slate-500 line-through">De R$ 47,90 por apenas:</span>
-            <span className="flex items-start font-sans text-[3.25rem] font-extrabold leading-none text-slate-900">
-              <span className="mr-1 mt-2 text-[1.35rem] text-teal-600">R$</span>
+          {/* Bloco do preço — mais presença: gradiente mais rico, borda dupla
+              (anel + borda), glow por trás, número maior. Preço/produto em si
+              (priceDigits, priceLabel) inalterados — só o invólucro visual. */}
+          <div
+            className={cn(
+              "relative mt-8 flex flex-col items-center gap-1 overflow-hidden rounded-[24px] border-2 border-teal-200 bg-gradient-to-b from-teal-50 via-white to-white py-8 text-center ring-1 ring-teal-100",
+              SHADOW_MEDIUM,
+            )}
+          >
+            <div className="pointer-events-none absolute -top-10 left-1/2 h-24 w-48 -translate-x-1/2 rounded-full bg-teal-300/25 blur-3xl" aria-hidden="true" />
+            <span className="relative text-[13px] font-semibold text-slate-500 line-through">De R$ 47,90 por apenas:</span>
+            <span className="relative flex items-start font-sans text-[3.5rem] font-extrabold leading-none text-slate-900 sm:text-[3.75rem]">
+              <span className="mr-1 mt-2.5 text-[1.4rem] text-teal-600">R$</span>
               {priceDigits}
             </span>
-            <span className="mt-2 text-[12px] font-bold uppercase tracking-wide text-slate-500">
+            <span className="relative mt-2 text-[12px] font-bold uppercase tracking-wide text-slate-500">
               Pagamento único · sem mensalidade
             </span>
           </div>
@@ -1159,7 +1228,7 @@ function CheckoutForm({
               className={cn(
                 "group relative flex cursor-pointer items-start justify-between gap-3 rounded-2xl border p-3.5 transition-all duration-200",
                 checked
-                  ? "border-teal-300 bg-teal-50/70 shadow-[0_4px_14px_-6px_rgba(13,148,136,0.35)]"
+                  ? "border-teal-400 bg-teal-50/70 shadow-[0_4px_14px_-6px_rgba(13,148,136,0.35)] ring-2 ring-teal-500/15"
                   : "border-slate-200 bg-slate-50 hover:-translate-y-0.5 hover:border-teal-200 hover:bg-white hover:shadow-[0_6px_16px_-10px_rgba(15,23,42,0.25)]",
               )}
             >

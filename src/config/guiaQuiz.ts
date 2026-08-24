@@ -1,10 +1,10 @@
 /**
- * Conteúdo do quiz de enfermagem exibido em GuiaEvolucaoEnfermagemPage —
- * portado da landing page de referência (reference/manual2026.html,
- * página /manual2026/ que já converteu bem). O conteúdo CLÍNICO das
- * perguntas, alternativas e explicações não foi alterado nesta etapa —
- * só a estrutura (de objetos soltos no <script> da página antiga para
- * dados tipados aqui, consumidos por um componente React nativo).
+ * Conteúdo do quiz de enfermagem exibido em GuiaEvolucaoEnfermagemPage.
+ * Perguntas baseadas em situações reais de documentação (qualidade do
+ * registro, não "cola" de legislação) — trocadas na rodada de redesign de
+ * 2026-08 para forçar reflexão em vez de resposta óbvia. Nunca formular
+ * como orientação médica individual nem como promessa de proteção
+ * jurídica/COREN — sempre em termos de qualidade e segurança do registro.
  */
 
 export interface QuizQuestion {
@@ -17,61 +17,54 @@ export interface QuizQuestion {
 
 export const guiaQuizQuestions: QuizQuestion[] = [
   {
-    question:
-      "Qual profissional da equipe de enfermagem tem a competência privativa de realizar a Evolução de Enfermagem?",
-    options: ["Técnico de Enfermagem", "Enfermeiro", "Auxiliar de Enfermagem", "Qualquer membro da equipe"],
-    answerIndex: 1,
-    explanation:
-      "A Evolução de Enfermagem é uma atividade privativa do Enfermeiro. O Técnico ou Auxiliar realiza a Anotação de Enfermagem.",
-  },
-  {
-    question: "Em caso de erro durante a anotação manual no prontuário, qual a conduta correta?",
+    question: "Após um cuidado, qual registro apresenta maior qualidade documental?",
     options: [
-      "Usar corretivo líquido",
-      "Riscar a palavra até ficar ilegível",
-      'Utilizar a palavra "digo" entre vírgulas',
-      "Arrancar a folha",
-    ],
-    answerIndex: 2,
-    explanation:
-      'Nunca rasure o prontuário. O correto é colocar a palavra errada entre vírgulas, seguida da expressão "digo", e então escrever o termo correto.',
-  },
-  {
-    question: "O que NÃO deve constar em uma Anotação de Enfermagem segura?",
-    options: [
-      "Sinais vitais e medidas aferidas",
-      'Termos vagos como "passa bem" ou "sem queixas"',
-      "Horário exato da ocorrência",
-      "Condutas tomadas após uma intercorrência",
+      "Paciente bem, medicado e confortável.",
+      "Paciente refere dor 8/10. Realizada intervenção conforme prescrição. Reavaliado após o cuidado, refere dor 3/10, mantendo-se consciente e comunicativo.",
+      "Paciente medicado sem intercorrências.",
+      "Paciente está melhor.",
     ],
     answerIndex: 1,
     explanation:
-      'Termos genéricos como "passa bem" não possuem valor clínico ou legal. Deve-se descrever de forma objetiva os fatos e dados observados no paciente.',
-  },
-  {
-    question: "Sobre o registro de recusa de medicação pelo paciente, é correto afirmar:",
-    options: [
-      "Não é necessário anotar, basta devolver o remédio à farmácia",
-      "Deve-se circular o horário e ignorar",
-      "Anotar o motivo, orientar o paciente e notificar o enfermeiro/médico",
-      "Obrigar o paciente a tomar para não prejudicar o registro",
-    ],
-    answerIndex: 2,
-    explanation:
-      "É um direito do paciente recusar terapias. A enfermagem deve anotar a recusa, o motivo relatado, a orientação prestada sobre os riscos e comunicar a chefia/médico responsável.",
+      "Um registro forte descreve situação observada, intervenção realizada e resposta do paciente, evitando termos genéricos.",
   },
   {
     question:
-      "Para garantir o seu respaldo legal, o registro no prontuário físico deve obrigatoriamente ser finalizado com:",
+      "Durante o plantão ocorre uma mudança importante no estado do paciente. Qual registro é mais útil para continuidade da assistência?",
     options: [
-      "Apenas o primeiro nome e um visto",
-      "Assinatura e número do CPF",
-      "Apenas a rubrica",
-      "Identificação legível (nome, Coren e categoria), preferencialmente com carimbo",
+      "Paciente passou mal.",
+      "Paciente apresentou alteração, médico avisado.",
+      "Registrar os achados objetivos observados, horário, condutas realizadas, comunicação à equipe e resposta apresentada pelo paciente.",
+      "Registrar somente no final do plantão para reunir todas as informações.",
     ],
-    answerIndex: 3,
+    answerIndex: 2,
     explanation:
-      "Segundo o COFEN, é obrigatório constar a identificação clara do profissional que executou a ação, contendo nome, categoria e número do COREN.",
+      "Informações objetivas, cronológicas e relacionadas às condutas e respostas tornam o registro mais útil para quem dará continuidade à assistência.",
+  },
+  {
+    question: "Qual anotação transmite MENOS informação clínica, apesar de parecer suficiente?",
+    options: [
+      "Paciente tranquilo.",
+      "Paciente em leito, consciente, comunicativo, refere ausência de dor no momento.",
+      "Curativo avaliado, sem sinais visíveis de sangramento no momento da observação.",
+      "Paciente aceitou dieta ofertada, sem queixas após a refeição.",
+    ],
+    answerIndex: 0,
+    explanation:
+      'Expressões vagas como "tranquilo", "bem" ou "sem alterações" podem esconder informações que seriam importantes para compreender a situação.',
+  },
+  {
+    question:
+      "Você terminou um procedimento e, minutos depois, percebe que uma informação relevante não entrou na anotação. Qual é o maior problema em simplesmente ignorar essa informação?",
+    options: [
+      "O prontuário fica visualmente menor.",
+      "A equipe seguinte pode receber um registro incompleto do que realmente aconteceu.",
+      "Não existe problema se o paciente estiver estável.",
+      "Somente informações sobre medicação precisam ser registradas.",
+    ],
+    answerIndex: 1,
+    explanation:
+      "O registro também serve para comunicar a assistência realizada e ajudar na continuidade do cuidado.",
   },
 ];
 
@@ -105,11 +98,11 @@ export const guiaProfileMessages: Record<NursingProfile, { title: string; body: 
 
 /** Mensagem de desempenho exibida logo depois da última pergunta, antes de pedir o perfil. */
 export function guiaQuizPerformanceMessage(score: number, total: number): string {
-  if (score <= 2) {
-    return "Sinal de alerta: vale reforçar a segurança teórica com urgência, para não comprometer o seu COREN.";
+  if (score <= total / 2) {
+    return "Sinal de alerta: vale reforçar a segurança teórica com urgência, para elevar a qualidade e segurança do seu registro profissional.";
   }
   if (score < total) {
-    return "Base boa, mas pequenos detalhes ainda podem dar dor de cabeça em uma auditoria. Os guias prontos ajudam bastante.";
+    return "Base boa, mas pequenos detalhes ainda podem comprometer a clareza do registro. Os guias prontos ajudam bastante.";
   }
   return "Excelente desempenho! Agora o foco é padronizar as anotações para ganhar velocidade no plantão.";
 }

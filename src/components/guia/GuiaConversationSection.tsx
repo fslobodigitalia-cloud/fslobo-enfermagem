@@ -79,10 +79,6 @@ export function GuiaConversationSection() {
                 <Star key={star} className="h-3 w-3 fill-amber-400 text-amber-400" />
               ))}
             </span>
-            <span aria-hidden="true" className="h-3 w-px bg-teal-200" />
-            <span className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-teal-700">
-              Prova social
-            </span>
           </span>
 
           <h2 className="mt-4 font-sans text-[1.9rem] font-extrabold leading-[1.12] tracking-tight text-slate-900 sm:text-[2.35rem] lg:text-[2.5rem]">
