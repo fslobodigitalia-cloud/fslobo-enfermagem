@@ -82,7 +82,11 @@ const INPUT_CLASS =
   "border-slate-300 bg-white text-slate-900 placeholder:text-slate-400 shadow-[0_1px_2px_rgba(15,23,42,0.04)] hover:border-teal-400 focus:border-teal-600 focus:bg-white focus:ring-2 focus:ring-teal-500/20";
 
 export function ProductCheckout({ slug, name }: { slug: string; name: string }) {
-  const { attempt } = useCheckoutAttempt(slug);
+  const { ensureAttempt } = useCheckoutAttempt(slug);
+  // checkoutAccessToken usado no polling/retomada desta submissão — capturado
+  // no momento do envio (ensureAttempt), nunca recalculado por engano depois
+  // (a tentativa "atual" pode já ter mudado se o formulário for reaberto).
+  const [activeAccessToken, setActiveAccessToken] = React.useState<string | null>(null);
 
   const [open, setOpen] = React.useState(false);
   const [firstName, setFirstName] = React.useState("");
@@ -143,7 +147,8 @@ export function ProductCheckout({ slug, name }: { slug: string; name: string }) 
     let cancelled = false;
 
     const interval = window.setInterval(async () => {
-      const outcome = await getOrderDownloads(order.publicId, attempt.checkoutAccessToken);
+      if (!activeAccessToken) return;
+      const outcome = await getOrderDownloads(order.publicId, activeAccessToken);
       if (cancelled) return;
       if (outcome.kind === "paid") {
         setDownloads(outcome.downloads);
@@ -155,7 +160,7 @@ export function ProductCheckout({ slug, name }: { slug: string; name: string }) 
       cancelled = true;
       window.clearInterval(interval);
     };
-  }, [result, downloads, attempt.checkoutAccessToken]);
+  }, [result, downloads, activeAccessToken]);
 
   const handleTurnstileToken = React.useCallback((token: string) => {
     setTurnstileToken(token);
@@ -188,6 +193,12 @@ export function ProductCheckout({ slug, name }: { slug: string; name: string }) 
     setSubmitting(true);
     setTurnstileMissing(false);
 
+    // ensureAttempt() decide, no momento do envio, se reaproveita o
+    // checkout_request_id salvo (mesmo nome/e-mail/slug — ex.: retry após
+    // erro de rede) ou gera um par novo (nada salvo ainda, ou dados
+    // diferentes de um envio anterior).
+    const attempt = ensureAttempt({ name: nm, email: mail, productSlugs: [slug] });
+
     const outcome = await createProductOrder({
       checkoutRequestId: attempt.checkoutRequestId,
       checkoutAccessToken: attempt.checkoutAccessToken,
@@ -204,6 +215,7 @@ export function ProductCheckout({ slug, name }: { slug: string; name: string }) 
     turnstileRef.current?.reset();
 
     if (outcome.kind !== "error") {
+      setActiveAccessToken(attempt.checkoutAccessToken);
       saveOrderAccess(slug, {
         publicId: outcome.order.publicId,
         checkoutAccessToken: attempt.checkoutAccessToken,

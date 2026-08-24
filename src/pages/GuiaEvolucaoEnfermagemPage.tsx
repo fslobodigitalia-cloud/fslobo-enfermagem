@@ -208,7 +208,13 @@ export default function GuiaEvolucaoEnfermagemPage() {
     initGuiaPixel();
   }, []);
 
-  const { attempt } = useCheckoutAttempt(guiaEvolucaoProduct.slug);
+  const { ensureAttempt } = useCheckoutAttempt(guiaEvolucaoProduct.slug);
+  // checkoutAccessToken usado no polling desta submissão — capturado no
+  // momento do envio (ensureAttempt), nunca recalculado depois: garante que
+  // o polling sempre consulta o pedido que foi de fato criado, mesmo que
+  // nome/e-mail/bumps mudem depois (o que trocaria o fingerprint e geraria
+  // outro checkout_request_id, sem relação com o pedido já em andamento).
+  const [activeAccessToken, setActiveAccessToken] = React.useState<string | null>(null);
 
   // Preço exibido: lido do MESMO catálogo público (RPC
   // get_active_product_catalog(), via useProductCatalog()) já usado por
@@ -305,7 +311,8 @@ export default function GuiaEvolucaoEnfermagemPage() {
     let cancelled = false;
 
     const interval = window.setInterval(async () => {
-      const outcome = await getOrderDownloads(order.publicId, attempt.checkoutAccessToken);
+      if (!activeAccessToken) return;
+      const outcome = await getOrderDownloads(order.publicId, activeAccessToken);
       if (cancelled) return;
       if (outcome.kind === "paid") {
         setDownloads(outcome.downloads);
@@ -319,7 +326,7 @@ export default function GuiaEvolucaoEnfermagemPage() {
       cancelled = true;
       window.clearInterval(interval);
     };
-  }, [result, downloads, attempt.checkoutAccessToken]);
+  }, [result, downloads, activeAccessToken]);
 
   // ── Purchase: dispara exatamente uma vez, no exato instante em que
   //    "paid" é confirmado (downloads deixa de ser null) DENTRO desta
@@ -387,6 +394,16 @@ export default function GuiaEvolucaoEnfermagemPage() {
     setSubmitting(true);
     setTurnstileMissing(false);
 
+    // ensureAttempt() decide, no momento do envio, se reaproveita o
+    // checkout_request_id salvo (mesmo nome/e-mail/product_slugs — ex.:
+    // retry após erro de rede) ou gera um par novo: bump marcado/desmarcado
+    // ou nome/e-mail corrigidos depois de um envio anterior mudam o
+    // fingerprint, então SEMPRE geram um checkout_request_id novo aqui —
+    // nunca mais reaproveitando o de uma tentativa com dados diferentes
+    // (era essa reutilização indevida que causava o 409 "checkout_conflict"
+    // da RPC create_or_get_product_order_with_items_efi).
+    const attempt = ensureAttempt({ name, email: mail, productSlugs });
+
     const outcome = await createProductOrder({
       checkoutRequestId: attempt.checkoutRequestId,
       checkoutAccessToken: attempt.checkoutAccessToken,
@@ -405,6 +422,7 @@ export default function GuiaEvolucaoEnfermagemPage() {
     turnstileRef.current?.reset();
 
     if (outcome.kind !== "error") {
+      setActiveAccessToken(attempt.checkoutAccessToken);
       saveOrderAccess(guiaEvolucaoProduct.slug, {
         publicId: outcome.order.publicId,
         checkoutAccessToken: attempt.checkoutAccessToken,

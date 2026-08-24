@@ -98,7 +98,13 @@ function EmptyCartState() {
 
 export default function CartPage() {
   const { items, itemCount, subtotalCents, removeItem, clearCart } = useCart();
-  const { attempt } = useCheckoutAttempt(CART_KEY);
+  const { ensureAttempt } = useCheckoutAttempt(CART_KEY);
+  // checkoutAccessToken usado no polling desta submissão — capturado no
+  // momento do envio (ensureAttempt), nunca recalculado depois: o carrinho
+  // pode mudar (item adicionado/removido) sem que o pedido já criado mude
+  // junto — o polling continua consultando o pedido real, não uma tentativa
+  // futura ainda não enviada.
+  const [activeAccessToken, setActiveAccessToken] = React.useState<string | null>(null);
 
   useDocumentMeta({
     title: "Seu carrinho | FSLobo Enfermagem",
@@ -185,7 +191,8 @@ export default function CartPage() {
     let cancelled = false;
 
     const interval = window.setInterval(async () => {
-      const outcome = await getOrderDownloads(order.publicId, attempt.checkoutAccessToken);
+      if (!activeAccessToken) return;
+      const outcome = await getOrderDownloads(order.publicId, activeAccessToken);
       if (cancelled) return;
       if (outcome.kind === "paid") {
         setDownloads(outcome.downloads);
@@ -197,7 +204,7 @@ export default function CartPage() {
       cancelled = true;
       window.clearInterval(interval);
     };
-  }, [result, downloads, attempt.checkoutAccessToken]);
+  }, [result, downloads, activeAccessToken]);
 
   // ── Carrinho só é limpo depois que os downloads estiverem disponíveis
   //    (nunca ao gerar o Pix, nunca em pending_payment) — mesmo instante
@@ -273,14 +280,21 @@ export default function CartPage() {
       return;
     }
 
+    const productSlugs = items.map((item) => item.slug);
+    // ensureAttempt() decide, no momento do envio, se reaproveita o
+    // checkout_request_id salvo (mesmo nome/e-mail/product_slugs — ex.:
+    // retry após erro de rede) ou gera um par novo: item adicionado ou
+    // removido do carrinho (ou nome/e-mail corrigidos) depois de um envio
+    // anterior muda o fingerprint, então SEMPRE gera um checkout_request_id
+    // novo aqui — nunca mais reaproveitando o de uma tentativa com dados
+    // diferentes (era essa reutilização indevida que causava o 409
+    // "checkout_conflict" da RPC create_or_get_product_order_with_items_efi).
+    const attempt = ensureAttempt({ name, email: mail, productSlugs });
+
     // InitiateCheckout: uma vez por tentativa de checkout (guardado por
     // checkout_request_id dentro de trackCartInitiateCheckout) — nunca
     // afeta o Pixel isolado do Guia (src/lib/guiaPixel.ts, não alterado).
-    trackCartInitiateCheckout(
-      attempt.checkoutRequestId,
-      subtotalCents,
-      items.map((item) => item.slug),
-    );
+    trackCartInitiateCheckout(attempt.checkoutRequestId, subtotalCents, productSlugs);
     // Chamada IRMÃ da acima — mesmo ponto exato, mesmo valor de exibição
     // (subtotalCents/CartContext). Nunca reaproveitado depois como fonte
     // de verdade para Purchase (fase futura). Nunca substitui o Meta.
@@ -298,7 +312,7 @@ export default function CartPage() {
       checkoutAccessToken: attempt.checkoutAccessToken,
       customerName: name,
       customerEmail: mail,
-      productSlugs: items.map((item) => item.slug),
+      productSlugs,
       turnstileToken,
     });
 
@@ -308,6 +322,7 @@ export default function CartPage() {
     turnstileRef.current?.reset();
 
     if (outcome.kind !== "error") {
+      setActiveAccessToken(attempt.checkoutAccessToken);
       saveOrderAccess(CART_KEY, {
         publicId: outcome.order.publicId,
         checkoutAccessToken: attempt.checkoutAccessToken,
