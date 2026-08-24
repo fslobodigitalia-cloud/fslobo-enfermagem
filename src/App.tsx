@@ -7,6 +7,7 @@ import { ScrollToTop } from "@/components/layout/ScrollToTop";
 
 import MaterialsPage from "@/pages/MaterialsPage";
 import ProductPage from "@/pages/ProductPage";
+import MapasMentaisPage from "@/pages/MapasMentaisPage";
 import CartPage from "@/pages/CartPage";
 import GuiaEvolucaoEnfermagemPage from "@/pages/GuiaEvolucaoEnfermagemPage";
 import ToolsHubPage from "@/pages/tools/ToolsHubPage";
@@ -61,6 +62,16 @@ export default function App() {
               de MaterialsPage.tsx. */}
           <Route path="/" element={<MaterialsPage />} />
           <Route path="/materiais" element={<MaterialsPage />} />
+          {/* Rota estática — SEMPRE vence /produto/:slug (React Router v6
+              rankeia segmento estático acima de segmento dinâmico,
+              independente da ordem de declaração), então este endereço
+              nunca cai no sistema genérico de ProductPage. Landing
+              dedicada do Mapas Mentais Ilustrados, mesma disciplina de
+              /guia-evolucao-enfermagem — ver src/pages/MapasMentaisPage.tsx. */}
+          <Route
+            path="/produto/concursos-enfermagem"
+            element={<MapasMentaisPage />}
+          />
           <Route path="/produto/:slug" element={<ProductPage />} />
           <Route path="/carrinho" element={<CartPage />} />
           <Route path="/ferramentas" element={<ToolsHubPage />} />
