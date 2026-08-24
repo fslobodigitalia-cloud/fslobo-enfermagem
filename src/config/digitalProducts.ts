@@ -40,7 +40,7 @@ export interface DigitalBump {
 
 export const guiaEvolucaoBumps: DigitalBump[] = [
   {
-    slug: "guia-ilustrado-enfermagem",
+    slug: "mapa-mental-ilustrado",
     name: "Guia Ilustrado de Enfermagem",
     description: "Conteúdos difíceis viram consulta rápida e visual para o dia a dia.",
     priceCents: 1000,
