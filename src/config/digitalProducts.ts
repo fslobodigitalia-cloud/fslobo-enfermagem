@@ -115,3 +115,60 @@ export const mapasMentaisBumps: DigitalBump[] = [
     priceLabel: "R$ 10,00",
   },
 ];
+
+/**
+ * Catálogo do Balanço Hídrico Ilustrado (produto principal, slug
+ * "balanco-hidrico") e seus order bumps — landing dedicada em
+ * /balanco-hidrico (BalancoHidricoPage.tsx). Independente de
+ * guiaEvolucaoProduct/guiaEvolucaoBumps e mapasMentaisProduct/
+ * mapasMentaisBumps acima (não alterados por este bloco) — mesma
+ * disciplina de preço, só que para outro produto/rota.
+ *
+ * IMPORTANTE: este produto existe em public.products com active = false —
+ * ainda NÃO está disponível para compra. priceCents/priceLabel aqui são
+ * só fallback visual/UX (mesma regra dos outros catálogos acima); como o
+ * produto está inativo, useProductCatalog()/get_active_product_catalog()
+ * nunca o retorna, então a página sempre usa este fallback até o produto
+ * ser ativado no banco (fora do escopo desta etapa). O checkout SEMPRE
+ * tentará chamar create-product-order-efi-prod normalmente — a RPC
+ * create_or_get_product_order_with_items_efi é quem rejeita com
+ * "product_not_found_or_inactive" enquanto active permanecer false; não
+ * há nenhuma tentativa de contornar essa checagem no frontend.
+ *
+ * balancoHidricoBumps nunca inclui "balanco-hidrico" (o próprio produto
+ * principal) — mesma disciplina de guiaEvolucaoBumps/mapasMentaisBumps.
+ * "medicamentos-na-pratica" foi deliberadamente excluído: está cadastrado
+ * como kind=primary no banco, não kind=bump.
+ */
+export const balancoHidricoProduct = {
+  slug: "balanco-hidrico",
+  name: "Balanço Hídrico Ilustrado",
+  description:
+    "Guia visual para registrar entradas e saídas, calcular o saldo parcial e de 24 horas, e interpretar o balanço hídrico com segurança no plantão.",
+  priceCents: 1000,
+  priceLabel: "R$ 10,00",
+};
+
+export const balancoHidricoBumps: DigitalBump[] = [
+  {
+    slug: "2000-questoes-enfermagem",
+    name: "2000 Questões de Enfermagem",
+    description: "Pratique com questões e descubra quais conteúdos ainda precisam de mais atenção.",
+    priceCents: 1000,
+    priceLabel: "R$ 10,00",
+  },
+  {
+    slug: "guia-feridas-cronicas",
+    name: "Guia de Feridas Crônicas",
+    description: "Material prático e ilustrado para revisar os principais tipos de feridas e cuidados de enfermagem.",
+    priceCents: 1000,
+    priceLabel: "R$ 10,00",
+  },
+  {
+    slug: "mapa-mental-ilustrado",
+    name: "Mapa Mental para Concursos de Enfermagem",
+    description: "Conteúdos difíceis viram consulta rápida e visual para o dia a dia e para os estudos.",
+    priceCents: 1000,
+    priceLabel: "R$ 10,00",
+  },
+];

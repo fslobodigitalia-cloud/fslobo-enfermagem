@@ -8,6 +8,7 @@ import { ScrollToTop } from "@/components/layout/ScrollToTop";
 import MaterialsPage from "@/pages/MaterialsPage";
 import ProductPage from "@/pages/ProductPage";
 import MapasMentaisPage from "@/pages/MapasMentaisPage";
+import BalancoHidricoPage from "@/pages/BalancoHidricoPage";
 import CartPage from "@/pages/CartPage";
 import GuiaEvolucaoEnfermagemPage from "@/pages/GuiaEvolucaoEnfermagemPage";
 import ToolsHubPage from "@/pages/tools/ToolsHubPage";
@@ -79,6 +80,15 @@ export default function App() {
           <Route path="/ferramentas/checklist-plantao" element={<ChecklistPlantaoPage />} />
           <Route path="/ferramentas/dicas-de-plantao" element={<DicasPlantaoPage />} />
           <Route path="/guia-evolucao-enfermagem" element={<GuiaEvolucaoEnfermagemPage />} />
+          {/* Rota estática — landing dedicada do Balanço Hídrico Ilustrado,
+              mesma disciplina de /guia-evolucao-enfermagem e de
+              /produto/concursos-enfermagem: caminho fixo, não passa por
+              /produto/:slug. Produto "balanco-hidrico" existe em
+              public.products com active=false — ver comentário em
+              src/config/digitalProducts.ts (checkout indisponível até a
+              ativação, fora do escopo desta rota). Ver
+              src/pages/BalancoHidricoPage.tsx. */}
+          <Route path="/balanco-hidrico" element={<BalancoHidricoPage />} />
           <Route path="/privacidade" element={<Privacy />} />
           <Route path="/termos" element={<Terms />} />
           <Route path="/entrega" element={<Delivery />} />
