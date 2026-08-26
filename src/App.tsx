@@ -1,5 +1,5 @@
 import * as React from "react";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { captureCampaignParams } from "@/lib/utmTracking";
 import { pendingConfigFields } from "@/config/site";
 import { CartProvider } from "@/context/CartContext";
@@ -73,6 +73,16 @@ export default function App() {
             path="/produto/concursos-enfermagem"
             element={<MapasMentaisPage />}
           />
+          {/* Mesma disciplina de /produto/concursos-enfermagem acima —
+              rota estática do Balanço Hídrico Ilustrado sob /produto/,
+              onde productRoute() (src/lib/catalogQueries.ts) e o card do
+              catálogo já apontam por padrão (nenhuma exceção especial
+              existe lá para este slug). Precisa estar declarada ANTES de
+              /produto/:slug (embora o React Router v6 já rankeie
+              segmento estático acima de dinâmico independente da ordem,
+              mantemos a ordem explícita por clareza, mesmo padrão do
+              bloco acima). */}
+          <Route path="/produto/balanco-hidrico" element={<BalancoHidricoPage />} />
           <Route path="/produto/:slug" element={<ProductPage />} />
           <Route path="/carrinho" element={<CartPage />} />
           <Route path="/ferramentas" element={<ToolsHubPage />} />
@@ -80,15 +90,14 @@ export default function App() {
           <Route path="/ferramentas/checklist-plantao" element={<ChecklistPlantaoPage />} />
           <Route path="/ferramentas/dicas-de-plantao" element={<DicasPlantaoPage />} />
           <Route path="/guia-evolucao-enfermagem" element={<GuiaEvolucaoEnfermagemPage />} />
-          {/* Rota estática — landing dedicada do Balanço Hídrico Ilustrado,
-              mesma disciplina de /guia-evolucao-enfermagem e de
-              /produto/concursos-enfermagem: caminho fixo, não passa por
-              /produto/:slug. Produto "balanco-hidrico" existe em
-              public.products com active=false — ver comentário em
-              src/config/digitalProducts.ts (checkout indisponível até a
-              ativação, fora do escopo desta rota). Ver
-              src/pages/BalancoHidricoPage.tsx. */}
-          <Route path="/balanco-hidrico" element={<BalancoHidricoPage />} />
+          {/* Endereço antigo da landing do Balanço Hídrico — a rota real
+              agora é /produto/balanco-hidrico (ver bloco acima, junto de
+              /produto/concursos-enfermagem), para ficar consistente com
+              productRoute()/o card do catálogo, que sempre apontam para
+              /produto/<slug>. Redirecionamento permanente no frontend
+              (replace: não empilha entrada no histórico, então o botão
+              "voltar" do navegador não fica preso em /balanco-hidrico). */}
+          <Route path="/balanco-hidrico" element={<Navigate to="/produto/balanco-hidrico" replace />} />
           <Route path="/privacidade" element={<Privacy />} />
           <Route path="/termos" element={<Terms />} />
           <Route path="/entrega" element={<Delivery />} />
