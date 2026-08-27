@@ -386,7 +386,7 @@ export default function CartPage() {
       <div className="min-h-screen bg-white font-sans text-slate-900">
         <SiteHeader />
         <main className="mx-auto w-full max-w-[640px] px-5 py-16 sm:py-20">
-          <CartDownloads downloads={downloads} />
+          <CartDownloads orderAccessKey={CART_KEY} downloads={downloads} />
         </main>
         <SiteFooter />
       </div>

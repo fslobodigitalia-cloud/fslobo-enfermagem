@@ -1,7 +1,7 @@
-import { Check, Download, FileText, MessageCircle } from "lucide-react";
+import { Check, FileText, MessageCircle } from "lucide-react";
 import { buildPixSupportWhatsAppUrl } from "@/lib/whatsapp";
-import type { DownloadItem } from "@/lib/orderDownloads";
-import { Button } from "@/components/ui/button";
+import { downloadItemKey, type DownloadItem } from "@/lib/orderDownloads";
+import { DownloadButton } from "@/components/downloads/DownloadButton";
 
 /**
  * Painel de downloads liberados — versão genérica/reutilizável do mesmo
@@ -13,7 +13,15 @@ import { Button } from "@/components/ui/button";
  * um `purchaseLabel` livre, por isso é reaproveitado aqui com o nome do
  * produto atual em vez do texto fixo do Guia.
  */
-export function ProductDownloads({ productName, downloads }: { productName: string; downloads: DownloadItem[] }) {
+export function ProductDownloads({
+  productName,
+  productSlug,
+  downloads,
+}: {
+  productName: string;
+  productSlug: string;
+  downloads: DownloadItem[];
+}) {
   const supportUrl = buildPixSupportWhatsAppUrl(null, { purchaseLabel: productName });
 
   return (
@@ -31,9 +39,9 @@ export function ProductDownloads({ productName, downloads }: { productName: stri
         </div>
 
         <ul role="list" className="flex w-full flex-col gap-3 text-left">
-          {downloads.map((download) => (
+          {downloads.map((download, index) => (
             <li
-              key={download.slug}
+              key={downloadItemKey(download, index)}
               className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)] sm:flex-row sm:items-center sm:justify-between"
             >
               <div className="flex min-w-0 items-center gap-3">
@@ -45,12 +53,12 @@ export function ProductDownloads({ productName, downloads }: { productName: stri
                   <p className="mt-0.5 text-[12px] text-slate-500">Arquivo em PDF</p>
                 </div>
               </div>
-              <Button asChild size="sm" className="w-full shrink-0 sm:w-auto">
-                <a href={download.url} target="_blank" rel="noopener noreferrer" download>
-                  <Download className="h-4 w-4" strokeWidth={1.8} aria-hidden="true" />
-                  Baixar material
-                </a>
-              </Button>
+              <DownloadButton
+                orderAccessKey={productSlug}
+                fileKey={downloadItemKey(download, index)}
+                label="Baixar material"
+                className="w-full shrink-0 sm:w-auto"
+              />
             </li>
           ))}
         </ul>

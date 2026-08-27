@@ -259,7 +259,7 @@ export function ProductCheckout({ slug, name }: { slug: string; name: string }) 
   }
 
   if (downloads !== null) {
-    return <ProductDownloads productName={name} downloads={downloads} />;
+    return <ProductDownloads productName={name} productSlug={slug} downloads={downloads} />;
   }
 
   if (showPixResult && result) {

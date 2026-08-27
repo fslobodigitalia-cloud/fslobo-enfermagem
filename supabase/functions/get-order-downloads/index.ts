@@ -338,10 +338,18 @@ Deno.serve(async (req: Request) => {
   for (let index = 0; index < info.item_slugs.length; index++) {
     const bucket = info.item_buckets[index];
     const path = info.item_paths[index];
+    // { download: true } (Fase 3B-fix): força o navegador a BAIXAR o PDF em
+    // vez de tentar renderizá-lo inline — corrige o caso relatado de
+    // clientes recebendo "PDF em branco" ao abrir o link dentro de
+    // navegadores internos do Facebook/Instagram (WebView), que tentam
+    // exibir o Content-Type application/pdf sem o visualizador nativo do
+    // Chrome/Safari. Não altera a expiração (SIGNED_URL_EXPIRES_IN_SECONDS
+    // continua 900s/15min, ver constante acima) nem nenhuma outra regra de
+    // autorização desta função.
     const { data: signedData, error: signedError } = await supabase
       .storage
       .from(bucket)
-      .createSignedUrl(path, SIGNED_URL_EXPIRES_IN_SECONDS);
+      .createSignedUrl(path, SIGNED_URL_EXPIRES_IN_SECONDS, { download: true });
 
     if (signedError || !signedData?.signedUrl) {
       console.error("[get-order-downloads] Falha ao gerar signed URL para um item do pedido.", {

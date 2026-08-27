@@ -38,7 +38,6 @@ import {
   CheckCircle2,
   Clock,
   Copy,
-  Download,
   FileText,
   ImageIcon,
   Loader2,
@@ -60,8 +59,9 @@ import {
   type ProductCheckoutResult,
   type ProductOrderSummary,
 } from "@/lib/productCheckout";
-import { getOrderDownloads, type DownloadItem } from "@/lib/orderDownloads";
+import { getOrderDownloads, downloadItemKey, type DownloadItem } from "@/lib/orderDownloads";
 import { saveOrderAccess, readOrderAccess, clearOrderAccess } from "@/lib/orderAccess";
+import { DownloadButton } from "@/components/downloads/DownloadButton";
 import { useProductCatalog } from "@/hooks/useProductCatalog";
 import { mapasMentaisProduct, mapasMentaisBumps, formatCents } from "@/config/digitalProducts";
 import {
@@ -562,7 +562,7 @@ export default function MapasMentaisPage() {
       <main>
         {downloads !== null ? (
           <div className={cn(PANEL_CONTAINER, "py-16")}>
-            <PaidPanel downloads={downloads} />
+            <PaidPanel downloads={downloads} orderAccessKey={mapasMentaisProduct.slug} />
           </div>
         ) : showPixResult && result !== null ? (
           <div className={cn(PANEL_CONTAINER, "py-16")}>
@@ -1435,7 +1435,7 @@ function OrderSummaryPanel({ order, statusLabel }: { order: ProductOrderSummary;
 
 /* ──────────────────────────── Pagamento confirmado ──────────────────────── */
 
-function PaidPanel({ downloads }: { downloads: DownloadItem[] }) {
+function PaidPanel({ downloads, orderAccessKey }: { downloads: DownloadItem[]; orderAccessKey: string }) {
   return (
     <Appear className={cn("relative overflow-hidden rounded-[28px] border border-slate-200 bg-white p-6 sm:p-9", PANEL_SHADOW)}>
       <PaidDecor />
@@ -1459,7 +1459,7 @@ function PaidPanel({ downloads }: { downloads: DownloadItem[] }) {
           {downloads.map((download, index) => (
             <Appear
               as="li"
-              key={download.slug}
+              key={downloadItemKey(download, index)}
               delay={0.12 + index * 0.08}
               className={cn(
                 "group relative flex flex-col gap-4 rounded-3xl border border-slate-200 bg-white p-4 transition-[transform,box-shadow] duration-300 sm:flex-row sm:items-center sm:p-5",
@@ -1487,12 +1487,13 @@ function PaidPanel({ downloads }: { downloads: DownloadItem[] }) {
                   </p>
                 </div>
               </div>
-              <Button asChild size="sm" variant="outline" className={cn("w-full shrink-0 sm:w-auto", CTA_BUTTON_CLASS)}>
-                <a href={download.url} target="_blank" rel="noopener noreferrer" download>
-                  <Download className="h-4 w-4" strokeWidth={1.8} aria-hidden="true" />
-                  Baixar material
-                </a>
-              </Button>
+              <DownloadButton
+                orderAccessKey={orderAccessKey}
+                fileKey={downloadItemKey(download, index)}
+                label="Baixar material"
+                variant="outline"
+                className={cn("w-full shrink-0 sm:w-auto", CTA_BUTTON_CLASS)}
+              />
             </Appear>
           ))}
         </ul>

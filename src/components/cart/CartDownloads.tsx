@@ -1,8 +1,8 @@
 import * as React from "react";
-import { Check, Download, FileText, MessageCircle } from "lucide-react";
+import { Check, FileText, MessageCircle } from "lucide-react";
 import { buildPixSupportWhatsAppUrl } from "@/lib/whatsapp";
-import type { DownloadItem } from "@/lib/orderDownloads";
-import { Button } from "@/components/ui/button";
+import { downloadItemKey, type DownloadItem } from "@/lib/orderDownloads";
+import { DownloadButton } from "@/components/downloads/DownloadButton";
 
 /**
  * Painel de downloads liberados do carrinho — mesmo conceito de
@@ -13,28 +13,40 @@ import { Button } from "@/components/ui/button";
  * get_order_downloads_info), então agrupamos por slug ANTES de renderizar,
  * exibindo o nome do produto uma vez e todos os arquivos dele em seguida.
  */
+/**
+ * Cada arquivo carrega seu índice ORIGINAL no array plano devolvido por
+ * get-order-downloads — não a posição dentro do grupo. downloadItemKey()
+ * (src/lib/orderDownloads.ts) precisa ser calculada sobre a MESMA posição
+ * que o DownloadButton vai encontrar ao rechamar get-order-downloads no
+ * clique (que devolve o array plano, na mesma ordem, nunca já agrupado).
+ */
+interface GroupedFile {
+  item: DownloadItem;
+  index: number;
+}
+
 interface DownloadGroup {
   slug: string;
   productName: string;
-  files: DownloadItem[];
+  files: GroupedFile[];
 }
 
 function groupDownloadsByProduct(downloads: DownloadItem[]): DownloadGroup[] {
   const order: string[] = [];
   const bySlug = new Map<string, DownloadGroup>();
-  for (const download of downloads) {
+  downloads.forEach((download, index) => {
     let group = bySlug.get(download.slug);
     if (!group) {
       group = { slug: download.slug, productName: download.name, files: [] };
       bySlug.set(download.slug, group);
       order.push(download.slug);
     }
-    group.files.push(download);
-  }
+    group.files.push({ item: download, index });
+  });
   return order.map((slug) => bySlug.get(slug)!);
 }
 
-export function CartDownloads({ downloads }: { downloads: DownloadItem[] }) {
+export function CartDownloads({ orderAccessKey, downloads }: { orderAccessKey: string; downloads: DownloadItem[] }) {
   const groups = React.useMemo(() => groupDownloadsByProduct(downloads), [downloads]);
   const supportUrl = buildPixSupportWhatsAppUrl(null, { purchaseLabel: "sua compra na FSLobo Enfermagem" });
 
@@ -61,9 +73,9 @@ export function CartDownloads({ downloads }: { downloads: DownloadItem[] }) {
                 {group.productName}
               </p>
               <ul role="list" className="flex flex-col gap-3 p-4">
-                {group.files.map((file, index) => (
+                {group.files.map(({ item, index }) => (
                   <li
-                    key={`${file.slug}-${index}`}
+                    key={downloadItemKey(item, index)}
                     className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
                   >
                     <div className="flex min-w-0 items-center gap-3">
@@ -72,16 +84,16 @@ export function CartDownloads({ downloads }: { downloads: DownloadItem[] }) {
                       </span>
                       <div className="min-w-0">
                         <p className="text-[13.5px] font-semibold leading-snug text-slate-800">
-                          {group.files.length > 1 ? file.name : "Arquivo em PDF"}
+                          {group.files.length > 1 ? item.name : "Arquivo em PDF"}
                         </p>
                       </div>
                     </div>
-                    <Button asChild size="sm" className="w-full shrink-0 sm:w-auto">
-                      <a href={file.url} target="_blank" rel="noopener noreferrer" download>
-                        <Download className="h-4 w-4" strokeWidth={1.8} aria-hidden="true" />
-                        Baixar PDF
-                      </a>
-                    </Button>
+                    <DownloadButton
+                      orderAccessKey={orderAccessKey}
+                      fileKey={downloadItemKey(item, index)}
+                      label="Baixar PDF"
+                      className="w-full shrink-0 sm:w-auto"
+                    />
                   </li>
                 ))}
               </ul>

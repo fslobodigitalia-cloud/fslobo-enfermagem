@@ -44,6 +44,21 @@ function parseDownloads(raw: unknown): DownloadItem[] | null {
   return downloads;
 }
 
+/**
+ * Chave estável de um item de download — usada como `key` de lista React
+ * e como identificador para localizar o MESMO arquivo depois de uma nova
+ * chamada a getOrderDownloads() (ver DownloadButton.tsx, que busca uma URL
+ * nova a cada clique). `slug` sozinho não é único quando um produto
+ * entrega mais de um PDF (get_order_downloads_info pode devolver várias
+ * linhas com o mesmo product_slug) — combinado com a posição no array
+ * (que a RPC sempre devolve na MESMA ordem, por product_slug, para um
+ * pedido já pago: order_items é imutável, nunca muda depois de criado) já
+ * é suficiente para identificar o mesmo arquivo entre duas chamadas.
+ */
+export function downloadItemKey(item: DownloadItem, index: number): string {
+  return `${item.slug}::${index}`;
+}
+
 export async function getOrderDownloads(publicId: string, checkoutAccessToken: string): Promise<OrderDownloadsResult> {
   const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/get-order-downloads`;
 
