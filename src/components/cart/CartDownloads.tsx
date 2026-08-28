@@ -3,6 +3,7 @@ import { Check, FileText, MessageCircle } from "lucide-react";
 import { buildPixSupportWhatsAppUrl } from "@/lib/whatsapp";
 import { downloadItemKey, type DownloadItem } from "@/lib/orderDownloads";
 import { DownloadButton } from "@/components/downloads/DownloadButton";
+import { InAppDownloadNotice } from "@/components/downloads/InAppDownloadNotice";
 
 /**
  * Painel de downloads liberados do carrinho — mesmo conceito de
@@ -65,6 +66,8 @@ export function CartDownloads({ orderAccessKey, downloads }: { orderAccessKey: s
             Seus {groups.length === 1 ? "material já está liberado" : "materiais já estão liberados"}.
           </p>
         </div>
+
+        <InAppDownloadNotice className="w-full" />
 
         <div role="list" className="flex w-full flex-col gap-4 text-left">
           {groups.map((group) => (

@@ -62,6 +62,7 @@ import {
 import { getOrderDownloads, downloadItemKey, type DownloadItem } from "@/lib/orderDownloads";
 import { saveOrderAccess, readOrderAccess, clearOrderAccess } from "@/lib/orderAccess";
 import { DownloadButton } from "@/components/downloads/DownloadButton";
+import { InAppDownloadNotice } from "@/components/downloads/InAppDownloadNotice";
 import { useProductCatalog } from "@/hooks/useProductCatalog";
 import { mapasMentaisProduct, mapasMentaisBumps, formatCents } from "@/config/digitalProducts";
 import {
@@ -1454,6 +1455,8 @@ function PaidPanel({ downloads, orderAccessKey }: { downloads: DownloadItem[]; o
           </h2>
           <p className="mt-2 text-[14.5px] leading-relaxed text-slate-600">Seus materiais já estão liberados.</p>
         </div>
+
+        <InAppDownloadNotice className="w-full" />
 
         <ul role="list" className="flex w-full flex-col gap-3.5 text-left">
           {downloads.map((download, index) => (

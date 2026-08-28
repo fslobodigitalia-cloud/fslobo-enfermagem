@@ -2,6 +2,7 @@ import { Check, FileText, MessageCircle } from "lucide-react";
 import { buildPixSupportWhatsAppUrl } from "@/lib/whatsapp";
 import { downloadItemKey, type DownloadItem } from "@/lib/orderDownloads";
 import { DownloadButton } from "@/components/downloads/DownloadButton";
+import { InAppDownloadNotice } from "@/components/downloads/InAppDownloadNotice";
 
 /**
  * Painel de downloads liberados — versão genérica/reutilizável do mesmo
@@ -37,6 +38,8 @@ export function ProductDownloads({
           </h3>
           <p className="mt-2 text-[14px] leading-relaxed text-slate-600">Seu material já está liberado.</p>
         </div>
+
+        <InAppDownloadNotice className="w-full" />
 
         <ul role="list" className="flex w-full flex-col gap-3 text-left">
           {downloads.map((download, index) => (
