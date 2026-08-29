@@ -59,7 +59,7 @@ function messageFor(
 }
 
 const IOS_META_IN_APP_MESSAGE =
-  "Você está no navegador do Instagram ou Facebook. Toque em ‘Baixar material’ e aguarde alguns segundos. O PDF pode ser salvo no app Arquivos, geralmente na pasta Downloads. Se após o clique abrir uma tela branca, sem fechar essa tela, toque nos três pontos e escolha ‘Abrir no Safari’.";
+  "Você está no navegador do Instagram ou Facebook. Para baixar, toque em ‘Preparar PDF’ e depois em ‘Abrir PDF agora’. Se aparecer uma tela branca ou um link comprido, toque nos três pontos dessa tela e escolha ‘Abrir no Safari’. Não copie nem envie o link.";
 
 const ANDROID_META_IN_APP_MESSAGE =
   "Você está no navegador do Instagram ou Facebook. Toque em ‘Baixar material’ e aguarde alguns segundos. O PDF pode ser salvo em Arquivos ou Downloads. Se após o clique abrir uma tela branca, sem fechar essa tela, toque nos três pontos e escolha ‘Abrir no Chrome’.";

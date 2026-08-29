@@ -72,3 +72,24 @@ export function getBrowserEnvironment(): BrowserEnvironment {
   if (uaLower === null) return { inAppBrowser: null, platform: "other" };
   return { inAppBrowser: detectInAppBrowser(uaLower), platform: detectPlatform(uaLower) };
 }
+
+/**
+ * `true` somente quando a cliente está em iOS/iPadOS DENTRO do navegador
+ * interno do Instagram, Facebook ou Messenger — o único cenário em que o
+ * disparo automático de download (`link.click()`) é conhecido por falhar
+ * silenciosamente (o WebView exibe/compartilha a signed URL em vez de
+ * apresentar o PDF). `false` para Safari/Chrome normais, para Android
+ * (mesmo dentro do Instagram/Facebook/Messenger — lá o clique automático
+ * funciona), para outros navegadores internos (TikTok, Twitter/X, WebView
+ * genérico) e para qualquer ambiente sem `navigator` (SSR/testes).
+ *
+ * Função pura no sentido de que não lê nada além de `navigator.userAgent`
+ * (via getBrowserEnvironment/safeLowerUserAgent, já protegidos) e não
+ * produz nenhum efeito colateral (nada é registrado ou armazenado).
+ */
+export function isMetaInAppIOSBrowser(env: BrowserEnvironment = getBrowserEnvironment()): boolean {
+  return (
+    env.platform === "ios" &&
+    (env.inAppBrowser === "instagram" || env.inAppBrowser === "facebook" || env.inAppBrowser === "messenger")
+  );
+}
