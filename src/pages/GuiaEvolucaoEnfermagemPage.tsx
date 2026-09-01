@@ -1,4 +1,5 @@
 import { GuiaConversationSection } from "../components/guia/GuiaConversationSection";
+import { ConnectedExtrasSection } from "@/components/guia/ConnectedExtrasSection";
 /**
  * Página comercial do Guia de Evolução de Enfermagem. Estrutura e copy
  * reconstroem a landing de referência já validada em conversão
@@ -505,6 +506,7 @@ export default function GuiaEvolucaoEnfermagemPage() {
             <ModulesSection />
             <GuiaConversationSection />
             <QuizSection onProfileSelected={handleQuizProfileSelected} onResultCta={handleQuizResultCta} priceCents={guiaPriceCents} />
+            <ConnectedExtrasSection />
             <OfferSection priceCents={guiaPriceCents}>
               {showForm && (
                 <CheckoutForm
@@ -1250,13 +1252,14 @@ function CheckoutForm({
 
       <div className="flex flex-col gap-3">
         <div className="flex flex-col gap-1">
-          <p className="text-[15px] font-bold text-slate-900">Complete seu material por + R$ 10,00 cada</p>
+          <p className="text-[15px] font-bold text-slate-900">Complete sua preparação por + R$ 10,00 cada</p>
           <p className="text-[13px] leading-relaxed text-slate-500">
-            Materiais extras para consultar no plantão e revisar nos estudos. Marque só o que quiser levar.
+            Você já conheceu dois deles acima. Marque apenas os materiais que fizerem sentido para sua rotina e seus estudos.
           </p>
         </div>
         {guiaEvolucaoBumps.map((bump) => {
           const checked = selectedBumps.has(bump.slug);
+          const previewedAbove = bump.slug === "mapa-mental-ilustrado" || bump.slug === "balanco-hidrico-bump";
           return (
             <label
               key={bump.slug}
@@ -1284,6 +1287,9 @@ function CheckoutForm({
                   className="mt-0.5 border-slate-300 bg-white hover:border-teal-500 data-[state=checked]:border-teal-600 data-[state=checked]:bg-teal-600 data-[state=checked]:text-white"
                 />
                 <span className="flex flex-col gap-1">
+                  <span className="w-fit rounded-full bg-white px-2 py-0.5 text-[9.5px] font-extrabold uppercase tracking-wide text-teal-700 ring-1 ring-teal-200">
+                    {previewedAbove ? "Você viu acima" : "Oferta adicional"}
+                  </span>
                   <span className="text-[14.5px] font-bold leading-snug text-slate-900">{bump.name}</span>
                   <span className="text-[12.5px] leading-snug text-slate-500">{bump.description}</span>
                   <span className={cn("text-[12.5px] font-bold", checked ? "text-teal-700" : "text-teal-600")}>

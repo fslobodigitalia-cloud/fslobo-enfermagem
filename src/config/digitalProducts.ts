@@ -41,22 +41,22 @@ export interface DigitalBump {
 export const guiaEvolucaoBumps: DigitalBump[] = [
   {
     slug: "mapa-mental-ilustrado",
-    name: "Guia Ilustrado de Enfermagem",
-    description: "Conteúdos difíceis viram consulta rápida e visual para o dia a dia.",
+    name: "Guia Ilustrado para Concursos e Processos Seletivos",
+    description: "Reforce os temas mais cobrados com uma revisão visual para provas e processos seletivos.",
     priceCents: 1000,
     priceLabel: "R$ 10,00",
   },
   {
-    slug: "2000-questoes-enfermagem",
-    name: "2000 Questões de Enfermagem",
-    description: "Pare de só ler: pratique com questões e descubra exatamente o que ainda precisa revisar.",
+    slug: "medicamentos-na-pratica",
+    name: "Medicamentos na Prática",
+    description: "Consulte classes, vias, cálculos e cuidados de enfermagem com mais segurança na prática.",
     priceCents: 1000,
     priceLabel: "R$ 10,00",
   },
   {
-    slug: "guia-feridas-cronicas",
-    name: "Guia de Feridas Crônicas",
-    description: "Tenha à mão um guia prático para consultar quando surgir dúvida sobre os principais tipos de feridas.",
+    slug: "balanco-hidrico-bump",
+    name: "Balanço Hídrico Ilustrado",
+    description: "Aprenda a registrar entradas e saídas, calcular o saldo e interpretar o balanço no plantão.",
     priceCents: 1000,
     priceLabel: "R$ 10,00",
   },
@@ -124,21 +124,17 @@ export const mapasMentaisBumps: DigitalBump[] = [
  * mapasMentaisBumps acima (não alterados por este bloco) — mesma
  * disciplina de preço, só que para outro produto/rota.
  *
- * IMPORTANTE: este produto existe em public.products com active = false —
- * ainda NÃO está disponível para compra. priceCents/priceLabel aqui são
- * só fallback visual/UX (mesma regra dos outros catálogos acima); como o
- * produto está inativo, useProductCatalog()/get_active_product_catalog()
- * nunca o retorna, então a página sempre usa este fallback até o produto
- * ser ativado no banco (fora do escopo desta etapa). O checkout SEMPRE
- * tentará chamar create-product-order-efi-prod normalmente — a RPC
- * create_or_get_product_order_with_items_efi é quem rejeita com
- * "product_not_found_or_inactive" enquanto active permanecer false; não
- * há nenhuma tentativa de contornar essa checagem no frontend.
+ * IMPORTANTE: "balanco-hidrico" é o produto PRINCIPAL da landing própria.
+ * Ele deve permanecer kind=primary e ativo. Quando o mesmo material for
+ * oferecido como adicional do Guia de Evolução, o slug usado é a variante
+ * separada "balanco-hidrico-bump", vinculada ao mesmo PDF no banco. Nunca
+ * transforme este registro principal em bump: isso retiraria o produto do
+ * catálogo e quebraria sua compra individual.
  *
  * balancoHidricoBumps nunca inclui "balanco-hidrico" (o próprio produto
  * principal) — mesma disciplina de guiaEvolucaoBumps/mapasMentaisBumps.
- * "medicamentos-na-pratica" foi deliberadamente excluído: está cadastrado
- * como kind=primary no banco, não kind=bump.
+ * A composição desta landing é independente dos adicionais exibidos no
+ * Guia de Evolução; por isso "medicamentos-na-pratica" não é incluído aqui.
  */
 export const balancoHidricoProduct = {
   slug: "balanco-hidrico",
