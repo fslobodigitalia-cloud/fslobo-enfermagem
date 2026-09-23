@@ -52,19 +52,10 @@ const CONNECTED_EXTRAS: ConnectedExtra[] = [
       alt: `Página ${number} de exemplo dos Mapas Mentais`,
     })),
   },
-  {
-    slug: "balanco-hidrico-bump",
-    name: "Balanço Hídrico Ilustrado",
-    description: "Aprenda a registrar entradas, saídas e calcular o saldo com exemplos práticos e modelos preenchidos.",
-    cover: {
-      src: "/balanco-hidrico/capa-balanco-hidrico.webp",
-      alt: "Capa do Balanço Hídrico Ilustrado",
-    },
-    pages: [1, 2, 3, 4, 5].map((number) => ({
-      src: `/balanco-hidrico/modulo-${number}.webp`,
-      alt: `Página ${number} de exemplo do Balanço Hídrico Ilustrado`,
-    })),
-  },
+  // Balanço Hídrico Ilustrado NÃO aparece aqui de propósito — permanece
+  // apenas como o terceiro adicional dentro do checkout (guiaEvolucaoBumps
+  // em src/config/digitalProducts.ts). Esta seção destaca só os dois
+  // adicionais com selo (ver CheckoutForm para a lista completa).
 ];
 
 function ProductPreviewDialog({
@@ -231,7 +222,7 @@ export function ConnectedExtrasSection() {
           </p>
         </div>
 
-        <div className="mt-9 grid grid-cols-2 gap-2.5 sm:mt-12 sm:grid-cols-3 sm:gap-6">
+        <div className="mt-9 grid grid-cols-2 gap-2.5 sm:mt-12 sm:gap-6">
           {CONNECTED_EXTRAS.map((product) => {
             const hasPreview = Boolean(product.pages && product.pages.length > 0);
             const Wrapper: React.ElementType = hasPreview ? "button" : "div";
