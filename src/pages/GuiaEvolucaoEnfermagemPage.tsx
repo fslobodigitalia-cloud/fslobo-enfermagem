@@ -1252,14 +1252,15 @@ function CheckoutForm({
 
       <div className="flex flex-col gap-3">
         <div className="flex flex-col gap-1">
-          <p className="text-[15px] font-bold text-slate-900">Complete sua preparação por + R$ 10,00 cada</p>
+          <p className="text-[15px] font-bold text-slate-900">Complete seu kit de enfermagem</p>
           <p className="text-[13px] leading-relaxed text-slate-500">
-            Você já conheceu dois deles acima. Marque apenas os materiais que fizerem sentido para sua rotina e seus estudos.
+            Adicione conteúdos que complementam seu Guia. Você recebe tudo junto após a confirmação do pagamento.
           </p>
         </div>
         {guiaEvolucaoBumps.map((bump) => {
           const checked = selectedBumps.has(bump.slug);
-          const previewedAbove = bump.slug === "mapa-mental-ilustrado" || bump.slug === "balanco-hidrico-bump";
+          const previewedAbove =
+            bump.slug === "medicamentos-na-pratica" || bump.slug === "mapa-mental-ilustrado" || bump.slug === "balanco-hidrico-bump";
           return (
             <label
               key={bump.slug}
@@ -1293,7 +1294,7 @@ function CheckoutForm({
                   <span className="text-[14.5px] font-bold leading-snug text-slate-900">{bump.name}</span>
                   <span className="text-[12.5px] leading-snug text-slate-500">{bump.description}</span>
                   <span className={cn("text-[12.5px] font-bold", checked ? "text-teal-700" : "text-teal-600")}>
-                    {checked ? "✓ Adicionado ao seu pedido" : `Adicionar por + ${bump.priceLabel}`}
+                    {checked ? "✓ Adicionado — você receberá junto com o Guia" : "Adicionar por apenas R$ 10"}
                   </span>
                 </span>
               </span>

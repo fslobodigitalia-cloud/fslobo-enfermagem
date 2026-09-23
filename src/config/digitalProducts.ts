@@ -40,23 +40,23 @@ export interface DigitalBump {
 
 export const guiaEvolucaoBumps: DigitalBump[] = [
   {
-    slug: "mapa-mental-ilustrado",
-    name: "Guia Ilustrado para Concursos e Processos Seletivos",
-    description: "Reforce os temas mais cobrados com uma revisão visual para provas e processos seletivos.",
+    slug: "medicamentos-na-pratica",
+    name: "Medicamentos na Prática",
+    description: "Consulte os medicamentos mais utilizados, vias de administração e principais cuidados de enfermagem.",
     priceCents: 1000,
     priceLabel: "R$ 10,00",
   },
   {
-    slug: "medicamentos-na-pratica",
-    name: "Medicamentos na Prática",
-    description: "Consulte classes, vias, cálculos e cuidados de enfermagem com mais segurança na prática.",
+    slug: "mapa-mental-ilustrado",
+    name: "Mapas Mentais",
+    description: "Revise os principais assuntos de enfermagem de forma visual, rápida e organizada.",
     priceCents: 1000,
     priceLabel: "R$ 10,00",
   },
   {
     slug: "balanco-hidrico-bump",
     name: "Balanço Hídrico Ilustrado",
-    description: "Aprenda a registrar entradas e saídas, calcular o saldo e interpretar o balanço no plantão.",
+    description: "Aprenda a registrar entradas, saídas e calcular o saldo com exemplos práticos e modelos preenchidos.",
     priceCents: 1000,
     priceLabel: "R$ 10,00",
   },

@@ -8,6 +8,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import { ProductCover } from "@/components/catalog/ProductCover";
 
 interface PreviewPage {
   src: string;
@@ -18,28 +19,43 @@ interface ConnectedExtra {
   slug: string;
   name: string;
   description: string;
-  cover: PreviewPage;
-  pages: PreviewPage[];
+  /** Imagem real de capa. Ausente quando o produto ainda não tem preview dedicado (ver mockup abaixo). */
+  cover?: PreviewPage;
+  /** Selo de destaque exibido no card (ex.: "Mais escolhido"). Opcional — sem selo quando ausente. */
+  badge?: string;
+  /**
+   * Páginas de exemplo para o preview em modal. Opcional: quando ausente
+   * (ex.: produto sem preview dedicado ainda), o card exibe só a capa
+   * (ou o mockup), sem abrir o modal de navegação por páginas.
+   */
+  pages?: PreviewPage[];
 }
 
 const CONNECTED_EXTRAS: ConnectedExtra[] = [
   {
+    slug: "medicamentos-na-pratica",
+    name: "Medicamentos na Prática",
+    description: "Consulte os medicamentos mais utilizados, vias de administração e principais cuidados de enfermagem.",
+    badge: "Mais escolhido",
+  },
+  {
     slug: "mapa-mental-ilustrado",
-    name: "Guia Ilustrado para Concursos e Processos Seletivos",
-    description: "Revisão visual para reforçar os temas mais cobrados em provas e processos seletivos.",
+    name: "Mapas Mentais",
+    description: "Revise os principais assuntos de enfermagem de forma visual, rápida e organizada.",
+    badge: "Ideal para provas",
     cover: {
       src: "/concursos-enfermagem/capa-mapas-mentais.webp",
-      alt: "Capa do Guia Ilustrado para Concursos e Processos Seletivos de Enfermagem",
+      alt: "Capa dos Mapas Mentais de Enfermagem",
     },
     pages: [1, 2, 3, 4, 5].map((number) => ({
       src: `/concursos-enfermagem/modulo-${number}.webp`,
-      alt: `Página ${number} de exemplo do Guia Ilustrado para Concursos e Processos Seletivos`,
+      alt: `Página ${number} de exemplo dos Mapas Mentais`,
     })),
   },
   {
     slug: "balanco-hidrico-bump",
     name: "Balanço Hídrico Ilustrado",
-    description: "Passo a passo visual para registrar entradas e saídas, calcular o saldo e interpretar o resultado.",
+    description: "Aprenda a registrar entradas, saídas e calcular o saldo com exemplos práticos e modelos preenchidos.",
     cover: {
       src: "/balanco-hidrico/capa-balanco-hidrico.webp",
       alt: "Capa do Balanço Hídrico Ilustrado",
@@ -67,10 +83,11 @@ function ProductPreviewDialog({
     setPageIndex(0);
   }, [product?.slug]);
 
-  if (!product) return null;
+  if (!product || !product.pages || product.pages.length === 0) return null;
+  const pages = product.pages;
 
   const goToPage = (nextIndex: number) => {
-    const total = product.pages.length;
+    const total = pages.length;
     setPageIndex((nextIndex + total) % total);
   };
 
@@ -126,9 +143,9 @@ function ProductPreviewDialog({
           onTouchEnd={handleTouchEnd}
         >
           <img
-            key={product.pages[pageIndex].src}
-            src={product.pages[pageIndex].src}
-            alt={product.pages[pageIndex].alt}
+            key={pages[pageIndex].src}
+            src={pages[pageIndex].src}
+            alt={pages[pageIndex].alt}
             className="max-h-[64svh] w-full rounded-xl object-contain"
           />
 
@@ -153,12 +170,12 @@ function ProductPreviewDialog({
             aria-live="polite"
             className="absolute bottom-5 left-1/2 -translate-x-1/2 rounded-full bg-slate-950/80 px-3 py-1 text-[12px] font-bold text-white backdrop-blur"
           >
-            {pageIndex + 1} de {product.pages.length}
+            {pageIndex + 1} de {pages.length}
           </span>
         </div>
 
         <div className="flex gap-2 overflow-x-auto border-t border-white/10 bg-slate-950 p-3 sm:px-6">
-          {product.pages.map((page, index) => (
+          {pages.map((page, index) => (
             <button
               key={page.src}
               type="button"
@@ -214,39 +231,64 @@ export function ConnectedExtrasSection() {
           </p>
         </div>
 
-        <div className="mt-9 grid grid-cols-2 gap-2.5 sm:mt-12 sm:gap-6">
-          {CONNECTED_EXTRAS.map((product) => (
-            <button
-              key={product.slug}
-              type="button"
-              onClick={() => openPreview(product)}
-              aria-label={`Ver páginas do ${product.name}`}
-              className="group flex min-w-0 flex-col overflow-hidden rounded-[20px] border border-slate-200 bg-white text-left shadow-[0_4px_8px_rgba(15,23,42,0.04),0_20px_40px_-22px_rgba(15,23,42,0.2)] transition duration-200 hover:-translate-y-1 hover:border-teal-300 hover:shadow-[0_8px_16px_rgba(15,23,42,0.06),0_28px_50px_-24px_rgba(13,148,136,0.32)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-teal-500/20 sm:rounded-[28px]"
-            >
-              <span className="relative flex aspect-[3/4] w-full items-center justify-center overflow-hidden bg-slate-50 p-1.5 sm:p-4">
-                <img
-                  src={product.cover.src}
-                  alt={product.cover.alt}
-                  className="h-full w-full rounded-[14px] object-contain transition duration-300 group-hover:scale-[1.02] sm:rounded-[18px]"
-                  loading="lazy"
-                />
-                <span className="absolute bottom-2.5 left-1/2 flex -translate-x-1/2 items-center gap-1.5 whitespace-nowrap rounded-full bg-slate-950/85 px-2.5 py-1.5 text-[10px] font-bold text-white shadow-lg backdrop-blur sm:bottom-5 sm:px-4 sm:py-2 sm:text-[12.5px]">
-                  <Eye className="h-3.5 w-3.5" aria-hidden="true" /> Ver páginas
-                </span>
-              </span>
+        <div className="mt-9 grid grid-cols-2 gap-2.5 sm:mt-12 sm:grid-cols-3 sm:gap-6">
+          {CONNECTED_EXTRAS.map((product) => {
+            const hasPreview = Boolean(product.pages && product.pages.length > 0);
+            const Wrapper: React.ElementType = hasPreview ? "button" : "div";
+            return (
+              <Wrapper
+                key={product.slug}
+                type={hasPreview ? "button" : undefined}
+                onClick={hasPreview ? () => openPreview(product) : undefined}
+                aria-label={hasPreview ? `Ver páginas do ${product.name}` : undefined}
+                className={cn(
+                  "group relative flex min-w-0 flex-col overflow-hidden rounded-[20px] border border-slate-200 bg-white text-left shadow-[0_4px_8px_rgba(15,23,42,0.04),0_20px_40px_-22px_rgba(15,23,42,0.2)] transition duration-200 sm:rounded-[28px]",
+                  hasPreview &&
+                    "hover:-translate-y-1 hover:border-teal-300 hover:shadow-[0_8px_16px_rgba(15,23,42,0.06),0_28px_50px_-24px_rgba(13,148,136,0.32)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-teal-500/20",
+                )}
+              >
+                {product.badge && (
+                  <span className="absolute left-2.5 top-2.5 z-10 rounded-full bg-teal-600 px-2.5 py-1 text-[9.5px] font-extrabold uppercase tracking-wide text-white shadow-md sm:left-4 sm:top-4 sm:px-3 sm:py-1.5 sm:text-[11px]">
+                    {product.badge}
+                  </span>
+                )}
 
-              <span className="flex flex-1 flex-col p-3 sm:p-6">
-                <span className="text-[12.5px] font-extrabold leading-snug text-slate-900 sm:text-[18px]">{product.name}</span>
-                <span className="mt-2 hidden text-[13.5px] leading-relaxed text-slate-600 sm:block">{product.description}</span>
-                <span className="mt-3 text-[10.5px] font-bold text-teal-700 sm:mt-5 sm:text-[13px]">
-                  Toque para ver algumas páginas
+                <span className="relative flex aspect-[3/4] w-full items-center justify-center overflow-hidden bg-slate-50 p-1.5 sm:p-4">
+                  {product.cover ? (
+                    <img
+                      src={product.cover.src}
+                      alt={product.cover.alt}
+                      className="h-full w-full rounded-[14px] object-contain transition duration-300 group-hover:scale-[1.02] sm:rounded-[18px]"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <ProductCover
+                      tone="teal"
+                      label={product.name}
+                      eyebrow="Adicional opcional"
+                      className="h-full w-full rounded-[14px] sm:rounded-[18px]"
+                    />
+                  )}
+                  {hasPreview && (
+                    <span className="absolute bottom-2.5 left-1/2 flex -translate-x-1/2 items-center gap-1.5 whitespace-nowrap rounded-full bg-slate-950/85 px-2.5 py-1.5 text-[10px] font-bold text-white shadow-lg backdrop-blur sm:bottom-5 sm:px-4 sm:py-2 sm:text-[12.5px]">
+                      <Eye className="h-3.5 w-3.5" aria-hidden="true" /> Ver páginas
+                    </span>
+                  )}
                 </span>
-                <span className="mt-2 inline-flex w-fit rounded-full bg-teal-50 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-teal-700 sm:px-3 sm:text-[11px]">
-                  Opcional · + R$ 10,00
+
+                <span className="flex flex-1 flex-col p-3 sm:p-6">
+                  <span className="text-[12.5px] font-extrabold leading-snug text-slate-900 sm:text-[18px]">{product.name}</span>
+                  <span className="mt-2 hidden text-[13.5px] leading-relaxed text-slate-600 sm:block">{product.description}</span>
+                  <span className="mt-3 text-[10.5px] font-bold text-teal-700 sm:mt-5 sm:text-[13px]">
+                    {hasPreview ? "Toque para ver algumas páginas" : "Disponível como adicional no checkout"}
+                  </span>
+                  <span className="mt-2 inline-flex w-fit rounded-full bg-teal-50 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-teal-700 sm:px-3 sm:text-[11px]">
+                    Opcional · + R$ 10,00
+                  </span>
                 </span>
-              </span>
-            </button>
-          ))}
+              </Wrapper>
+            );
+          })}
         </div>
 
         <p className="mx-auto mt-6 max-w-[60ch] text-center text-[12.5px] leading-relaxed text-slate-500 sm:text-[13.5px]">
