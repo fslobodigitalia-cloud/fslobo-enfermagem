@@ -37,6 +37,14 @@ const CONNECTED_EXTRAS: ConnectedExtra[] = [
     name: "Medicamentos na Prática",
     description: "Consulte os medicamentos mais utilizados, vias de administração e principais cuidados de enfermagem.",
     badge: "Mais escolhido",
+    cover: {
+      src: "/medicamentos-na-pratica/capa-medicamentos-na-pratica.webp",
+      alt: "Capa do material Medicamentos na Prática",
+    },
+    pages: [1, 2, 3, 4].map((number) => ({
+      src: `/medicamentos-na-pratica/modulo-${number}.webp`,
+      alt: `Página ${number} de exemplo de Medicamentos na Prática`,
+    })),
   },
   {
     slug: "mapa-mental-ilustrado",
