@@ -29,10 +29,18 @@ interface DocumentMetaOptions {
   path?: string;
   /** Páginas legais não precisam ser indexadas com prioridade. */
   noindex?: boolean;
+  /**
+   * URL absoluta de uma imagem própria para og:image/twitter:image (ex.: a
+   * capa do produto). Opcional e aditivo — quando omitido, o comportamento
+   * é IDÊNTICO ao de antes desta adição: og:image/twitter:image continuam
+   * intocados, com o valor estático já definido em index.html (usado hoje
+   * por toda página que não passa este campo).
+   */
+  image?: string;
 }
 
 /** Atualiza título, descrição e canonical ao navegar entre as rotas. */
-export function useDocumentMeta({ title, description, path = "/", noindex }: DocumentMetaOptions) {
+export function useDocumentMeta({ title, description, path = "/", noindex, image }: DocumentMetaOptions) {
   React.useEffect(() => {
     document.title = title;
     setMeta('meta[name="description"]', "content", description);
@@ -40,10 +48,14 @@ export function useDocumentMeta({ title, description, path = "/", noindex }: Doc
     setMeta('meta[property="og:description"]', "content", description);
     setMeta('meta[property="og:url"]', "content", `${contact.siteUrl}${path}`);
     setCanonical(`${contact.siteUrl}${path}`);
+    if (image) {
+      setMeta('meta[property="og:image"]', "content", image);
+      setMeta('meta[name="twitter:image"]', "content", image);
+    }
 
     const robots = noindex ? "noindex, follow" : "index, follow";
     setMeta('meta[name="robots"]', "content", robots);
-  }, [title, description, path, noindex]);
+  }, [title, description, path, noindex, image]);
 }
 
 /**

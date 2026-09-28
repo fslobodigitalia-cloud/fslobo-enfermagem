@@ -168,3 +168,45 @@ export const balancoHidricoBumps: DigitalBump[] = [
     priceLabel: "R$ 10,00",
   },
 ];
+
+/**
+ * Catálogo de Medicamentos na Prática (produto principal, slug
+ * "medicamentos-na-pratica") e seus order bumps — landing dedicada em
+ * /medicamentos-na-pratica (MedicamentosNaPraticaPage.tsx). Independente
+ * dos blocos acima (nenhum deles foi alterado por este) — mesma disciplina
+ * de preço, só que para outro produto/rota.
+ *
+ * "medicamentos-na-pratica" era kind='bump' no banco até esta landing ser
+ * criada — passou a kind='primary' (mudança de dado, não de código) para
+ * poder ser vendido sozinho por R$10 aqui. Continua funcionando normalmente
+ * como adicional no Guia de Evolução e no Mapas Mentais (a RPC de checkout
+ * aceita 1+ produtos kind='primary' no mesmo pedido).
+ *
+ * Os dois bumps aqui ("guia-evolucao-enfermagem" e "concursos-enfermagem")
+ * são os mesmos produtos PRINCIPAIS de suas próprias landings — igual ao
+ * padrão já usado em mapasMentaisBumps/guiaEvolucaoBumps, que também citam
+ * produtos primary de outras landings como bump em contextos diferentes.
+ */
+export const medicamentosProduct = {
+  slug: "medicamentos-na-pratica",
+  name: "Medicamentos na Prática",
+  priceCents: 1000,
+  priceLabel: "R$ 10,00",
+};
+
+export const medicamentosBumps: DigitalBump[] = [
+  {
+    slug: "guia-evolucao-enfermagem",
+    name: "Anotação e Evolução de Enfermagem",
+    description: "Modelos prontos de evolução e anotação de enfermagem para consultar no plantão.",
+    priceCents: 1000,
+    priceLabel: "R$ 10,00",
+  },
+  {
+    slug: "concursos-enfermagem",
+    name: "Mapas Mentais",
+    description: "Revise os principais assuntos de enfermagem de forma visual, rápida e organizada.",
+    priceCents: 1000,
+    priceLabel: "R$ 10,00",
+  },
+];
