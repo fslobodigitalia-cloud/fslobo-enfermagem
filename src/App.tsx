@@ -1,5 +1,5 @@
 import * as React from "react";
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { captureCampaignParams } from "@/lib/utmTracking";
 import { pendingConfigFields } from "@/config/site";
 import { CartProvider } from "@/context/CartContext";
@@ -22,6 +22,16 @@ import Terms from "@/pages/Terms";
 import Delivery from "@/pages/Delivery";
 import Refund from "@/pages/Refund";
 import NotFound from "@/pages/NotFound";
+
+/**
+ * Redireciona para outro caminho preservando query string (UTMs, fbclid etc.)
+ * e hash. `replace`: a URL antiga não fica no histórico, então o botão
+ * Voltar leva à página anterior em vez de cair num loop de redirecionamento.
+ */
+function RedirectKeepingQuery({ to }: { to: string }) {
+  const { search, hash } = useLocation();
+  return <Navigate to={{ pathname: to, search, hash }} replace />;
+}
 
 export default function App() {
   React.useEffect(() => {
@@ -85,6 +95,13 @@ export default function App() {
               mantemos a ordem explícita por clareza, mesmo padrão do
               bloco acima). */}
           <Route path="/produto/balanco-hidrico" element={<BalancoHidricoPage />} />
+          {/* O combo tem landing exclusiva (/guia-evolucao-medicamentos); a URL
+              genérica de produto redireciona para ela, mantendo os parâmetros
+              de campanha. Estática: vence /produto/:slug. */}
+          <Route
+            path="/produto/combo-evolucao-medicamentos"
+            element={<RedirectKeepingQuery to="/guia-evolucao-medicamentos" />}
+          />
           <Route path="/produto/:slug" element={<ProductPage />} />
           <Route path="/carrinho" element={<CartPage />} />
           <Route path="/ferramentas" element={<ToolsHubPage />} />

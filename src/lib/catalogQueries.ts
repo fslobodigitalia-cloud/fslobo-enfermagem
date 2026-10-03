@@ -107,5 +107,9 @@ export function formatPriceCents(cents: number, currency: string): string {
  * mesmo produto. Os demais produtos usam a rota dinâmica padrão.
  */
 export function productRoute(slug: string): string {
-  return slug === "guia-evolucao-enfermagem" ? "/guia-evolucao-enfermagem" : `/produto/${slug}`;
+  if (slug === "guia-evolucao-enfermagem") return "/guia-evolucao-enfermagem";
+  // O combo também tem landing exclusiva e aprovada (GuiaEvolucaoMedicamentosPage);
+  // /produto/combo-evolucao-medicamentos só redireciona para ela (ver App.tsx).
+  if (slug === "combo-evolucao-medicamentos") return "/guia-evolucao-medicamentos";
+  return `/produto/${slug}`;
 }
