@@ -85,13 +85,8 @@ import {
   comboEvolucaoMedicamentosBumps as comboBumps,
   formatCents,
 } from "@/config/digitalProducts";
-import {
-  guiaQuizQuestions,
-  guiaProfileOptions,
-  guiaProfileMessages,
-  guiaQuizPerformanceMessage,
-  type NursingProfile,
-} from "@/config/guiaQuiz";
+import { guiaProfileOptions, guiaProfileMessages, type NursingProfile } from "@/config/guiaQuiz";
+import { comboQuizQuestions, comboQuizPerformanceMessage, COMBO_QUIZ_INCLUDED_NOTE } from "@/config/comboQuiz";
 import { buildPixSupportWhatsAppUrl } from "@/lib/whatsapp";
 import { initGuiaPixel, trackGuiaLead, trackGuiaQuizInterest, trackGuiaInitiateCheckout, trackGuiaPurchase } from "@/lib/guiaPixel";
 import { SiteHeader } from "@/components/layout/SiteHeader";
@@ -866,8 +861,8 @@ function QuizSection({
   const [selected, setSelected] = React.useState<number | null>(null);
   const [profile, setProfile] = React.useState<NursingProfile | null>(null);
 
-  const question = guiaQuizQuestions[index];
-  const isLast = index === guiaQuizQuestions.length - 1;
+  const question = comboQuizQuestions[index];
+  const isLast = index === comboQuizQuestions.length - 1;
 
   function handleAnswer(optionIndex: number) {
     if (selected !== null) return;
@@ -895,7 +890,7 @@ function QuizSection({
   // acompanhar o feedback antes do clique em "Próxima questão".
   const progressPercent =
     phase === "questions"
-      ? ((index + (selected !== null ? 1 : 0)) / guiaQuizQuestions.length) * 100
+      ? ((index + (selected !== null ? 1 : 0)) / comboQuizQuestions.length) * 100
       : 100;
 
   return (
@@ -910,7 +905,7 @@ function QuizSection({
               Será que você está <span className="text-teal-600">registrando certo?</span>
             </h2>
             <p className="mx-auto mt-3 max-w-[52ch] text-[15.5px] text-slate-600">
-              Pequenos detalhes fazem toda a diferença na qualidade e segurança do seu registro profissional. Faça o teste rápido:
+              Pequenos detalhes fazem toda a diferença na qualidade e segurança do seu registro e da sua medicação. Faça o teste rápido, com questões de anotação e de Medicamentos na Prática:
             </p>
           </div>
         )}
@@ -924,7 +919,7 @@ function QuizSection({
               <div className="flex flex-col gap-4">
                 <div className="flex items-center justify-between text-[12px] font-bold uppercase tracking-wide text-slate-400">
                   <span>
-                    Pergunta {index + 1} de {guiaQuizQuestions.length}
+                    Pergunta {index + 1} de {comboQuizQuestions.length}
                   </span>
                   <span className="text-teal-600">{Math.round(progressPercent)}%</span>
                 </div>
@@ -1022,10 +1017,10 @@ function QuizSection({
           {phase === "profile" && (
             <div className="flex flex-col items-center gap-7 text-center">
               <h3 className="font-sans text-[1.5rem] font-extrabold text-slate-900 sm:text-[1.7rem]">
-                🎯 Você acertou <span className="text-teal-600">{score}</span> de {guiaQuizQuestions.length} questões!
+                🎯 Você acertou <span className="text-teal-600">{score}</span> de {comboQuizQuestions.length} questões!
               </h3>
               <p className={cn("rounded-2xl border border-emerald-200 bg-emerald-50 px-6 py-4 text-[15px] font-semibold text-emerald-800", SHADOW_SOFT)}>
-                {guiaQuizPerformanceMessage(score, guiaQuizQuestions.length)}
+                {comboQuizPerformanceMessage(score, comboQuizQuestions.length)}
               </p>
               <p className="text-[15px] text-slate-600">
                 Responda uma pergunta rápida para receber uma análise personalizada do seu resultado.
@@ -1057,9 +1052,12 @@ function QuizSection({
                 {guiaProfileMessages[profile].title}
               </h3>
               <p className={cn("rounded-2xl border border-emerald-200 bg-emerald-50 px-6 py-4 text-[14.5px] font-semibold text-emerald-800", SHADOW_SOFT)}>
-                🎯 Seu desempenho final: {score}/{guiaQuizQuestions.length} questões
+                🎯 Seu desempenho final: {score}/{comboQuizQuestions.length} questões
               </p>
               <p className="text-left text-[15.5px] leading-relaxed text-slate-600">{guiaProfileMessages[profile].body}</p>
+              <p className={cn("rounded-2xl border border-teal-200 bg-teal-50 px-6 py-4 text-left text-[14.5px] font-semibold text-teal-800", SHADOW_SOFT)}>
+                {COMBO_QUIZ_INCLUDED_NOTE}
+              </p>
               <Button type="button" variant="outline" size="lg" full className={CTA_BUTTON_CLASS} onClick={onResultCta}>
                 Quero os modelos por {formatCents(priceCents)}
               </Button>

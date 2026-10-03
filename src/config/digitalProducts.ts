@@ -239,7 +239,7 @@ export const comboEvolucaoMedicamentosProduct = {
 export const comboEvolucaoMedicamentosBumps: DigitalBump[] = [
   {
     slug: "mapa-mental-ilustrado",
-    name: "Mapas Mentais",
+    name: "Mapas Mentais para Concursos de Enfermagem",
     description: "Revise os principais assuntos de enfermagem de forma visual, rápida e organizada.",
     priceCents: 1000,
     priceLabel: "R$ 10,00",
