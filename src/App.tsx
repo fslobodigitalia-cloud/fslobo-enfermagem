@@ -11,6 +11,7 @@ import MapasMentaisPage from "@/pages/MapasMentaisPage";
 import BalancoHidricoPage from "@/pages/BalancoHidricoPage";
 import CartPage from "@/pages/CartPage";
 import GuiaEvolucaoEnfermagemPage from "@/pages/GuiaEvolucaoEnfermagemPage";
+import GuiaEvolucaoMedicamentosPage from "@/pages/GuiaEvolucaoMedicamentosPage";
 import MedicamentosNaPraticaPage from "@/pages/MedicamentosNaPraticaPage";
 import ToolsHubPage from "@/pages/tools/ToolsHubPage";
 import CalculadoraEnfermagemPage from "@/pages/tools/CalculadoraEnfermagemPage";
@@ -91,6 +92,7 @@ export default function App() {
           <Route path="/ferramentas/checklist-plantao" element={<ChecklistPlantaoPage />} />
           <Route path="/ferramentas/dicas-de-plantao" element={<DicasPlantaoPage />} />
           <Route path="/guia-evolucao-enfermagem" element={<GuiaEvolucaoEnfermagemPage />} />
+          <Route path="/guia-evolucao-medicamentos" element={<GuiaEvolucaoMedicamentosPage />} />
           <Route path="/medicamentos-na-pratica" element={<MedicamentosNaPraticaPage />} />
           {/* Endereço antigo da landing do Balanço Hídrico — a rota real
               agora é /produto/balanco-hidrico (ver bloco acima, junto de

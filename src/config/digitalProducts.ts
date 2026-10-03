@@ -210,3 +210,45 @@ export const medicamentosBumps: DigitalBump[] = [
     priceLabel: "R$ 10,00",
   },
 ];
+
+/**
+ * Oferta combo "Guia de Anotação e Evolução + Medicamentos na Prática" —
+ * landing dedicada em /guia-evolucao-medicamentos
+ * (GuiaEvolucaoMedicamentosPage.tsx). Independente de guiaEvolucaoProduct/
+ * guiaEvolucaoBumps e medicamentosProduct/medicamentosBumps acima (nenhum
+ * foi alterado por este bloco).
+ *
+ * "combo-evolucao-medicamentos" é um produto PRINCIPAL próprio no banco,
+ * com entrega vinculada (2 PDFs do Guia + 3 PDFs de Medicamentos). O
+ * checkout desta landing envia SOMENTE [combo, ...bumps] — nunca os slugs
+ * individuais do Guia/Medicamentos junto, senão o cliente seria cobrado
+ * (e receberia) em duplicidade.
+ *
+ * comboEvolucaoMedicamentosProduct.priceCents é só FALLBACK visual. O preço
+ * exibido prefere o catálogo público (get_active_product_catalog(), que só
+ * lista produto active + catalog_status='ready'); o valor REALMENTE
+ * cobrado é sempre o order.amountCents devolvido pelo backend.
+ */
+export const comboEvolucaoMedicamentosProduct = {
+  slug: "combo-evolucao-medicamentos",
+  name: "Guia de Anotação e Evolução + Medicamentos na Prática",
+  priceCents: 1700,
+  priceLabel: "R$ 17,00",
+};
+
+export const comboEvolucaoMedicamentosBumps: DigitalBump[] = [
+  {
+    slug: "mapa-mental-ilustrado",
+    name: "Mapas Mentais",
+    description: "Revise os principais assuntos de enfermagem de forma visual, rápida e organizada.",
+    priceCents: 1000,
+    priceLabel: "R$ 10,00",
+  },
+  {
+    slug: "balanco-hidrico-bump",
+    name: "Balanço Hídrico Ilustrado",
+    description: "Aprenda a registrar entradas, saídas e calcular o saldo com exemplos práticos e modelos preenchidos.",
+    priceCents: 1000,
+    priceLabel: "R$ 10,00",
+  },
+];

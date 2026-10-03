@@ -77,16 +77,38 @@ function centsToReais(cents: number): number {
 }
 
 /**
- * Injeta o script, inicializa o pixel e dispara PageView + ViewContent —
- * chamado uma vez ao montar a página (guardado por `initialized`, então
- * um segundo useEffect/StrictMode double-invoke não duplica nada).
+ * Identifica a "visita" atual à página: cada navegação do React Router
+ * grava uma `key` própria em history.state, então re-execuções do efeito
+ * na MESMA entrada (StrictMode, re-render) têm a mesma chave e não
+ * duplicam eventos, enquanto entrar em outra rota (ex.: do Guia para o
+ * combo) gera uma chave nova e conta como nova visualização de página.
+ */
+function currentVisitKey(): string {
+  const stateKey = (window.history.state as { key?: string } | null)?.key;
+  return `${window.location.pathname}|${stateKey ?? "initial"}`;
+}
+
+const trackedVisits = new Set<string>();
+
+/**
+ * Chamado ao montar cada página que usa este pixel. Script + fbq("init")
+ * acontecem UMA vez por carregamento do app (`initialized`); PageView +
+ * ViewContent disparam UMA vez por visita de página (navegação SPA
+ * incluída) — antes, `initialized` global fazia a segunda rota visitada
+ * na mesma sessão ficar sem nenhum evento.
  */
 export function initGuiaPixel(): void {
-  if (initialized || typeof window === "undefined") return;
-  initialized = true;
+  if (typeof window === "undefined") return;
 
-  injectScript();
-  window.fbq?.("init", PIXEL_ID);
+  if (!initialized) {
+    initialized = true;
+    injectScript();
+    window.fbq?.("init", PIXEL_ID);
+  }
+
+  const visit = currentVisitKey();
+  if (trackedVisits.has(visit)) return;
+  trackedVisits.add(visit);
   window.fbq?.("track", "PageView");
   window.fbq?.("track", "ViewContent");
 }
