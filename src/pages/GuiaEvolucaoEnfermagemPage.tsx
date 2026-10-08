@@ -1,5 +1,5 @@
 import { GuiaConversationSection } from "../components/guia/GuiaConversationSection";
-import { ConnectedExtrasSection } from "@/components/guia/ConnectedExtrasSection";
+import { ConnectedExtrasSection, CONNECTED_EXTRA_SLUGS } from "@/components/guia/ConnectedExtrasSection";
 /**
  * Página comercial do Guia de Evolução de Enfermagem. Estrutura e copy
  * reconstroem a landing de referência já validada em conversão
@@ -502,10 +502,10 @@ export default function GuiaEvolucaoEnfermagemPage() {
           </div>
         ) : (
           <>
-            <Hero />
-            <ModulesSection />
+            <Hero priceCents={guiaPriceCents} />
+            <ModulesSection priceCents={guiaPriceCents} />
             <GuiaConversationSection />
-            <QuizSection onProfileSelected={handleQuizProfileSelected} onResultCta={handleQuizResultCta} priceCents={guiaPriceCents} />
+            <QuizSection onProfileSelected={handleQuizProfileSelected} onResultCta={handleQuizResultCta} onSkip={scrollToOffer} priceCents={guiaPriceCents} />
             <ConnectedExtrasSection />
             <OfferSection priceCents={guiaPriceCents}>
               {showForm && (
@@ -639,7 +639,7 @@ function SpecialtyMarquee() {
   );
 }
 
-function Hero() {
+function Hero({ priceCents }: { priceCents: number }) {
   // Vídeo de fundo só entra em prefers-reduced-motion: reduce nunca é
   // renderizado — o overlay + backgroundColor do <section> (navy sólido)
   // cobrem esse caso sozinhos, sem precisar pausar/tocar vídeo nenhum.
@@ -689,6 +689,14 @@ function Hero() {
             Você cuida do paciente com todo o carinho, mas trava na hora de registrar? Aqui é só consultar:
             manual ilustrado + modelos prontos por situação clínica para adaptar ao seu paciente, sem sair tarde do plantão.
           </p>
+          <p className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-[14.5px] font-bold text-white lg:justify-start lg:text-[15.5px]">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-teal-400/30 bg-teal-400/10 px-3 py-1 text-teal-200">
+              <FileText className="h-4 w-4" aria-hidden="true" /> PDF com mais de 132 modelos
+            </span>
+            <span className="text-slate-200">
+              por <span className="text-teal-300">{formatCents(priceCents)}</span> · pagamento único
+            </span>
+          </p>
 
           {/* Benefícios — no mobile, "pills" empilhados; no desktop, badges
               compactos. Mesma hierarquia de antes, adaptada ao fundo escuro. */}
@@ -717,8 +725,8 @@ function Hero() {
             ))}
           </div>
 
-          <Button size="lg" variant="outline" full className={cn("max-w-[360px] lg:w-auto lg:px-12", CTA_BUTTON_CLASS)} onClick={scrollToOffer}>
-            Quero acessar o guia
+          <Button size="lg" variant="outline" full className={cn("max-w-[400px] lg:w-auto lg:px-12", CTA_BUTTON_CLASS)} onClick={scrollToOffer}>
+            Quero acessar o guia por {formatCents(priceCents)}
           </Button>
         </div>
 
@@ -763,7 +771,7 @@ const MODULE_PAGES = [
   { src: "/guia-evolucao/modulo-8.webp", alt: "Página de exemplo do Guia de Evolução de Enfermagem — modelo 8, roteiro de anotação de enfermagem" },
 ];
 
-function ModulesSection() {
+function ModulesSection({ priceCents }: { priceCents: number }) {
   return (
     <section className="relative bg-white px-5 py-12 sm:py-24" style={TEXTURE_TEAL_BLOOM}>
       <div className="mx-auto w-full max-w-[1180px]">
@@ -814,6 +822,11 @@ function ModulesSection() {
         <p className="mt-3 flex items-center justify-center gap-2 text-[13px] font-semibold uppercase tracking-wide text-slate-400">
           <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" /> Arraste para ver o conteúdo
         </p>
+        <div className="mt-8 flex justify-center">
+          <Button size="lg" variant="outline" full className={cn("max-w-[400px] sm:w-auto sm:px-12", CTA_BUTTON_CLASS)} onClick={scrollToOffer}>
+            Quero este guia por {formatCents(priceCents)}
+          </Button>
+        </div>
       </div>
     </section>
   );
@@ -826,10 +839,12 @@ type QuizPhase = "questions" | "profile" | "result";
 function QuizSection({
   onProfileSelected,
   onResultCta,
+  onSkip,
   priceCents,
 }: {
   onProfileSelected: () => void;
   onResultCta: () => void;
+  onSkip: () => void;
   priceCents: number;
 }) {
   const [phase, setPhase] = React.useState<QuizPhase>("questions");
@@ -884,6 +899,13 @@ function QuizSection({
             <p className="mx-auto mt-3 max-w-[52ch] text-[15.5px] text-slate-600">
               Pequenos detalhes fazem toda a diferença na qualidade e segurança do seu registro profissional. Faça o teste rápido:
             </p>
+            <button
+              type="button"
+              onClick={onSkip}
+              className="mt-4 text-[14px] font-semibold text-teal-700 underline underline-offset-4 hover:text-teal-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500/30"
+            >
+              Pular o teste e ver a oferta
+            </button>
           </div>
         )}
 
@@ -1045,13 +1067,6 @@ function QuizSection({
 
 /* ────────────────────── Oferta principal / preço / compra ────────────────── */
 
-const OFFER_BENEFITS = [
-  "Manual ilustrado: entenda como estruturar a evolução e a anotação",
-  "+132 modelos prontos por situação clínica, para consultar e adaptar",
-  "Setores do dia a dia: Clínica Médica, UTI e Emergência",
-  "Em PDF: consulta rápida pelo celular no plantão",
-];
-
 /**
  * Fundo cinematográfico do checkout — mesmo navy profundo da Hero, com
  * glows teal/emerald em camadas (mais presença que o TEXTURE_TEAL_BLOOM
@@ -1077,26 +1092,8 @@ function OfferSection({ children, priceCents }: { children: React.ReactNode; pri
       <div aria-hidden="true" className="pointer-events-none absolute -left-24 top-1/3 h-72 w-72 rounded-full bg-teal-400/10 blur-3xl" />
       <div aria-hidden="true" className="pointer-events-none absolute -right-20 bottom-10 h-80 w-80 rounded-full bg-emerald-400/10 blur-3xl" />
 
-      <div className="relative mx-auto grid w-full max-w-[1100px] gap-10 lg:grid-cols-[0.85fr_1.15fr] lg:gap-14">
-        {/* Coluna esquerda — vídeo do produto, fixa ao rolar no desktop. Moldura
-            com glow por trás, coerente com o fundo escuro (o <video> em si —
-            src, controls, playsInline — não muda). */}
-        <div className="relative lg:sticky lg:top-10 lg:self-start">
-          <div className="pointer-events-none absolute inset-0 -z-10 scale-105 rounded-[32px] bg-teal-400/15 blur-2xl" aria-hidden="true" />
-          <div className={cn("overflow-hidden rounded-[28px] border border-white/15", "shadow-[0_8px_16px_rgba(0,0,0,0.25),0_40px_80px_-28px_rgba(0,0,0,0.55)]")}>
-            <video
-              src="/guia-evolucao/video-guia-evolucao.mp4"
-              controls
-              playsInline
-              className="block aspect-[3/4] w-full object-cover"
-            />
-          </div>
-        </div>
-
-        {/* Coluna direita — nome, benefícios, preço, bumps, checkout: o ponto
-            mais "premium" da página — produto + checkout dentro de um bloco
-            seguro e valioso. Cartão claro (legibilidade máxima) sobre o fundo
-            escuro do entorno — é isso que dá a profundidade em camadas. */}
+      <div className="relative mx-auto w-full max-w-[680px]">
+        {/* Cartão único e centralizado: nome → descrição → preço → adicionais → formulário. */}
         <div className={cn("relative overflow-hidden rounded-[28px] border border-white/10 bg-white p-6 sm:p-10", "shadow-[0_8px_16px_rgba(0,0,0,0.2),0_40px_90px_-30px_rgba(0,0,0,0.6)]")}>
           <div className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-teal-50/80 blur-3xl" aria-hidden="true" />
           <div className="pointer-events-none absolute -bottom-20 -left-16 h-56 w-56 rounded-full bg-emerald-50/70 blur-3xl" aria-hidden="true" />
@@ -1108,27 +1105,15 @@ function OfferSection({ children, priceCents }: { children: React.ReactNode; pri
             {guiaEvolucaoProduct.name}
           </h2>
           <p className="relative mt-3 text-[15.5px] leading-relaxed text-slate-600">
-            Dois materiais que se completam: um para você entender como montar o registro e outro para consultar e adaptar na hora do plantão.
+            Guia digital de anotação e evolução com exemplos e modelos para consultar e adaptar aos registros do plantão.
           </p>
-
-          <ul className="relative mt-7 flex flex-col gap-3">
-            {OFFER_BENEFITS.map((item) => (
-              <li
-                key={item}
-                className="flex items-start gap-3 rounded-2xl bg-slate-50 px-4 py-3 text-[14.5px] font-medium text-slate-700"
-              >
-                <Check className="mt-0.5 h-4 w-4 shrink-0 text-teal-600" strokeWidth={2.5} aria-hidden="true" />
-                {item}
-              </li>
-            ))}
-          </ul>
 
           {/* Bloco do preço — mais presença: gradiente mais rico, borda dupla
               (anel + borda), glow por trás, número maior. Preço/produto em si
               (priceDigits, priceLabel) inalterados — só o invólucro visual. */}
           <div
             className={cn(
-              "relative mt-8 flex flex-col items-center gap-1 overflow-hidden rounded-[24px] border-2 border-teal-200 bg-gradient-to-b from-teal-50 via-white to-white py-8 text-center ring-1 ring-teal-100",
+              "relative mt-7 flex flex-col items-center gap-1 overflow-hidden rounded-[24px] border-2 border-teal-200 bg-gradient-to-b from-teal-50 via-white to-white py-8 text-center ring-1 ring-teal-100",
               SHADOW_MEDIUM,
             )}
           >
@@ -1140,6 +1125,9 @@ function OfferSection({ children, priceCents }: { children: React.ReactNode; pri
             </span>
             <span className="relative mt-2 text-[12px] font-bold uppercase tracking-wide text-slate-500">
               Pagamento único · sem mensalidade
+            </span>
+            <span className="relative text-[13px] font-medium text-slate-500">
+              Material digital em PDF · acesso após a confirmação do Pix
             </span>
           </div>
 
@@ -1206,6 +1194,61 @@ function CheckoutForm({
 }) {
   return (
     <form id="checkout" onSubmit={onSubmit} noValidate className="flex flex-col gap-5 text-left">
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-1">
+          <p className="text-[15px] font-bold text-slate-900">Complete seu kit de enfermagem</p>
+          <p className="text-[13px] leading-relaxed text-slate-500">
+            Adicione conteúdos que complementam seu Guia. Você recebe tudo junto após a confirmação do pagamento.
+          </p>
+        </div>
+        {guiaEvolucaoBumps.map((bump) => {
+          const checked = selectedBumps.has(bump.slug);
+          // Só os adicionais realmente exibidos em ConnectedExtrasSection
+          // (antes do checkout) ganham o selo "Você viu acima".
+          const previewedAbove = CONNECTED_EXTRA_SLUGS.includes(bump.slug);
+          return (
+            <label
+              key={bump.slug}
+              htmlFor={`bump-${bump.slug}`}
+              className={cn(
+                "group relative flex cursor-pointer items-start justify-between gap-3 rounded-2xl border p-3.5 transition-all duration-200",
+                checked
+                  ? "border-teal-400 bg-teal-50/70 shadow-[0_4px_14px_-6px_rgba(13,148,136,0.35)] ring-2 ring-teal-500/15"
+                  : "border-slate-200 bg-slate-50 hover:-translate-y-0.5 hover:border-teal-200 hover:bg-white hover:shadow-[0_6px_16px_-10px_rgba(15,23,42,0.25)]",
+              )}
+            >
+              {checked && (
+                <span
+                  aria-hidden="true"
+                  className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-teal-600 text-white shadow-sm"
+                >
+                  <Check className="h-3 w-3" strokeWidth={3} />
+                </span>
+              )}
+              <span className="flex items-start gap-3">
+                <Checkbox
+                  id={`bump-${bump.slug}`}
+                  checked={checked}
+                  onCheckedChange={() => onToggleBump(bump.slug)}
+                  className="mt-0.5 border-slate-300 bg-white hover:border-teal-500 data-[state=checked]:border-teal-600 data-[state=checked]:bg-teal-600 data-[state=checked]:text-white"
+                />
+                <span className="flex flex-col gap-1">
+                  <span className="w-fit rounded-full bg-white px-2 py-0.5 text-[9.5px] font-extrabold uppercase tracking-wide text-teal-700 ring-1 ring-teal-200">
+                    {previewedAbove ? "Você viu acima" : "Oferta adicional"}
+                  </span>
+                  <span className="text-[14.5px] font-bold leading-snug text-slate-900">{bump.name}</span>
+                  <span className="text-[12.5px] leading-snug text-slate-500">{bump.description}</span>
+                  {checked && (
+                    <span className="text-[12.5px] font-bold text-teal-700">✓ Adicionado — você receberá junto com o Guia</span>
+                  )}
+                </span>
+              </span>
+              <span className="whitespace-nowrap text-[13px] font-semibold text-teal-700">+ {bump.priceLabel}</span>
+            </label>
+          );
+        })}
+      </div>
+
       <div className="flex flex-col gap-2.5">
         <Label htmlFor="checkout-nome" className="text-slate-500">
           Nome
@@ -1243,65 +1286,14 @@ function CheckoutForm({
           maxLength={254}
           className="border-slate-300 bg-white text-slate-900 placeholder:text-slate-400 shadow-[0_1px_2px_rgba(15,23,42,0.04)] hover:border-teal-400 focus:border-teal-600 focus:bg-white focus:ring-2 focus:ring-teal-500/20"
         />
+        <p className="text-[12.5px] leading-relaxed text-slate-500">
+          Use um e-mail que você acessa: ele fica vinculado ao seu pedido. Depois da confirmação do Pix, o material é liberado nesta mesma página.
+        </p>
         {errors.email && (
           <p role="alert" className="text-[13px] text-rose-600">
             {errors.email}
           </p>
         )}
-      </div>
-
-      <div className="flex flex-col gap-3">
-        <div className="flex flex-col gap-1">
-          <p className="text-[15px] font-bold text-slate-900">Complete seu kit de enfermagem</p>
-          <p className="text-[13px] leading-relaxed text-slate-500">
-            Adicione conteúdos que complementam seu Guia. Você recebe tudo junto após a confirmação do pagamento.
-          </p>
-        </div>
-        {guiaEvolucaoBumps.map((bump) => {
-          const checked = selectedBumps.has(bump.slug);
-          const previewedAbove =
-            bump.slug === "medicamentos-na-pratica" || bump.slug === "mapa-mental-ilustrado" || bump.slug === "balanco-hidrico-bump";
-          return (
-            <label
-              key={bump.slug}
-              htmlFor={`bump-${bump.slug}`}
-              className={cn(
-                "group relative flex cursor-pointer items-start justify-between gap-3 rounded-2xl border p-3.5 transition-all duration-200",
-                checked
-                  ? "border-teal-400 bg-teal-50/70 shadow-[0_4px_14px_-6px_rgba(13,148,136,0.35)] ring-2 ring-teal-500/15"
-                  : "border-slate-200 bg-slate-50 hover:-translate-y-0.5 hover:border-teal-200 hover:bg-white hover:shadow-[0_6px_16px_-10px_rgba(15,23,42,0.25)]",
-              )}
-            >
-              {checked && (
-                <span
-                  aria-hidden="true"
-                  className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-teal-600 text-white shadow-sm"
-                >
-                  <Check className="h-3 w-3" strokeWidth={3} />
-                </span>
-              )}
-              <span className="flex items-start gap-3">
-                <Checkbox
-                  id={`bump-${bump.slug}`}
-                  checked={checked}
-                  onCheckedChange={() => onToggleBump(bump.slug)}
-                  className="mt-0.5 border-slate-300 bg-white hover:border-teal-500 data-[state=checked]:border-teal-600 data-[state=checked]:bg-teal-600 data-[state=checked]:text-white"
-                />
-                <span className="flex flex-col gap-1">
-                  <span className="w-fit rounded-full bg-white px-2 py-0.5 text-[9.5px] font-extrabold uppercase tracking-wide text-teal-700 ring-1 ring-teal-200">
-                    {previewedAbove ? "Você viu acima" : "Oferta adicional"}
-                  </span>
-                  <span className="text-[14.5px] font-bold leading-snug text-slate-900">{bump.name}</span>
-                  <span className="text-[12.5px] leading-snug text-slate-500">{bump.description}</span>
-                  <span className={cn("text-[12.5px] font-bold", checked ? "text-teal-700" : "text-teal-600")}>
-                    {checked ? "✓ Adicionado — você receberá junto com o Guia" : "Adicionar por apenas R$ 10"}
-                  </span>
-                </span>
-              </span>
-              <span className="whitespace-nowrap text-[13px] font-semibold text-teal-700">+ {bump.priceLabel}</span>
-            </label>
-          );
-        })}
       </div>
 
       <div className={cn("relative flex items-center justify-between overflow-hidden rounded-2xl border border-teal-200 bg-gradient-to-b from-teal-50 to-white px-5 py-4", SHADOW_SOFT)}>

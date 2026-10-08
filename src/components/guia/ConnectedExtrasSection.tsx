@@ -66,6 +66,9 @@ const CONNECTED_EXTRAS: ConnectedExtra[] = [
   // adicionais com selo (ver CheckoutForm para a lista completa).
 ];
 
+/** Slugs dos adicionais exibidos nesta seção — base do selo "Você viu acima" no checkout. */
+export const CONNECTED_EXTRA_SLUGS: readonly string[] = CONNECTED_EXTRAS.map((extra) => extra.slug);
+
 function ProductPreviewDialog({
   product,
   open,
