@@ -216,7 +216,7 @@ export function ConnectedExtrasSection() {
   };
 
   return (
-    <section className="relative overflow-hidden bg-white px-3.5 py-16 sm:px-5 sm:py-24" aria-labelledby="connected-extras-title">
+    <section className="relative overflow-hidden bg-white px-3.5 pb-12 pt-9 sm:px-5 sm:py-24" aria-labelledby="connected-extras-title">
       <div className="pointer-events-none absolute -left-32 top-0 h-72 w-72 rounded-full bg-teal-100/60 blur-3xl" aria-hidden="true" />
       <div className="pointer-events-none absolute -right-32 bottom-0 h-72 w-72 rounded-full bg-emerald-100/60 blur-3xl" aria-hidden="true" />
 

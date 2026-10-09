@@ -4,7 +4,7 @@ import { ConnectedExtrasSection, CONNECTED_EXTRA_SLUGS } from "@/components/guia
  * Página comercial do Guia de Evolução de Enfermagem. Estrutura e copy
  * reconstroem a landing de referência já validada em conversão
  * (reference/manual2026.html, /manual2026/): Hero → 3 dores
- * → carrossel de conteúdo → quiz (perguntas → perfil → resultado) →
+ * → carrossel de conteúdo → conversas → adicionais →
  * oferta/preço/checkout → Pix → confirmação + downloads.
  *
  * O CHECKOUT em si (Turnstile, create-product-order, get-order-downloads,
@@ -40,7 +40,6 @@ import * as React from "react";
 import {
   ArrowRight,
   Check,
-  CheckCircle2,
   Clock,
   Copy,
   FileText,
@@ -50,10 +49,9 @@ import {
   MessageCircle,
   ShieldCheck,
   Sparkles,
-  XCircle,
   Zap,
 } from "lucide-react";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { useDocumentMeta } from "@/lib/seo";
 import { useCheckoutAttempt } from "@/lib/checkoutAttempt";
@@ -69,15 +67,8 @@ import { DownloadButton } from "@/components/downloads/DownloadButton";
 import { InAppDownloadNotice } from "@/components/downloads/InAppDownloadNotice";
 import { useProductCatalog } from "@/hooks/useProductCatalog";
 import { guiaEvolucaoProduct, guiaEvolucaoBumps, formatCents } from "@/config/digitalProducts";
-import {
-  guiaQuizQuestions,
-  guiaProfileOptions,
-  guiaProfileMessages,
-  guiaQuizPerformanceMessage,
-  type NursingProfile,
-} from "@/config/guiaQuiz";
 import { buildPixSupportWhatsAppUrl } from "@/lib/whatsapp";
-import { initGuiaPixel, trackGuiaLead, trackGuiaQuizInterest, trackGuiaInitiateCheckout, trackGuiaPurchase } from "@/lib/guiaPixel";
+import { initGuiaPixel, trackGuiaInitiateCheckout, trackGuiaPurchase } from "@/lib/guiaPixel";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { SiteFooter } from "@/components/layout/SiteFooter";
 import { Button } from "@/components/ui/button";
@@ -106,7 +97,7 @@ const PANEL_CONTAINER = "mx-auto w-full max-w-[640px] px-5";
  * Sempre em camadas (uma sombra de contato curta + uma difusa longa),
  * nunca uma sombra preta única e pesada. SOFT para elementos secundários
  * (badges, ícones, cards do carrossel), MEDIUM para blocos de conteúdo
- * (quiz, preço). Os pontos de maior destaque (vídeo do produto, card de
+ * (preço). Os pontos de maior destaque (vídeo do produto, card de
  * checkout) usam sombras dedicadas mais fortes, escritas inline onde
  * aparecem, coerentes com o fundo escuro que os envolve.
  */
@@ -132,15 +123,11 @@ const CTA_BUTTON_CLASS = cn(
 /**
  * Texturas de fundo — só CSS (radial-gradient), sem imagem/biblioteca,
  * opacidades muito baixas (5-6%) para não competir com o conteúdo nem
- * pesar no LCP. TEAL_BLOOM para fundos brancos, DOTS para fundos slate.
+ * pesar no LCP. TEAL_BLOOM para fundos brancos.
  */
 const TEXTURE_TEAL_BLOOM: React.CSSProperties = {
   backgroundImage:
     "radial-gradient(55% 45% at 12% 0%, rgba(13,148,136,0.06), transparent 60%), radial-gradient(45% 40% at 100% 100%, rgba(13,148,136,0.05), transparent 60%)",
-};
-const TEXTURE_DOTS: React.CSSProperties = {
-  backgroundImage: "radial-gradient(rgba(13,148,136,0.06) 1px, transparent 1px)",
-  backgroundSize: "22px 22px",
 };
 
 interface FormErrors {
@@ -468,15 +455,6 @@ export default function GuiaEvolucaoEnfermagemPage() {
     }
   }
 
-  function handleQuizProfileSelected() {
-    trackGuiaLead(guiaPriceCents);
-  }
-
-  function handleQuizResultCta() {
-    trackGuiaQuizInterest();
-    scrollToOffer();
-  }
-
   if (resuming) {
     return (
       <div className="min-h-screen bg-white font-sans text-slate-900">
@@ -505,7 +483,6 @@ export default function GuiaEvolucaoEnfermagemPage() {
             <Hero priceCents={guiaPriceCents} />
             <ModulesSection priceCents={guiaPriceCents} />
             <GuiaConversationSection />
-            <QuizSection onProfileSelected={handleQuizProfileSelected} onResultCta={handleQuizResultCta} onSkip={scrollToOffer} priceCents={guiaPriceCents} />
             <ConnectedExtrasSection />
             <OfferSection priceCents={guiaPriceCents}>
               {showForm && (
@@ -826,239 +803,6 @@ function ModulesSection({ priceCents }: { priceCents: number }) {
           <Button size="lg" variant="outline" full className={cn("max-w-[400px] sm:w-auto sm:px-12", CTA_BUTTON_CLASS)} onClick={scrollToOffer}>
             Quero este guia por {formatCents(priceCents)}
           </Button>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-/* ────────────────────────────────── Quiz ─────────────────────────────────── */
-
-type QuizPhase = "questions" | "profile" | "result";
-
-function QuizSection({
-  onProfileSelected,
-  onResultCta,
-  onSkip,
-  priceCents,
-}: {
-  onProfileSelected: () => void;
-  onResultCta: () => void;
-  onSkip: () => void;
-  priceCents: number;
-}) {
-  const [phase, setPhase] = React.useState<QuizPhase>("questions");
-  const [index, setIndex] = React.useState(0);
-  const [score, setScore] = React.useState(0);
-  const [selected, setSelected] = React.useState<number | null>(null);
-  const [profile, setProfile] = React.useState<NursingProfile | null>(null);
-
-  const question = guiaQuizQuestions[index];
-  const isLast = index === guiaQuizQuestions.length - 1;
-
-  function handleAnswer(optionIndex: number) {
-    if (selected !== null) return;
-    setSelected(optionIndex);
-    if (optionIndex === question.answerIndex) setScore((s) => s + 1);
-  }
-
-  function handleNext() {
-    if (isLast) {
-      setPhase("profile");
-      return;
-    }
-    setIndex((i) => i + 1);
-    setSelected(null);
-  }
-
-  function handleProfile(id: NursingProfile) {
-    setProfile(id);
-    setPhase("result");
-    onProfileSelected();
-  }
-
-  // Só visual: progresso da BARRA (não da lógica) — conta a pergunta atual
-  // como "concluída" assim que ela é respondida, para o preenchimento
-  // acompanhar o feedback antes do clique em "Próxima questão".
-  const progressPercent =
-    phase === "questions"
-      ? ((index + (selected !== null ? 1 : 0)) / guiaQuizQuestions.length) * 100
-      : 100;
-
-  return (
-    <section id="quiz" className="relative bg-slate-50 px-5 py-20 sm:py-28" style={TEXTURE_DOTS}>
-      <div className="mx-auto w-full max-w-[820px]">
-        {phase !== "result" && (
-          <div className="mb-10 text-center">
-            <span className={cn("inline-flex items-center rounded-full border border-teal-200 bg-white px-4 py-1.5 text-[12px] font-bold uppercase tracking-wide text-teal-700", SHADOW_SOFT)}>
-              Teste rápido
-            </span>
-            <h2 className="mt-4 font-sans text-[1.9rem] font-extrabold tracking-tight text-slate-900 sm:text-[2.35rem]">
-              Será que você está <span className="text-teal-600">registrando certo?</span>
-            </h2>
-            <p className="mx-auto mt-3 max-w-[52ch] text-[15.5px] text-slate-600">
-              Pequenos detalhes fazem toda a diferença na qualidade e segurança do seu registro profissional. Faça o teste rápido:
-            </p>
-            <button
-              type="button"
-              onClick={onSkip}
-              className="mt-4 text-[14px] font-semibold text-teal-700 underline underline-offset-4 hover:text-teal-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500/30"
-            >
-              Pular o teste e ver a oferta
-            </button>
-          </div>
-        )}
-
-        <div className={cn("relative rounded-[32px] border border-slate-200 bg-white p-7 sm:p-10", SHADOW_MEDIUM)}>
-          {/* Realce sutil no topo do card — sensação de superfície levemente convexa. */}
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-px rounded-t-[32px] bg-gradient-to-r from-transparent via-white to-transparent" aria-hidden="true" />
-
-          {phase === "questions" && (
-            <div className="flex flex-col gap-7">
-              <div className="flex flex-col gap-4">
-                <div className="flex items-center justify-between text-[12px] font-bold uppercase tracking-wide text-slate-400">
-                  <span>
-                    Pergunta {index + 1} de {guiaQuizQuestions.length}
-                  </span>
-                  <span className="text-teal-600">{Math.round(progressPercent)}%</span>
-                </div>
-                <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-100 shadow-inner">
-                  <div
-                    className="h-full rounded-full bg-teal-600 shadow-[0_1px_2px_rgba(13,148,136,0.5)] transition-all duration-300"
-                    style={{ width: `${progressPercent}%` }}
-                  />
-                </div>
-              </div>
-
-              {/* AnimatePresence: cada pergunta entra com um fade + leve subida —
-                  reforça a sensação de "próxima etapa" sem ser chamativo.
-                  mode="wait" evita a pergunta nova sobrepor a anterior. */}
-              <AnimatePresence mode="wait" initial={false}>
-                <motion.div
-                  key={index}
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -8 }}
-                  transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-                  className="flex flex-col gap-6"
-                >
-                  <p className="text-[1.25rem] font-bold leading-snug text-slate-900 sm:text-[1.4rem]">{question.question}</p>
-
-                  <div className="flex flex-col gap-3">
-                    {question.options.map((option, i) => {
-                      const isCorrectOption = i === question.answerIndex;
-                      const isSelectedOption = i === selected;
-                      const answered = selected !== null;
-                      const letter = String.fromCharCode(65 + i);
-                      return (
-                        <button
-                          key={option}
-                          type="button"
-                          onClick={() => handleAnswer(i)}
-                          disabled={answered}
-                          className={cn(
-                            "flex items-center gap-3.5 rounded-2xl border-2 px-5 py-4 text-left text-[15.5px] font-semibold transition-all duration-200",
-                            !answered && cn("border-slate-200 bg-white text-slate-800 hover:-translate-y-0.5 hover:border-teal-400 hover:bg-teal-50/60", SHADOW_SOFT),
-                            answered && isCorrectOption && "border-emerald-500 bg-emerald-50 text-emerald-800 shadow-[0_4px_12px_-4px_rgba(16,185,129,0.35)]",
-                            answered && isSelectedOption && !isCorrectOption && "border-rose-400 bg-rose-50 text-rose-800 shadow-[0_4px_12px_-4px_rgba(244,63,94,0.3)]",
-                            answered && !isSelectedOption && !isCorrectOption && "border-slate-200 bg-white text-slate-400",
-                          )}
-                        >
-                          <span
-                            className={cn(
-                              "flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[13px] font-extrabold transition-colors duration-200",
-                              !answered && "bg-slate-100 text-slate-500",
-                              answered && isCorrectOption && "bg-emerald-500 text-white",
-                              answered && isSelectedOption && !isCorrectOption && "bg-rose-400 text-white",
-                              answered && !isSelectedOption && !isCorrectOption && "bg-slate-100 text-slate-400",
-                            )}
-                            aria-hidden="true"
-                          >
-                            {letter}
-                          </span>
-                          <span className="flex-1">{option}</span>
-                          {answered && isCorrectOption && (
-                            <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-600" aria-hidden="true" />
-                          )}
-                          {answered && isSelectedOption && !isCorrectOption && (
-                            <XCircle className="h-5 w-5 shrink-0 text-rose-600" aria-hidden="true" />
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </motion.div>
-              </AnimatePresence>
-
-              {selected !== null && (
-                <div className={cn("rounded-2xl border-l-4 border-teal-500 bg-teal-50/60 p-6", SHADOW_SOFT)}>
-                  <p className="flex items-center gap-2 text-[15px] font-bold text-slate-900">
-                    {selected === question.answerIndex ? (
-                      <>
-                        <CheckCircle2 className="h-5 w-5 text-emerald-600" aria-hidden="true" /> Resposta correta!
-                      </>
-                    ) : (
-                      <>
-                        <XCircle className="h-5 w-5 text-rose-600" aria-hidden="true" /> Incorreto.
-                      </>
-                    )}
-                  </p>
-                  <p className="mt-2 text-[14.5px] leading-relaxed text-slate-600">{question.explanation}</p>
-                  <Button type="button" variant="outline" full className={cn("mt-6", CTA_BUTTON_CLASS)} onClick={handleNext}>
-                    {isLast ? "Ver meu resultado" : "Próxima questão"}
-                    <ArrowRight className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
-                  </Button>
-                </div>
-              )}
-            </div>
-          )}
-
-          {phase === "profile" && (
-            <div className="flex flex-col items-center gap-7 text-center">
-              <h3 className="font-sans text-[1.5rem] font-extrabold text-slate-900 sm:text-[1.7rem]">
-                🎯 Você acertou <span className="text-teal-600">{score}</span> de {guiaQuizQuestions.length} questões!
-              </h3>
-              <p className={cn("rounded-2xl border border-emerald-200 bg-emerald-50 px-6 py-4 text-[15px] font-semibold text-emerald-800", SHADOW_SOFT)}>
-                {guiaQuizPerformanceMessage(score, guiaQuizQuestions.length)}
-              </p>
-              <p className="text-[15px] text-slate-600">
-                Responda uma pergunta rápida para receber uma análise personalizada do seu resultado.
-              </p>
-              <p className="text-[13px] font-bold uppercase tracking-wide text-slate-500">
-                Em qual etapa da sua jornada na enfermagem você está?
-              </p>
-              <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2">
-                {guiaProfileOptions.map((option) => (
-                  <button
-                    key={option.id}
-                    type="button"
-                    onClick={() => handleProfile(option.id)}
-                    className={cn(
-                      "rounded-2xl border-2 border-slate-200 bg-white px-5 py-5 text-[15px] font-bold text-slate-800 transition-all duration-200 hover:-translate-y-0.5 hover:border-teal-400 hover:bg-teal-50/60",
-                      SHADOW_SOFT,
-                    )}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {phase === "result" && profile && (
-            <div className="flex flex-col gap-6 text-center">
-              <h3 className="font-sans text-[1.5rem] font-extrabold text-slate-900 sm:text-[1.7rem]">
-                {guiaProfileMessages[profile].title}
-              </h3>
-              <p className={cn("rounded-2xl border border-emerald-200 bg-emerald-50 px-6 py-4 text-[14.5px] font-semibold text-emerald-800", SHADOW_SOFT)}>
-                🎯 Seu desempenho final: {score}/{guiaQuizQuestions.length} questões
-              </p>
-              <p className="text-left text-[15.5px] leading-relaxed text-slate-600">{guiaProfileMessages[profile].body}</p>
-              <Button type="button" variant="outline" size="lg" full className={CTA_BUTTON_CLASS} onClick={onResultCta}>
-                Quero os modelos por {formatCents(priceCents)}
-              </Button>
-            </div>
-          )}
         </div>
       </div>
     </section>
