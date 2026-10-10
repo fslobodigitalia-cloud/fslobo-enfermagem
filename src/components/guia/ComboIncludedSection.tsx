@@ -19,12 +19,6 @@ const MIN_ZOOM = 1;
 const MAX_ZOOM = 4;
 const ZOOM_STEP = 0.5;
 
-const MEDICAMENTOS_POINTS = [
-  "Medicamentos mais utilizados no dia a dia do plantão",
-  "Vias de administração e principais cuidados de enfermagem",
-  "3 PDFs de Medicamentos na Prática, já incluídos no combo",
-];
-
 const clampZoom = (value: number) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, value));
 
 /**
@@ -281,8 +275,25 @@ function PagePreviewViewer({
  */
 export function ComboIncludedSection() {
   const [viewerIndex, setViewerIndex] = React.useState<number | null>(null);
+  const [previewIndex, setPreviewIndex] = React.useState(0);
   const lastIndex = React.useRef(0);
   const scrollPosition = React.useRef(0);
+  const touchStart = React.useRef<number | null>(null);
+  const ignoreClick = React.useRef(false);
+
+  const goToPreview = (step: number) => {
+    setPreviewIndex((current) => (current + step + MEDICAMENTOS_PAGES.length) % MEDICAMENTOS_PAGES.length);
+  };
+
+  const handleTouchEnd = (event: React.TouchEvent) => {
+    if (touchStart.current === null) return;
+    const distance = event.changedTouches[0]?.clientX - touchStart.current;
+    touchStart.current = null;
+    if (Math.abs(distance) < 45) return;
+    ignoreClick.current = true;
+    window.setTimeout(() => { ignoreClick.current = false; }, 400);
+    goToPreview(distance < 0 ? 1 : -1);
+  };
 
   const openViewer = (index: number) => {
     scrollPosition.current = window.scrollY;
@@ -299,7 +310,7 @@ export function ComboIncludedSection() {
   };
 
   return (
-    <section className="relative overflow-hidden bg-white px-3.5 py-16 sm:px-5 sm:py-24" aria-labelledby="combo-included-title">
+    <section className="relative overflow-hidden bg-white px-3.5 py-14 sm:px-5 sm:py-20" aria-labelledby="combo-included-title">
       <div className="pointer-events-none absolute -left-32 top-0 h-72 w-72 rounded-full bg-teal-100/60 blur-3xl" aria-hidden="true" />
       <div className="pointer-events-none absolute -right-32 bottom-0 h-72 w-72 rounded-full bg-emerald-100/60 blur-3xl" aria-hidden="true" />
 
@@ -316,52 +327,37 @@ export function ComboIncludedSection() {
           </p>
         </div>
 
-        <div className="mt-10 grid items-start gap-8 lg:grid-cols-[0.8fr_1.2fr] lg:gap-12">
-          <div className="mx-auto flex aspect-[3/4] w-full max-w-[320px] items-center justify-center overflow-hidden rounded-[28px] border border-slate-200 bg-slate-50 p-3 shadow-[0_4px_8px_rgba(15,23,42,0.05),0_20px_40px_-20px_rgba(15,23,42,0.16)]">
+        <div className="mx-auto mt-8 flex aspect-[3/4] w-full max-w-[210px] items-center justify-center overflow-hidden rounded-2xl bg-slate-50 p-2 shadow-[0_6px_16px_rgba(15,23,42,0.10),0_24px_36px_-22px_rgba(15,23,42,0.25)] sm:max-w-[245px]">
             <img
               src={MEDICAMENTOS_COVER.src}
               alt={MEDICAMENTOS_COVER.alt}
               loading="lazy"
-              className="h-full w-full rounded-[18px] object-contain"
+              className="h-full w-full rounded-xl object-contain"
             />
-          </div>
+        </div>
 
-          <div className="flex flex-col gap-6">
-            <ul className="flex flex-col gap-3">
-              {MEDICAMENTOS_POINTS.map((item) => (
-                <li key={item} className="flex items-start gap-3 rounded-2xl bg-slate-50 px-4 py-3 text-[14.5px] font-medium text-slate-700">
-                  <Check className="mt-0.5 h-4 w-4 shrink-0 text-teal-600" strokeWidth={2.5} aria-hidden="true" />
-                  {item}
-                </li>
-              ))}
-            </ul>
-
-            <div>
-              <p className="mb-3 text-[12px] font-bold uppercase tracking-wide text-slate-400">
-                Algumas páginas do material · toque para ampliar
-              </p>
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                {MEDICAMENTOS_PAGES.map((page, i) => (
-                  <button
-                    key={page.src}
-                    type="button"
-                    onClick={() => openViewer(i)}
-                    aria-label={`Ampliar página ${i + 1} de Medicamentos na Prática`}
-                    className={cn(
-                      "group relative flex aspect-[3/4] items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 p-1.5 transition",
-                      "shadow-[0_2px_4px_rgba(15,23,42,0.04),0_8px_20px_-14px_rgba(15,23,42,0.12)]",
-                      "hover:-translate-y-0.5 hover:border-teal-300 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-teal-500/20",
-                    )}
-                  >
-                    <img src={page.src} alt={page.alt} loading="lazy" className="h-full w-full rounded-xl object-contain" />
-                    <span className="absolute bottom-2 right-2 flex h-8 w-8 items-center justify-center rounded-full bg-slate-950/80 text-white shadow-md" aria-hidden="true">
-                      <Maximize2 className="h-4 w-4" />
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
+        <div className="mx-auto mt-7 max-w-[400px] text-center">
+          <p className="text-[13px] font-semibold text-slate-600">Veja algumas páginas do material · toque para ampliar</p>
+          <div className="mt-3 flex items-center justify-center gap-3 sm:gap-5">
+            <button type="button" onClick={() => goToPreview(-1)} aria-label="Página anterior de Medicamentos" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-teal-50 text-teal-800 transition hover:bg-teal-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600">
+              <ChevronLeft className="h-5 w-5" aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              onClick={() => { if (ignoreClick.current) { ignoreClick.current = false; return; } openViewer(previewIndex); }}
+              onTouchStart={(event) => { touchStart.current = event.touches[0]?.clientX ?? null; }}
+              onTouchEnd={handleTouchEnd}
+              aria-label={`Ampliar página ${previewIndex + 1} de Medicamentos na Prática`}
+              className="group relative flex aspect-[3/4] w-full max-w-[160px] items-center justify-center overflow-hidden rounded-xl bg-slate-50 p-1.5 shadow-[0_5px_14px_rgba(15,23,42,0.09),0_16px_28px_-16px_rgba(15,23,42,0.2)] transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 sm:max-w-[190px]"
+            >
+              <img src={MEDICAMENTOS_PAGES[previewIndex].src} alt={MEDICAMENTOS_PAGES[previewIndex].alt} loading="lazy" className="h-full w-full rounded-lg object-contain" />
+              <span className="absolute bottom-2 right-2 flex h-8 w-8 items-center justify-center rounded-full bg-slate-950/80 text-white" aria-hidden="true"><Maximize2 className="h-4 w-4" /></span>
+            </button>
+            <button type="button" onClick={() => goToPreview(1)} aria-label="Próxima página de Medicamentos" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-teal-50 text-teal-800 transition hover:bg-teal-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600">
+              <ChevronRight className="h-5 w-5" aria-hidden="true" />
+            </button>
           </div>
+          <p aria-live="polite" className="mt-3 text-[13px] font-bold tabular-nums text-slate-600">Página {previewIndex + 1} de {MEDICAMENTOS_PAGES.length}</p>
         </div>
       </div>
 

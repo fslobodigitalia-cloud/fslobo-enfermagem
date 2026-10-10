@@ -55,7 +55,6 @@ import {
   Clock,
   Copy,
   FileText,
-  HeartPulse,
   Loader2,
   Lock,
   MessageCircle,
@@ -549,110 +548,19 @@ export default function GuiaEvolucaoMedicamentosPage() {
 
 /* ────────────────────────────────── Hero ────────────────────────────────── */
 
-const TRUST_ITEMS = [
-  { icon: HeartPulse, label: "Fácil de entender" },
-  { icon: ShieldCheck, label: "Mais segurança nos registros" },
-  { icon: Clock, label: "Poupa seu tempo" },
-];
-
-/**
- * Camada de contraste sobre o vídeo de fundo da Hero — mesmo tom navy do
- * SiteFooter (#0a1622), com as duas luzes teal discretas que já existiam
- * no fundo sólido anterior (identidade visual preservada). Gradiente
- * vertical mais escuro no topo/base (onde ficam badge/título e CTA) e
- * mais transparente no meio, + vinheta lateral — forte o bastante para os
- * textos ficarem perfeitamente legíveis, sem apagar por completo o
- * movimento do vídeo por trás. Só CSS, sem imagem.
- */
 const HERO_VIDEO_OVERLAY: React.CSSProperties = {
   backgroundImage:
-    "linear-gradient(180deg, rgba(10,22,34,0.82) 0%, rgba(10,22,34,0.6) 45%, rgba(10,22,34,0.88) 100%), linear-gradient(90deg, rgba(10,22,34,0.6) 0%, rgba(10,22,34,0) 22%, rgba(10,22,34,0) 78%, rgba(10,22,34,0.6) 100%), radial-gradient(60% 55% at 14% 8%, rgba(45,212,191,0.16), transparent 62%), radial-gradient(50% 45% at 100% 100%, rgba(13,148,136,0.14), transparent 60%)",
+    "linear-gradient(100deg, rgba(5,49,48,0.95) 0%, rgba(7,65,60,0.86) 58%, rgba(13,73,65,0.81) 100%), radial-gradient(70% 75% at 100% 5%, rgba(244,201,105,0.18), transparent 75%)",
 };
 
-/**
- * Setores/áreas da enfermagem exibidos na faixa contínua ao final da Hero —
- * puramente ilustrativo (o Guia cobre Clínica Médica, UTI e Emergência;
- * as demais áreas aqui são só contexto visual da profissão, não promessa
- * de conteúdo específico para cada setor).
- */
-const SPECIALTY_AREAS = [
-  "Clínica Médica",
-  "Clínica Cirúrgica",
-  "Urgência e Emergência",
-  "UTI / CTI",
-  "Pronto Atendimento",
-  "Centro Cirúrgico",
-  "Pediatria",
-  "Obstetrícia",
-  "Maternidade",
-  "Cardiologia",
-  "Oncologia",
-  "Nefrologia",
-  "Ortopedia",
-  "Saúde Mental",
-  "Atenção Primária",
-  "Home Care",
-];
-
-/**
- * Faixa/carrossel horizontal infinito de setores, ao final da Hero. Loop
- * puramente em CSS (duas cópias da mesma lista, translateX de 0 a -50%) —
- * sem JS, sem layout shift, sem depender de framer-motion para o
- * movimento contínuo. A cópia duplicada é aria-hidden (mesmo conteúdo
- * textual repetido só para o efeito visual de loop); a lista real (para
- * leitores de tela) é a primeira. prefers-reduced-motion é respeitado via
- * media query no <style> local — para o movimento sem depender de JS.
- */
-function SpecialtyMarquee() {
-  return (
-    <div
-      className="relative left-1/2 mt-12 w-screen -translate-x-1/2 overflow-hidden border-t border-white/10 py-5 [mask-image:linear-gradient(to_right,transparent,black_6%,black_94%,transparent)] sm:mt-16"
-      aria-label="Áreas e setores da enfermagem"
-    >
-      <div className="guia-marquee-track flex w-max items-center">
-        {[0, 1].map((copyIndex) => (
-          <ul
-            key={copyIndex}
-            aria-hidden={copyIndex === 1 ? "true" : undefined}
-            className="flex shrink-0 items-center gap-8 pr-8"
-          >
-            {SPECIALTY_AREAS.map((area) => (
-              <li
-                key={area}
-                className="flex shrink-0 items-center gap-8 whitespace-nowrap text-[12.5px] font-bold uppercase tracking-[0.08em] text-slate-300/85"
-              >
-                {area}
-                <span className="h-1 w-1 shrink-0 rounded-full bg-teal-400/50" aria-hidden="true" />
-              </li>
-            ))}
-          </ul>
-        ))}
-      </div>
-      <style>{`
-        .guia-marquee-track { animation: guia-marquee-scroll 38s linear infinite; }
-        @keyframes guia-marquee-scroll {
-          from { transform: translateX(0); }
-          to { transform: translateX(-50%); }
-        }
-        @media (prefers-reduced-motion: reduce) {
-          .guia-marquee-track { animation: none; }
-        }
-      `}</style>
-    </div>
-  );
-}
-
 function Hero({ priceCents }: { priceCents: number }) {
-  // Vídeo de fundo só entra em prefers-reduced-motion: reduce nunca é
-  // renderizado — o overlay + backgroundColor do <section> (navy sólido)
-  // cobrem esse caso sozinhos, sem precisar pausar/tocar vídeo nenhum.
   const reducedMotion = useReducedMotion();
 
   return (
-    <section className="relative overflow-hidden px-3.5 pb-16 pt-14 text-white sm:px-5 sm:pb-20 sm:pt-16 lg:pb-24 lg:pt-20" style={{ backgroundColor: "#0a1622" }}>
+    <section className="relative overflow-hidden bg-[#073f3d] px-4 pb-14 pt-14 text-white sm:px-6 sm:pb-20 sm:pt-20">
       {!reducedMotion && (
         <video
-          className="pointer-events-none absolute inset-0 h-full w-full object-cover"
+          className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-65"
           src="/guia-evolucao/hero-enfermagem.mp4"
           autoPlay
           muted
@@ -661,102 +569,45 @@ function Hero({ priceCents }: { priceCents: number }) {
           aria-hidden="true"
         />
       )}
-      {/* Camada de contraste — sempre presente (com ou sem vídeo), garante
-          leitura dos textos em qualquer cenário. */}
       <div className="pointer-events-none absolute inset-0" style={HERO_VIDEO_OVERLAY} aria-hidden="true" />
 
-      {/* Fio de luz no topo/base — separa das seções claras vizinhas sem borda dura. */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/[0.08]" aria-hidden="true" />
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-white/[0.08]" aria-hidden="true" />
-
-      <div className="relative mx-auto grid w-full max-w-[1180px] items-center gap-12 lg:grid-cols-[1.05fr_0.95fr] lg:gap-16">
-        {/* Coluna esquerda. No mobile (< lg), um painel translúcido elevado
-            sobre o navy (sensação de camada, não um card branco destoando
-            do fundo escuro). No desktop (lg+), texto solto ao lado do
-            mockup do produto. */}
-        <div
-          className={cn(
-            "flex flex-col items-center gap-6 rounded-[30px] border border-white/10 bg-white/[0.04] p-6 text-center backdrop-blur-sm sm:p-8",
-            "shadow-[0_2px_4px_rgba(0,0,0,0.2),0_28px_56px_-24px_rgba(0,0,0,0.5)]",
-            "lg:items-start lg:rounded-none lg:border-0 lg:bg-transparent lg:p-0 lg:text-left lg:shadow-none lg:backdrop-blur-none",
-          )}
-        >
-          <span className="inline-flex items-center rounded-full border border-teal-400/30 bg-teal-400/10 px-4 py-1.5 text-[12px] font-bold uppercase tracking-wide text-teal-300">
-            2 materiais em PDF no mesmo pedido
-          </span>
-          <h1 className="font-sans text-[2.125rem] font-extrabold leading-[1.1] tracking-tight text-white sm:text-[2.5rem] lg:text-[3.25rem] xl:text-[3.75rem]">
-            Saiba exatamente o que escrever no prontuário e{" "}
-            <span className="text-teal-400">vá para casa em paz</span>
+      <div className="relative mx-auto grid w-full max-w-[1160px] items-center gap-6 lg:grid-cols-[1.06fr_0.94fr] lg:gap-10">
+        <div className="flex flex-col items-center text-center lg:items-start lg:text-left">
+          <h1 className="max-w-[15ch] font-sans text-[2.25rem] font-extrabold leading-[1.08] tracking-tight text-white sm:text-[3rem] lg:text-[3.6rem]">
+            Do prontuário à medicação, <span className="text-[#f4d389]">mais clareza no plantão.</span>
           </h1>
-          <p className="max-w-[52ch] text-[16px] leading-relaxed text-slate-300 lg:text-[17.5px]">
-            Você cuida do paciente com todo o carinho, mas trava na hora de registrar? Aqui é só consultar:
-            manual ilustrado + modelos prontos por situação clínica para adaptar ao seu paciente, sem sair tarde do plantão. No combo, o Guia de Anotação e Evolução vem junto com Medicamentos na Prática.
+          <p className="mt-5 max-w-[52ch] text-[16px] leading-relaxed text-emerald-50 sm:text-[17px]">
+            Um guia com mais de 132 modelos de anotação e evolução para adaptar ao seu paciente, junto com Medicamentos na Prática no mesmo pedido.
           </p>
-          <p className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-[14.5px] font-bold text-white lg:justify-start lg:text-[15.5px]">
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-teal-400/30 bg-teal-400/10 px-3 py-1 text-teal-200">
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-2.5 text-[14px] font-semibold lg:justify-start">
+            <span className="inline-flex items-center gap-2 rounded-full bg-white/12 px-3.5 py-2 text-white">
               <FileText className="h-4 w-4" aria-hidden="true" /> 2 materiais digitais em PDF
             </span>
-            <span className="text-slate-200">
-              por <span className="text-teal-300">{formatCents(priceCents)}</span> · pagamento único
+            <span className="rounded-full bg-[#f4d389] px-3.5 py-2 font-extrabold text-[#173d39]">
+              {formatCents(priceCents)} · pagamento único
             </span>
-          </p>
-
-          {/* Benefícios — no mobile, "pills" empilhados; no desktop, badges
-              compactos. Mesma hierarquia de antes, adaptada ao fundo escuro. */}
-          <div className="flex w-full flex-col gap-3 lg:hidden">
-            {TRUST_ITEMS.map(({ icon: Icon, label }) => (
-              <div
-                key={label}
-                className="flex min-h-[56px] items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.04] px-5 py-3.5 text-left"
-              >
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/10 text-teal-300">
-                  <Icon className="h-[18px] w-[18px]" strokeWidth={2} aria-hidden="true" />
-                </span>
-                <span className="text-[14.5px] font-bold text-white">{label}</span>
-              </div>
-            ))}
           </div>
-          <div className="hidden lg:flex lg:flex-wrap lg:items-center lg:justify-start lg:gap-3">
-            {TRUST_ITEMS.map(({ icon: Icon, label }) => (
-              <span
-                key={label}
-                className="flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.05] px-4 py-2 text-[13px] font-semibold text-slate-200"
-              >
-                <Icon className="h-4 w-4 text-teal-300" strokeWidth={2} aria-hidden="true" />
-                {label}
-              </span>
-            ))}
-          </div>
-
-          <Button size="lg" variant="outline" full className={cn("max-w-[360px] lg:w-auto lg:px-12", CTA_BUTTON_CLASS)} onClick={scrollToOffer}>
+          <Button
+            size="lg"
+            variant="outline"
+            full
+            className="mt-7 max-w-[370px] border-transparent bg-[#f4d389] font-extrabold text-[#173d39] shadow-[0_6px_12px_rgba(0,0,0,0.14),0_20px_40px_-18px_rgba(0,0,0,0.45)] transition hover:-translate-y-0.5 hover:border-transparent hover:bg-[#ffe2a4] hover:text-[#173d39] focus-visible:ring-2 focus-visible:ring-white lg:w-auto lg:px-10"
+            onClick={scrollToOffer}
+          >
             Quero os 2 materiais por {formatCents(priceCents)}
           </Button>
         </div>
 
-        {/* Coluna direita — composição editorial do produto (capa real, sem
-            depender de cover_url do catálogo: este hero é próprio da página
-            e usa o asset dedicado do Guia). Só no desktop (lg+). */}
-        <div className="relative hidden lg:flex lg:justify-end">
-          <div className="pointer-events-none absolute inset-0 -z-10 scale-110 rounded-[40px] bg-teal-400/15 blur-3xl" aria-hidden="true" />
-          <div
-            className={cn(
-              "relative flex aspect-[3/4] w-full max-w-[380px] items-center justify-center overflow-hidden rounded-[32px] border border-white/15 bg-white p-3",
-              "shadow-[0_8px_16px_rgba(0,0,0,0.25),0_40px_80px_-28px_rgba(0,0,0,0.55)]",
-            )}
-          >
-            <img
-              src="/guia-evolucao/capa-guia.webp"
-              alt="Capa do Guia de Evolução de Enfermagem, material digital com modelos prontos de anotação e evolução de enfermagem"
-              width={1086}
-              height={1448}
-              loading="eager"
-              className="h-full w-full rounded-[22px] object-contain"
-            />
+        <div className="relative mx-auto h-[275px] w-full max-w-[350px] sm:h-[340px] sm:max-w-[460px] lg:h-[440px] lg:max-w-[500px]" aria-label="Capas dos dois materiais incluídos no combo">
+          <div className="pointer-events-none absolute inset-x-8 bottom-5 top-7 rounded-full bg-[#f4d389]/15 blur-3xl" aria-hidden="true" />
+          <div className="absolute left-[7%] top-4 w-[48%] -rotate-[7deg] rounded-2xl bg-white p-1.5 shadow-[0_12px_24px_rgba(0,0,0,0.24),0_32px_54px_-18px_rgba(0,0,0,0.55)] sm:p-2">
+            <img src="/guia-evolucao/capa-guia.webp" alt="Capa do Guia de Anotação e Evolução de Enfermagem" width={1086} height={1448} loading="eager" className="aspect-[3/4] w-full rounded-xl object-contain" />
+          </div>
+          <div className="absolute right-[7%] top-9 w-[48%] rotate-[7deg] rounded-2xl bg-white p-1.5 shadow-[0_12px_24px_rgba(0,0,0,0.24),0_32px_54px_-18px_rgba(0,0,0,0.55)] sm:top-12 sm:p-2">
+            <img src="/medicamentos-na-pratica/capa-medicamentos-na-pratica.webp" alt="Capa de Medicamentos na Prática, incluído no combo" loading="eager" className="aspect-[3/4] w-full rounded-xl object-contain" />
           </div>
         </div>
       </div>
-
-      <SpecialtyMarquee />
     </section>
   );
 }
@@ -883,7 +734,7 @@ function OfferSection({
             {comboProduct.name}
           </h2>
           <p className="relative mt-3 text-[15.5px] leading-relaxed text-slate-600">
-            Dois materiais digitais em PDF no mesmo pedido: o Guia de Anotação e Evolução (manual ilustrado e mais de 132 modelos prontos) e Medicamentos na Prática (medicamentos mais usados, vias de administração e cuidados de enfermagem).
+            Dois materiais digitais em PDF no mesmo pedido: o Guia de Anotação e Evolução, com mais de 132 modelos prontos, e Medicamentos na Prática.
           </p>
 
           {/* Bloco do preço — mais presença: gradiente mais rico, borda dupla
