@@ -4,6 +4,7 @@ import { authorize, cardEnvironment, configured, createCharge, getCharge, asReco
 const URL = Deno.env.get("SUPABASE_URL");
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 const ORIGIN = Deno.env.get("ALLOWED_ORIGIN");
+const PREVIEW_ORIGIN = Deno.env.get("EFI_CARD_PREVIEW_ORIGIN");
 const TURNSTILE_SECRET = Deno.env.get("TURNSTILE_SECRET_KEY");
 const TURNSTILE_HOST = Deno.env.get("TURNSTILE_EXPECTED_HOSTNAME");
 const TURNSTILE_ACTION = Deno.env.get("TURNSTILE_EXPECTED_ACTION_PRODUCT_ORDER");
@@ -11,9 +12,13 @@ const RATE_SECRET = Deno.env.get("RATE_LIMIT_HASH_SECRET");
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+function isAllowedOrigin(origin: string | null): origin is string {
+  return origin !== null && (origin === ORIGIN || origin === PREVIEW_ORIGIN);
+}
+
 function cors(origin: string | null): Headers {
   const headers = new Headers({ "Content-Type": "application/json", "Cache-Control": "no-store", Vary: "Origin" });
-  if (origin && origin === ORIGIN) headers.set("Access-Control-Allow-Origin", origin);
+  if (isAllowedOrigin(origin)) headers.set("Access-Control-Allow-Origin", origin);
   return headers;
 }
 function result(status: number, data: unknown, origin: string | null): Response {
@@ -79,14 +84,14 @@ async function verifyTurnstile(token: string): Promise<boolean> {
 Deno.serve(async (req: Request) => {
   const origin = req.headers.get("origin");
   if (req.method === "OPTIONS") {
-    if (origin !== ORIGIN) return fail(403, "origin_not_allowed", origin);
+    if (!isAllowedOrigin(origin)) return fail(403, "origin_not_allowed", origin);
     const headers = cors(origin);
     headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
     headers.set("Access-Control-Allow-Headers", "content-type");
     return new Response(null, { status: 204, headers });
   }
   if (req.method !== "POST") return fail(405, "method_not_allowed", origin);
-  if (origin !== ORIGIN) return fail(403, "origin_not_allowed", origin);
+  if (!isAllowedOrigin(origin)) return fail(403, "origin_not_allowed", origin);
   if (!URL || !SERVICE_KEY || !ORIGIN || !TURNSTILE_SECRET || !TURNSTILE_HOST || !TURNSTILE_ACTION
     || !RATE_SECRET || RATE_SECRET.length < 32 || !configured()) return fail(500, "server_misconfigured", origin);
   if (!(req.headers.get("content-type") ?? "").startsWith("application/json")) return fail(415, "unsupported_media_type", origin);
