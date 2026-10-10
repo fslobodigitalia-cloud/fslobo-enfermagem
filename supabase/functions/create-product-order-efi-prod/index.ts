@@ -479,6 +479,13 @@ Deno.serve(async (req: Request) => {
   if (!isValidOrderResult(rpc.data)) return errorResponse(500, "database_error", "Não foi possível criar o pedido agora.", origin);
 
   const order = rpc.data[0];
+  // Trava a escolha do Pix antes da chamada externa; a seleção de cartão
+  // usa o mesmo bloqueio de linha na RPC, impedindo as duas cobranças.
+  const { data: claimedPix, error: claimError } = await supabase.rpc("claim_efi_pix_checkout", { p_order_id: order.order_id });
+  if (claimError) return errorResponse(500, "database_error", "Não foi possível processar o pedido agora.", origin);
+  if (claimedPix !== true)
+    return errorResponse(409, "checkout_conflict", "Esta tentativa de compra já foi iniciada com cartão.", origin);
+
   let httpClient: Deno.HttpClient | null = null;
   try {
     httpClient = Deno.createHttpClient({ cert, key });
