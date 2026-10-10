@@ -16,6 +16,12 @@
 # menos que tenha sua própria seção [functions.<nome>] dizendo o contrário.
 verify_jwt = false
 
+[functions.create-product-card-order]
+verify_jwt = false
+
+[functions.efi-card-notification]
+verify_jwt = false
+
 [functions.create-pix-order]
 # Diferente de draw-cards: esta função é PÚBLICA por natureza — é chamada
 # pelo navegador de um visitante do site, que nunca tem (nem deveria ter) um
