@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { TurnstileWidget, type TurnstileWidgetHandle } from "@/components/checkout/TurnstileWidget";
+import { CardCheckoutPanel } from "@/components/checkout/CardCheckoutPanel";
 import { ProductPixResult } from "./ProductPixResult";
 import { ProductDownloads } from "./ProductDownloads";
 
@@ -363,6 +364,7 @@ export function ProductCheckout({ slug, name }: { slug: string; name: string }) 
           </Button>
         </form>
       )}
+      {showForm && <CardCheckoutPanel storageKey={slug} productName={name} productSlugs={[slug]} />}
 
       {result?.kind === "error" && errorCategory !== null && errorCategory !== "input" && (
         <ProductCheckoutErrorBlock code={result.code} category={errorCategory} productName={name} />
