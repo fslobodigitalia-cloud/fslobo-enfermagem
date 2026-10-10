@@ -24,6 +24,7 @@ import { CartCheckoutForm, type FormErrors } from "@/components/cart/CartCheckou
 import { CartPixResult } from "@/components/cart/CartPixResult";
 import { CartDownloads } from "@/components/cart/CartDownloads";
 import type { TurnstileWidgetHandle } from "@/components/checkout/TurnstileWidget";
+import { CardCheckoutPanel } from "@/components/checkout/CardCheckoutPanel";
 
 /**
  * Checkout do carrinho — Etapa 2. Reaproveita EXATAMENTE a mesma
@@ -561,6 +562,8 @@ export default function CartPage() {
                     // causador) — o formulário nunca duplica essa mensagem.
                     errorMessage={null}
                   />
+                  <CardCheckoutPanel storageKey={CART_KEY} productName="materiais do carrinho"
+                    productSlugs={items.map((item) => item.slug)} />
                 </div>
               )}
             </div>

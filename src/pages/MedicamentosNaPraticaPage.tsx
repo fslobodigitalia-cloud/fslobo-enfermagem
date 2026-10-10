@@ -99,6 +99,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { TurnstileWidget, type TurnstileWidgetHandle } from "@/components/checkout/TurnstileWidget";
+import { CardCheckoutPanel } from "@/components/checkout/CardCheckoutPanel";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 /** Precisa ser EXATAMENTE a mesma action já validada pelo backend
@@ -481,6 +482,8 @@ export default function MedicamentosNaPraticaPage() {
                   errorMessage={result?.kind === "error" && errorCategory === "input" ? errorMessageFor(result.code) : null}
                 />
               )}
+              {showForm && <CardCheckoutPanel storageKey={medicamentosProduct.slug} productName={medicamentosProduct.name}
+                productSlugs={[medicamentosProduct.slug, ...Array.from(selectedBumps)]} />}
               {result?.kind === "error" && errorCategory !== null && errorCategory !== "input" && (
                 <ErrorPanel code={result.code} category={errorCategory} />
               )}

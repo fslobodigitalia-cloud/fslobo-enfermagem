@@ -76,6 +76,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { TurnstileWidget, type TurnstileWidgetHandle } from "@/components/checkout/TurnstileWidget";
+import { CardCheckoutPanel } from "@/components/checkout/CardCheckoutPanel";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const TURNSTILE_ACTION = "create_product_order";
@@ -509,6 +510,8 @@ export default function GuiaEvolucaoEnfermagemPage() {
                   errorMessage={result?.kind === "error" && errorCategory === "input" ? errorMessageFor(result.code) : null}
                 />
               )}
+              {showForm && <CardCheckoutPanel storageKey={guiaEvolucaoProduct.slug} productName={guiaEvolucaoProduct.name}
+                productSlugs={[guiaEvolucaoProduct.slug, ...Array.from(selectedBumps)]} />}
               {result?.kind === "error" && errorCategory !== null && errorCategory !== "input" && (
                 <ErrorPanel code={result.code} category={errorCategory} />
               )}

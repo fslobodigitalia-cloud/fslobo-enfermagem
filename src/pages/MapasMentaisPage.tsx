@@ -88,6 +88,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { TurnstileWidget, type TurnstileWidgetHandle } from "@/components/checkout/TurnstileWidget";
+import { CardCheckoutPanel } from "@/components/checkout/CardCheckoutPanel";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 /** Precisa ser EXATAMENTE a mesma action já validada pelo backend
@@ -600,6 +601,8 @@ export default function MapasMentaisPage() {
                   errorMessage={result?.kind === "error" && errorCategory === "input" ? errorMessageFor(result.code) : null}
                 />
               )}
+              {showForm && <CardCheckoutPanel storageKey={mapasMentaisProduct.slug} productName={mapasMentaisProduct.name}
+                productSlugs={[mapasMentaisProduct.slug, ...Array.from(selectedBumps)]} />}
               {result?.kind === "error" && errorCategory !== null && errorCategory !== "input" && (
                 <ErrorPanel code={result.code} category={errorCategory} />
               )}

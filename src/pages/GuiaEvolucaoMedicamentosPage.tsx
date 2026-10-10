@@ -96,6 +96,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { TurnstileWidget, type TurnstileWidgetHandle } from "@/components/checkout/TurnstileWidget";
+import { CardCheckoutPanel } from "@/components/checkout/CardCheckoutPanel";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const TURNSTILE_ACTION = "create_product_order";
@@ -555,6 +556,8 @@ export default function GuiaEvolucaoMedicamentosPage() {
                   errorMessage={result?.kind === "error" && errorCategory === "input" ? errorMessageFor(result.code) : null}
                 />
               )}
+              {showForm && comboAvailable && <CardCheckoutPanel storageKey={comboProduct.slug} productName={comboProduct.name}
+                productSlugs={[comboProduct.slug, ...Array.from(selectedBumps).filter((slug) => comboBumps.some((b) => b.slug === slug))]} />}
               {result?.kind === "error" && errorCategory !== null && errorCategory !== "input" && (
                 <ErrorPanel code={result.code} category={errorCategory} />
               )}
