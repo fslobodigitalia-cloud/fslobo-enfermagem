@@ -2,7 +2,7 @@ import { GuiaConversationSection } from "../components/guia/GuiaConversationSect
 import { ComboIncludedSection } from "@/components/guia/ComboIncludedSection";
 /**
  * Oferta combo "Guia de Anotação e Evolução + Medicamentos na Prática"
- * (R$ 17) em /guia-evolucao-medicamentos. Derivada de
+ * em /guia-evolucao-medicamentos (preço sempre lido do catálogo). Derivada de
  * GuiaEvolucaoEnfermagemPage.tsx (mesma estrutura/estilo; a página original
  * não é tocada). Diferenças: produto principal = combo-evolucao-medicamentos
  * (entrega vinculada: 2 PDFs do Guia + 3 PDFs de Medicamentos), Medicamentos
@@ -16,7 +16,7 @@ import { ComboIncludedSection } from "@/components/guia/ComboIncludedSection";
  * Página comercial do Guia de Evolução de Enfermagem. Estrutura e copy
  * reconstroem a landing de referência já validada em conversão
  * (reference/manual2026.html, /manual2026/): Hero → 3 dores
- * → carrossel de conteúdo → quiz (perguntas → perfil → resultado) →
+ * → carrossel de conteúdo → conversas → combo incluído →
  * oferta/preço/checkout → Pix → confirmação + downloads.
  *
  * O CHECKOUT em si (Turnstile, create-product-order, get-order-downloads,
@@ -52,7 +52,6 @@ import * as React from "react";
 import {
   ArrowRight,
   Check,
-  CheckCircle2,
   Clock,
   Copy,
   FileText,
@@ -62,10 +61,9 @@ import {
   MessageCircle,
   ShieldCheck,
   Sparkles,
-  XCircle,
   Zap,
 } from "lucide-react";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { useDocumentMeta } from "@/lib/seo";
 import { useCheckoutAttempt } from "@/lib/checkoutAttempt";
@@ -85,10 +83,8 @@ import {
   comboEvolucaoMedicamentosBumps as comboBumps,
   formatCents,
 } from "@/config/digitalProducts";
-import { guiaProfileOptions, guiaProfileMessages, type NursingProfile } from "@/config/guiaQuiz";
-import { comboQuizQuestions, comboQuizPerformanceMessage, COMBO_QUIZ_INCLUDED_NOTE } from "@/config/comboQuiz";
 import { buildPixSupportWhatsAppUrl } from "@/lib/whatsapp";
-import { initGuiaPixel, trackGuiaLead, trackGuiaQuizInterest, trackGuiaInitiateCheckout, trackGuiaPurchase } from "@/lib/guiaPixel";
+import { initGuiaPixel, trackGuiaInitiateCheckout, trackGuiaPurchase } from "@/lib/guiaPixel";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { SiteFooter } from "@/components/layout/SiteFooter";
 import { Button } from "@/components/ui/button";
@@ -143,15 +139,11 @@ const CTA_BUTTON_CLASS = cn(
 /**
  * Texturas de fundo — só CSS (radial-gradient), sem imagem/biblioteca,
  * opacidades muito baixas (5-6%) para não competir com o conteúdo nem
- * pesar no LCP. TEAL_BLOOM para fundos brancos, DOTS para fundos slate.
+ * pesar no LCP. TEAL_BLOOM para fundos brancos.
  */
 const TEXTURE_TEAL_BLOOM: React.CSSProperties = {
   backgroundImage:
     "radial-gradient(55% 45% at 12% 0%, rgba(13,148,136,0.06), transparent 60%), radial-gradient(45% 40% at 100% 100%, rgba(13,148,136,0.05), transparent 60%)",
-};
-const TEXTURE_DOTS: React.CSSProperties = {
-  backgroundImage: "radial-gradient(rgba(13,148,136,0.06) 1px, transparent 1px)",
-  backgroundSize: "22px 22px",
 };
 
 interface FormErrors {
@@ -198,13 +190,6 @@ export default function GuiaEvolucaoMedicamentosPage() {
   // antes apontava para "/", de quando "/" ainda servia este componente
   // diretamente; "/" agora serve o catálogo (MaterialsPage), então manter
   // o canonical em "/" apontaria para a página errada aos olhos do Google.
-  useDocumentMeta({
-    title: "Guia de Anotação e Evolução + Medicamentos na Prática por R$ 17 | FSlobo Enfermagem",
-    description:
-      "Combo digital em PDF: Guia de Anotação e Evolução de Enfermagem com mais de 132 modelos prontos + Medicamentos na Prática, por R$ 17. Pagamento via Pix e acesso imediato.",
-    path: "/guia-evolucao-medicamentos",
-  });
-
   // Só enquanto esta página está montada, força um fundo claro no <body>
   // como garantia extra contra qualquer flash escuro em bounce/overscroll
   // (ex.: iOS Safari) — desfeito automaticamente ao sair da página.
@@ -242,6 +227,11 @@ export default function GuiaEvolucaoMedicamentosPage() {
   const comboCatalogProduct =
     catalog.status === "success" ? catalog.products.find((p) => p.slug === comboProduct.slug) ?? null : null;
   const guiaPriceCents = comboCatalogProduct?.priceCents ?? comboProduct.priceCents;
+  useDocumentMeta({
+    title: `Guia de Anotação e Evolução + Medicamentos na Prática por ${formatCents(guiaPriceCents)} | FSlobo Enfermagem`,
+    description: `Combo digital em PDF: Guia de Anotação e Evolução de Enfermagem com mais de 132 modelos prontos + Medicamentos na Prática, por ${formatCents(guiaPriceCents)}. Pagamento via Pix e acesso imediato.`,
+    path: "/guia-evolucao-medicamentos",
+  });
   // Pix só é liberado quando o combo aparece no catálogo público (RPC
   // get_active_product_catalog: active + catalog_status='ready'). Enquanto
   // for draft/inativo a página é só prévia — decidido pelo backend, nunca
@@ -490,15 +480,6 @@ export default function GuiaEvolucaoMedicamentosPage() {
     }
   }
 
-  function handleQuizProfileSelected() {
-    trackGuiaLead(guiaPriceCents);
-  }
-
-  function handleQuizResultCta() {
-    trackGuiaQuizInterest();
-    scrollToOffer();
-  }
-
   if (resuming) {
     return (
       <div className="min-h-screen bg-white font-sans text-slate-900">
@@ -524,10 +505,9 @@ export default function GuiaEvolucaoMedicamentosPage() {
           </div>
         ) : (
           <>
-            <Hero />
-            <ModulesSection />
+            <Hero priceCents={guiaPriceCents} />
+            <ModulesSection priceCents={guiaPriceCents} />
             <GuiaConversationSection />
-            <QuizSection onProfileSelected={handleQuizProfileSelected} onResultCta={handleQuizResultCta} priceCents={guiaPriceCents} />
             <ComboIncludedSection />
             <OfferSection priceCents={guiaPriceCents} availability={comboAvailability}>
               {showForm && (
@@ -662,7 +642,7 @@ function SpecialtyMarquee() {
   );
 }
 
-function Hero() {
+function Hero({ priceCents }: { priceCents: number }) {
   // Vídeo de fundo só entra em prefers-reduced-motion: reduce nunca é
   // renderizado — o overlay + backgroundColor do <section> (navy sólido)
   // cobrem esse caso sozinhos, sem precisar pausar/tocar vídeo nenhum.
@@ -702,7 +682,7 @@ function Hero() {
           )}
         >
           <span className="inline-flex items-center rounded-full border border-teal-400/30 bg-teal-400/10 px-4 py-1.5 text-[12px] font-bold uppercase tracking-wide text-teal-300">
-            Guia + Medicamentos por R$ 17
+            2 materiais em PDF no mesmo pedido
           </span>
           <h1 className="font-sans text-[2.125rem] font-extrabold leading-[1.1] tracking-tight text-white sm:text-[2.5rem] lg:text-[3.25rem] xl:text-[3.75rem]">
             Saiba exatamente o que escrever no prontuário e{" "}
@@ -711,6 +691,14 @@ function Hero() {
           <p className="max-w-[52ch] text-[16px] leading-relaxed text-slate-300 lg:text-[17.5px]">
             Você cuida do paciente com todo o carinho, mas trava na hora de registrar? Aqui é só consultar:
             manual ilustrado + modelos prontos por situação clínica para adaptar ao seu paciente, sem sair tarde do plantão. No combo, o Guia de Anotação e Evolução vem junto com Medicamentos na Prática.
+          </p>
+          <p className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-[14.5px] font-bold text-white lg:justify-start lg:text-[15.5px]">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-teal-400/30 bg-teal-400/10 px-3 py-1 text-teal-200">
+              <FileText className="h-4 w-4" aria-hidden="true" /> 2 materiais digitais em PDF
+            </span>
+            <span className="text-slate-200">
+              por <span className="text-teal-300">{formatCents(priceCents)}</span> · pagamento único
+            </span>
           </p>
 
           {/* Benefícios — no mobile, "pills" empilhados; no desktop, badges
@@ -741,7 +729,7 @@ function Hero() {
           </div>
 
           <Button size="lg" variant="outline" full className={cn("max-w-[360px] lg:w-auto lg:px-12", CTA_BUTTON_CLASS)} onClick={scrollToOffer}>
-            Quero o combo por {formatCents(comboProduct.priceCents)}
+            Quero os 2 materiais por {formatCents(priceCents)}
           </Button>
         </div>
 
@@ -786,7 +774,7 @@ const MODULE_PAGES = [
   { src: "/guia-evolucao/modulo-8.webp", alt: "Página de exemplo do Guia de Evolução de Enfermagem — modelo 8, roteiro de anotação de enfermagem" },
 ];
 
-function ModulesSection() {
+function ModulesSection({ priceCents }: { priceCents: number }) {
   return (
     <section className="relative bg-white px-5 py-12 sm:py-24" style={TEXTURE_TEAL_BLOOM}>
       <div className="mx-auto w-full max-w-[1180px]">
@@ -837,232 +825,10 @@ function ModulesSection() {
         <p className="mt-3 flex items-center justify-center gap-2 text-[13px] font-semibold uppercase tracking-wide text-slate-400">
           <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" /> Arraste para ver o conteúdo
         </p>
-      </div>
-    </section>
-  );
-}
-
-/* ────────────────────────────────── Quiz ─────────────────────────────────── */
-
-type QuizPhase = "questions" | "profile" | "result";
-
-function QuizSection({
-  onProfileSelected,
-  onResultCta,
-  priceCents,
-}: {
-  onProfileSelected: () => void;
-  onResultCta: () => void;
-  priceCents: number;
-}) {
-  const [phase, setPhase] = React.useState<QuizPhase>("questions");
-  const [index, setIndex] = React.useState(0);
-  const [score, setScore] = React.useState(0);
-  const [selected, setSelected] = React.useState<number | null>(null);
-  const [profile, setProfile] = React.useState<NursingProfile | null>(null);
-
-  const question = comboQuizQuestions[index];
-  const isLast = index === comboQuizQuestions.length - 1;
-
-  function handleAnswer(optionIndex: number) {
-    if (selected !== null) return;
-    setSelected(optionIndex);
-    if (optionIndex === question.answerIndex) setScore((s) => s + 1);
-  }
-
-  function handleNext() {
-    if (isLast) {
-      setPhase("profile");
-      return;
-    }
-    setIndex((i) => i + 1);
-    setSelected(null);
-  }
-
-  function handleProfile(id: NursingProfile) {
-    setProfile(id);
-    setPhase("result");
-    onProfileSelected();
-  }
-
-  // Só visual: progresso da BARRA (não da lógica) — conta a pergunta atual
-  // como "concluída" assim que ela é respondida, para o preenchimento
-  // acompanhar o feedback antes do clique em "Próxima questão".
-  const progressPercent =
-    phase === "questions"
-      ? ((index + (selected !== null ? 1 : 0)) / comboQuizQuestions.length) * 100
-      : 100;
-
-  return (
-    <section id="quiz" className="relative bg-slate-50 px-5 py-20 sm:py-28" style={TEXTURE_DOTS}>
-      <div className="mx-auto w-full max-w-[820px]">
-        {phase !== "result" && (
-          <div className="mb-10 text-center">
-            <span className={cn("inline-flex items-center rounded-full border border-teal-200 bg-white px-4 py-1.5 text-[12px] font-bold uppercase tracking-wide text-teal-700", SHADOW_SOFT)}>
-              Teste rápido
-            </span>
-            <h2 className="mt-4 font-sans text-[1.9rem] font-extrabold tracking-tight text-slate-900 sm:text-[2.35rem]">
-              Será que você está <span className="text-teal-600">registrando certo?</span>
-            </h2>
-            <p className="mx-auto mt-3 max-w-[52ch] text-[15.5px] text-slate-600">
-              Pequenos detalhes fazem toda a diferença na qualidade e segurança do seu registro e da sua medicação. Faça o teste rápido, com questões de anotação e de Medicamentos na Prática:
-            </p>
-          </div>
-        )}
-
-        <div className={cn("relative rounded-[32px] border border-slate-200 bg-white p-7 sm:p-10", SHADOW_MEDIUM)}>
-          {/* Realce sutil no topo do card — sensação de superfície levemente convexa. */}
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-px rounded-t-[32px] bg-gradient-to-r from-transparent via-white to-transparent" aria-hidden="true" />
-
-          {phase === "questions" && (
-            <div className="flex flex-col gap-7">
-              <div className="flex flex-col gap-4">
-                <div className="flex items-center justify-between text-[12px] font-bold uppercase tracking-wide text-slate-400">
-                  <span>
-                    Pergunta {index + 1} de {comboQuizQuestions.length}
-                  </span>
-                  <span className="text-teal-600">{Math.round(progressPercent)}%</span>
-                </div>
-                <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-100 shadow-inner">
-                  <div
-                    className="h-full rounded-full bg-teal-600 shadow-[0_1px_2px_rgba(13,148,136,0.5)] transition-all duration-300"
-                    style={{ width: `${progressPercent}%` }}
-                  />
-                </div>
-              </div>
-
-              {/* AnimatePresence: cada pergunta entra com um fade + leve subida —
-                  reforça a sensação de "próxima etapa" sem ser chamativo.
-                  mode="wait" evita a pergunta nova sobrepor a anterior. */}
-              <AnimatePresence mode="wait" initial={false}>
-                <motion.div
-                  key={index}
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -8 }}
-                  transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-                  className="flex flex-col gap-6"
-                >
-                  <p className="text-[1.25rem] font-bold leading-snug text-slate-900 sm:text-[1.4rem]">{question.question}</p>
-
-                  <div className="flex flex-col gap-3">
-                    {question.options.map((option, i) => {
-                      const isCorrectOption = i === question.answerIndex;
-                      const isSelectedOption = i === selected;
-                      const answered = selected !== null;
-                      const letter = String.fromCharCode(65 + i);
-                      return (
-                        <button
-                          key={option}
-                          type="button"
-                          onClick={() => handleAnswer(i)}
-                          disabled={answered}
-                          className={cn(
-                            "flex items-center gap-3.5 rounded-2xl border-2 px-5 py-4 text-left text-[15.5px] font-semibold transition-all duration-200",
-                            !answered && cn("border-slate-200 bg-white text-slate-800 hover:-translate-y-0.5 hover:border-teal-400 hover:bg-teal-50/60", SHADOW_SOFT),
-                            answered && isCorrectOption && "border-emerald-500 bg-emerald-50 text-emerald-800 shadow-[0_4px_12px_-4px_rgba(16,185,129,0.35)]",
-                            answered && isSelectedOption && !isCorrectOption && "border-rose-400 bg-rose-50 text-rose-800 shadow-[0_4px_12px_-4px_rgba(244,63,94,0.3)]",
-                            answered && !isSelectedOption && !isCorrectOption && "border-slate-200 bg-white text-slate-400",
-                          )}
-                        >
-                          <span
-                            className={cn(
-                              "flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[13px] font-extrabold transition-colors duration-200",
-                              !answered && "bg-slate-100 text-slate-500",
-                              answered && isCorrectOption && "bg-emerald-500 text-white",
-                              answered && isSelectedOption && !isCorrectOption && "bg-rose-400 text-white",
-                              answered && !isSelectedOption && !isCorrectOption && "bg-slate-100 text-slate-400",
-                            )}
-                            aria-hidden="true"
-                          >
-                            {letter}
-                          </span>
-                          <span className="flex-1">{option}</span>
-                          {answered && isCorrectOption && (
-                            <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-600" aria-hidden="true" />
-                          )}
-                          {answered && isSelectedOption && !isCorrectOption && (
-                            <XCircle className="h-5 w-5 shrink-0 text-rose-600" aria-hidden="true" />
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </motion.div>
-              </AnimatePresence>
-
-              {selected !== null && (
-                <div className={cn("rounded-2xl border-l-4 border-teal-500 bg-teal-50/60 p-6", SHADOW_SOFT)}>
-                  <p className="flex items-center gap-2 text-[15px] font-bold text-slate-900">
-                    {selected === question.answerIndex ? (
-                      <>
-                        <CheckCircle2 className="h-5 w-5 text-emerald-600" aria-hidden="true" /> Resposta correta!
-                      </>
-                    ) : (
-                      <>
-                        <XCircle className="h-5 w-5 text-rose-600" aria-hidden="true" /> Incorreto.
-                      </>
-                    )}
-                  </p>
-                  <p className="mt-2 text-[14.5px] leading-relaxed text-slate-600">{question.explanation}</p>
-                  <Button type="button" variant="outline" full className={cn("mt-6", CTA_BUTTON_CLASS)} onClick={handleNext}>
-                    {isLast ? "Ver meu resultado" : "Próxima questão"}
-                    <ArrowRight className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
-                  </Button>
-                </div>
-              )}
-            </div>
-          )}
-
-          {phase === "profile" && (
-            <div className="flex flex-col items-center gap-7 text-center">
-              <h3 className="font-sans text-[1.5rem] font-extrabold text-slate-900 sm:text-[1.7rem]">
-                🎯 Você acertou <span className="text-teal-600">{score}</span> de {comboQuizQuestions.length} questões!
-              </h3>
-              <p className={cn("rounded-2xl border border-emerald-200 bg-emerald-50 px-6 py-4 text-[15px] font-semibold text-emerald-800", SHADOW_SOFT)}>
-                {comboQuizPerformanceMessage(score, comboQuizQuestions.length)}
-              </p>
-              <p className="text-[15px] text-slate-600">
-                Responda uma pergunta rápida para receber uma análise personalizada do seu resultado.
-              </p>
-              <p className="text-[13px] font-bold uppercase tracking-wide text-slate-500">
-                Em qual etapa da sua jornada na enfermagem você está?
-              </p>
-              <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2">
-                {guiaProfileOptions.map((option) => (
-                  <button
-                    key={option.id}
-                    type="button"
-                    onClick={() => handleProfile(option.id)}
-                    className={cn(
-                      "rounded-2xl border-2 border-slate-200 bg-white px-5 py-5 text-[15px] font-bold text-slate-800 transition-all duration-200 hover:-translate-y-0.5 hover:border-teal-400 hover:bg-teal-50/60",
-                      SHADOW_SOFT,
-                    )}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {phase === "result" && profile && (
-            <div className="flex flex-col gap-6 text-center">
-              <h3 className="font-sans text-[1.5rem] font-extrabold text-slate-900 sm:text-[1.7rem]">
-                {guiaProfileMessages[profile].title}
-              </h3>
-              <p className={cn("rounded-2xl border border-emerald-200 bg-emerald-50 px-6 py-4 text-[14.5px] font-semibold text-emerald-800", SHADOW_SOFT)}>
-                🎯 Seu desempenho final: {score}/{comboQuizQuestions.length} questões
-              </p>
-              <p className="text-left text-[15.5px] leading-relaxed text-slate-600">{guiaProfileMessages[profile].body}</p>
-              <p className={cn("rounded-2xl border border-teal-200 bg-teal-50 px-6 py-4 text-left text-[14.5px] font-semibold text-teal-800", SHADOW_SOFT)}>
-                {COMBO_QUIZ_INCLUDED_NOTE}
-              </p>
-              <Button type="button" variant="outline" size="lg" full className={CTA_BUTTON_CLASS} onClick={onResultCta}>
-                Quero os modelos por {formatCents(priceCents)}
-              </Button>
-            </div>
-          )}
+        <div className="mt-8 flex justify-center">
+          <Button size="lg" variant="outline" full className={cn("max-w-[400px] sm:w-auto sm:px-12", CTA_BUTTON_CLASS)} onClick={scrollToOffer}>
+            Quero os 2 materiais por {formatCents(priceCents)}
+          </Button>
         </div>
       </div>
     </section>
@@ -1070,14 +836,6 @@ function QuizSection({
 }
 
 /* ────────────────────── Oferta principal / preço / compra ────────────────── */
-
-const OFFER_BENEFITS = [
-  "Manual ilustrado: entenda como estruturar a evolução e a anotação",
-  "+132 modelos prontos por situação clínica, para consultar e adaptar",
-  "Setores do dia a dia: Clínica Médica, UTI e Emergência",
-  "Medicamentos na Prática incluído: medicamentos mais usados, vias de administração e cuidados de enfermagem",
-  "5 PDFs no total (2 do Guia + 3 de Medicamentos), para consulta rápida pelo celular no plantão",
-];
 
 /**
  * Fundo cinematográfico do checkout — mesmo navy profundo da Hero, com
@@ -1112,34 +870,8 @@ function OfferSection({
       <div aria-hidden="true" className="pointer-events-none absolute -left-24 top-1/3 h-72 w-72 rounded-full bg-teal-400/10 blur-3xl" />
       <div aria-hidden="true" className="pointer-events-none absolute -right-20 bottom-10 h-80 w-80 rounded-full bg-emerald-400/10 blur-3xl" />
 
-      <div className="relative mx-auto grid w-full max-w-[1100px] gap-10 lg:grid-cols-[0.85fr_1.15fr] lg:gap-14">
-        {/* Coluna esquerda — vídeo do produto, fixa ao rolar no desktop. Moldura
-            com glow por trás, coerente com o fundo escuro (o <video> em si —
-            src, controls, playsInline — não muda). */}
-        <div className="relative lg:sticky lg:top-10 lg:self-start">
-          <div className="pointer-events-none absolute inset-0 -z-10 scale-105 rounded-[32px] bg-teal-400/15 blur-2xl" aria-hidden="true" />
-          <div className={cn("overflow-hidden rounded-[28px] border border-white/15", "shadow-[0_8px_16px_rgba(0,0,0,0.25),0_40px_80px_-28px_rgba(0,0,0,0.55)]")}>
-            <div className="grid grid-cols-2 gap-3 bg-white p-3">
-              <img
-                src="/guia-evolucao/capa-guia.webp"
-                alt="Capa do Guia de Anotação e Evolução de Enfermagem"
-                loading="lazy"
-                className="aspect-[3/4] w-full rounded-2xl object-contain"
-              />
-              <img
-                src="/medicamentos-na-pratica/capa-medicamentos-na-pratica.webp"
-                alt="Capa do material Medicamentos na Prática"
-                loading="lazy"
-                className="aspect-[3/4] w-full rounded-2xl object-contain"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Coluna direita — nome, benefícios, preço, bumps, checkout: o ponto
-            mais "premium" da página — produto + checkout dentro de um bloco
-            seguro e valioso. Cartão claro (legibilidade máxima) sobre o fundo
-            escuro do entorno — é isso que dá a profundidade em camadas. */}
+      <div className="relative mx-auto w-full max-w-[680px]">
+        {/* Cartão único e centralizado: nome → descrição → preço → adicionais → formulário. */}
         <div className={cn("relative overflow-hidden rounded-[28px] border border-white/10 bg-white p-6 sm:p-10", "shadow-[0_8px_16px_rgba(0,0,0,0.2),0_40px_90px_-30px_rgba(0,0,0,0.6)]")}>
           <div className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-teal-50/80 blur-3xl" aria-hidden="true" />
           <div className="pointer-events-none absolute -bottom-20 -left-16 h-56 w-56 rounded-full bg-emerald-50/70 blur-3xl" aria-hidden="true" />
@@ -1151,20 +883,8 @@ function OfferSection({
             {comboProduct.name}
           </h2>
           <p className="relative mt-3 text-[15.5px] leading-relaxed text-slate-600">
-            Guia de Anotação e Evolução + Medicamentos na Prática em um único pedido: um para montar o registro com clareza e outro para consultar os medicamentos na hora do plantão.
+            Dois materiais digitais em PDF no mesmo pedido: o Guia de Anotação e Evolução (manual ilustrado e mais de 132 modelos prontos) e Medicamentos na Prática (medicamentos mais usados, vias de administração e cuidados de enfermagem).
           </p>
-
-          <ul className="relative mt-7 flex flex-col gap-3">
-            {OFFER_BENEFITS.map((item) => (
-              <li
-                key={item}
-                className="flex items-start gap-3 rounded-2xl bg-slate-50 px-4 py-3 text-[14.5px] font-medium text-slate-700"
-              >
-                <Check className="mt-0.5 h-4 w-4 shrink-0 text-teal-600" strokeWidth={2.5} aria-hidden="true" />
-                {item}
-              </li>
-            ))}
-          </ul>
 
           {/* Bloco do preço — mais presença: gradiente mais rico, borda dupla
               (anel + borda), glow por trás, número maior. Preço/produto em si
@@ -1176,7 +896,7 @@ function OfferSection({
             )}
           >
             <div className="pointer-events-none absolute -top-10 left-1/2 h-24 w-48 -translate-x-1/2 rounded-full bg-teal-300/25 blur-3xl" aria-hidden="true" />
-            <span className="relative text-[13px] font-semibold text-slate-500">Combo completo por apenas:</span>
+            <span className="relative text-[13px] font-semibold text-slate-500">Os 2 materiais por:</span>
             <span className="relative flex items-start font-sans text-[3.5rem] font-extrabold leading-none text-slate-900 sm:text-[3.75rem]">
               <span className="mr-1 mt-2.5 text-[1.4rem] text-teal-600">R$</span>
               {priceDigits}
@@ -1184,7 +904,15 @@ function OfferSection({
             <span className="relative mt-2 text-[12px] font-bold uppercase tracking-wide text-slate-500">
               Pagamento único · sem mensalidade
             </span>
+            <span className="relative text-[13px] font-medium text-slate-500">
+              Materiais digitais em PDF · acesso após a confirmação do Pix
+            </span>
           </div>
+
+          <p className="relative mt-4 flex items-start gap-2 rounded-2xl bg-teal-50 px-4 py-3 text-left text-[14px] font-semibold leading-snug text-teal-900">
+            <Check className="mt-0.5 h-4 w-4 shrink-0 text-teal-700" strokeWidth={2.5} aria-hidden="true" />
+            Medicamentos na Prática já está incluído no combo, então não aparece como adicional.
+          </p>
 
           {availability === "unavailable" && (
             <div role="status" className="relative mt-8 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-left">
@@ -1261,6 +989,64 @@ function CheckoutForm({
 }) {
   return (
     <form id="checkout" onSubmit={onSubmit} noValidate className="flex flex-col gap-5 text-left">
+      <div className="flex flex-col gap-3 rounded-2xl border border-teal-100 bg-teal-50/80 p-3 sm:p-4">
+        <div className="flex flex-col gap-1">
+          <p className="text-[15.5px] font-extrabold text-slate-900">Complete seu kit de enfermagem</p>
+          <p className="text-[13px] leading-relaxed text-slate-700">
+            Adicione conteúdos que complementam o combo. Você recebe tudo junto após a confirmação do pagamento.
+          </p>
+        </div>
+        {comboBumps.map((bump) => {
+          const checked = selectedBumps.has(bump.slug);
+          return (
+            <label
+              key={bump.slug}
+              htmlFor={`bump-${bump.slug}`}
+              className={cn(
+                "group relative flex cursor-pointer items-start justify-between gap-3 rounded-2xl border p-3.5 transition-colors duration-150",
+                // Selecionado: fundo verde claro + borda verde forte. Não
+                // selecionado: sempre neutro — o hover (só com mouse) nunca
+                // usa verde, para não parecer selecionado.
+                checked
+                  ? "border-teal-600 bg-emerald-50 ring-1 ring-teal-600"
+                  : "border-slate-300 bg-white [@media(hover:hover)]:hover:border-slate-400",
+              )}
+            >
+              {checked && (
+                <span
+                  aria-hidden="true"
+                  className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-teal-600 text-white shadow-sm"
+                >
+                  <Check className="h-3 w-3" strokeWidth={3} />
+                </span>
+              )}
+              <span className="flex items-start gap-3">
+                <Checkbox
+                  id={`bump-${bump.slug}`}
+                  checked={checked}
+                  onCheckedChange={() => onToggleBump(bump.slug)}
+                  className="mt-0.5 border-slate-400 bg-white hover:border-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/40 data-[state=checked]:border-teal-600 data-[state=checked]:bg-teal-600 data-[state=checked]:text-white"
+                />
+                <span className="flex flex-col gap-1">
+                  {/* Nenhum adicional deste combo é apresentado antes da oferta
+                      (a seção acima só mostra Medicamentos, já incluído) — por
+                      isso não há selo "Você viu acima" aqui. */}
+                  <span className="w-fit rounded-full bg-white px-2 py-0.5 text-[9.5px] font-extrabold uppercase tracking-wide text-teal-700 ring-1 ring-teal-200">
+                    Oferta adicional
+                  </span>
+                  <span className="text-[15px] font-extrabold leading-snug text-slate-900">{bump.name}</span>
+                  <span className="text-[13px] leading-snug text-slate-700">{bump.description}</span>
+                  {checked && (
+                    <span className="text-[12.5px] font-extrabold text-teal-800">✓ Adicionado — você receberá junto com o combo</span>
+                  )}
+                </span>
+              </span>
+              <span className="whitespace-nowrap text-[14px] font-extrabold text-teal-800">+ {bump.priceLabel}</span>
+            </label>
+          );
+        })}
+      </div>
+
       <div className="flex flex-col gap-2.5">
         <Label htmlFor="checkout-nome" className="text-slate-500">
           Nome
@@ -1298,63 +1084,14 @@ function CheckoutForm({
           maxLength={254}
           className="border-slate-300 bg-white text-slate-900 placeholder:text-slate-400 shadow-[0_1px_2px_rgba(15,23,42,0.04)] hover:border-teal-400 focus:border-teal-600 focus:bg-white focus:ring-2 focus:ring-teal-500/20"
         />
+        <p className="text-[12.5px] leading-relaxed text-slate-500">
+          Use um e-mail que você acessa: ele fica vinculado ao seu pedido. Depois da confirmação do Pix, os materiais são liberados nesta mesma página.
+        </p>
         {errors.email && (
           <p role="alert" className="text-[13px] text-rose-600">
             {errors.email}
           </p>
         )}
-      </div>
-
-      <div className="flex flex-col gap-3">
-        <div className="flex flex-col gap-1">
-          <p className="text-[15px] font-bold text-slate-900">Complete seu kit de enfermagem</p>
-          <p className="text-[13px] leading-relaxed text-slate-500">
-            Adicione conteúdos que complementam o combo. Você recebe tudo junto após a confirmação do pagamento.
-          </p>
-        </div>
-        {comboBumps.map((bump) => {
-          const checked = selectedBumps.has(bump.slug);
-          return (
-            <label
-              key={bump.slug}
-              htmlFor={`bump-${bump.slug}`}
-              className={cn(
-                "group relative flex cursor-pointer items-start justify-between gap-3 rounded-2xl border p-3.5 transition-all duration-200",
-                checked
-                  ? "border-teal-400 bg-teal-50/70 shadow-[0_4px_14px_-6px_rgba(13,148,136,0.35)] ring-2 ring-teal-500/15"
-                  : "border-slate-200 bg-slate-50 hover:-translate-y-0.5 hover:border-teal-200 hover:bg-white hover:shadow-[0_6px_16px_-10px_rgba(15,23,42,0.25)]",
-              )}
-            >
-              {checked && (
-                <span
-                  aria-hidden="true"
-                  className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-teal-600 text-white shadow-sm"
-                >
-                  <Check className="h-3 w-3" strokeWidth={3} />
-                </span>
-              )}
-              <span className="flex items-start gap-3">
-                <Checkbox
-                  id={`bump-${bump.slug}`}
-                  checked={checked}
-                  onCheckedChange={() => onToggleBump(bump.slug)}
-                  className="mt-0.5 border-slate-300 bg-white hover:border-teal-500 data-[state=checked]:border-teal-600 data-[state=checked]:bg-teal-600 data-[state=checked]:text-white"
-                />
-                <span className="flex flex-col gap-1">
-                  <span className="w-fit rounded-full bg-white px-2 py-0.5 text-[9.5px] font-extrabold uppercase tracking-wide text-teal-700 ring-1 ring-teal-200">
-                    Oferta adicional
-                  </span>
-                  <span className="text-[14.5px] font-bold leading-snug text-slate-900">{bump.name}</span>
-                  <span className="text-[12.5px] leading-snug text-slate-500">{bump.description}</span>
-                  <span className={cn("text-[12.5px] font-bold", checked ? "text-teal-700" : "text-teal-600")}>
-                    {checked ? "✓ Adicionado — você receberá junto com o combo" : "Adicionar por apenas R$ 10"}
-                  </span>
-                </span>
-              </span>
-              <span className="whitespace-nowrap text-[13px] font-semibold text-teal-700">+ {bump.priceLabel}</span>
-            </label>
-          );
-        })}
       </div>
 
       <div className={cn("relative flex items-center justify-between overflow-hidden rounded-2xl border border-teal-200 bg-gradient-to-b from-teal-50 to-white px-5 py-4", SHADOW_SOFT)}>
@@ -1412,7 +1149,7 @@ function CheckoutForm({
             ? "Compra indisponível no momento"
             : availability === "checking"
               ? "Verificando disponibilidade..."
-              : "Gerar meu Pix e receber o material"}
+              : "Gerar meu Pix e receber os 2 materiais"}
       </Button>
     </form>
   );
