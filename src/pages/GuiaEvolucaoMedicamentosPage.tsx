@@ -580,7 +580,7 @@ function Hero({ priceCents }: { priceCents: number }) {
             Um guia com mais de 132 modelos de anotação e evolução para adaptar ao seu paciente, junto com Medicamentos na Prática no mesmo pedido.
           </p>
           <div className="mt-6 flex flex-wrap items-center justify-center gap-2.5 text-[14px] font-semibold lg:justify-start">
-            <span className="inline-flex items-center gap-2 rounded-full bg-white/12 px-3.5 py-2 text-white">
+            <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3.5 py-2 text-white">
               <FileText className="h-4 w-4" aria-hidden="true" /> 2 materiais digitais em PDF
             </span>
             <span className="rounded-full bg-[#f4d389] px-3.5 py-2 font-extrabold text-[#173d39]">
