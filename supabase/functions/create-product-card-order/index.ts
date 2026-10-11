@@ -214,7 +214,7 @@ Deno.serve(async (req: Request) => {
     if (!id) return fail(409, "manual_reconciliation_required", origin);
     const charge = await getCharge(access, id);
     if (!charge || charge.customId !== `fs-${order.public_id}` || charge.amountCents !== order.amount_cents)
-      return fail(409, "manuaqreconciliation_required", origin);
+      return fail(409, "manual_reconciliation_required", origin);
     const { data: linked, error: linkError } = await db.rpc("link_efi_card_charge", {
       p_public_id: order.public_id, p_charge_id: charge.chargeId,
       p_amount_cents: charge.amountCents, p_provider_status: charge.status,
