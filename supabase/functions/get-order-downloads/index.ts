@@ -57,6 +57,7 @@ import { createClient } from "npm:@supabase/supabase-js@2.112.0";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 const ALLOWED_ORIGIN = Deno.env.get("ALLOWED_ORIGIN");
+const PREVIEW_ORIGIN = Deno.env.get("EFI_CARD_PREVIEW_ORIGIN");
 
 const MAX_BODY_BYTES = 2 * 1024; // 2 KB — corpo tem só dois campos, pequenos.
 // ALTERAÇÃO (etapa 1 do carrinho multiproduto): era 5 ("catálogo do MVP: 1
@@ -73,10 +74,14 @@ const CHECKOUT_ACCESS_TOKEN_REGEX = /^[0-9a-f]{64}$/;
 // ──────────────────────────────────  CORS  ──────────────────────────────────
 // Mesmo padrão de create-pix-order/create-product-order: ALLOWED_ORIGIN é
 // OBRIGATÓRIO, nunca wildcard, sempre a origem EXATA configurada.
+function isAllowedOrigin(origin: string | null): origin is string {
+  return origin !== null && (origin === ALLOWED_ORIGIN || origin === PREVIEW_ORIGIN);
+}
+
 function buildCorsHeaders(origin: string | null): Headers {
   const headers = new Headers();
   headers.set("Vary", "Origin");
-  if (ALLOWED_ORIGIN && origin === ALLOWED_ORIGIN) {
+  if (isAllowedOrigin(origin)) {
     headers.set("Access-Control-Allow-Origin", origin);
   }
   return headers;
@@ -210,7 +215,7 @@ Deno.serve(async (req: Request) => {
   // é proteção de navegador, não autenticação; requisições sem Origin
   // (server-to-server) são permitidas passar, mesmo raciocínio já usado em
   // create-pix-order/create-product-order.
-  if (origin !== null && origin !== ALLOWED_ORIGIN) {
+  if (origin !== null && !isAllowedOrigin(origin)) {
     return errorResponse(403, "origin_not_allowed", "Origem não permitida.", origin);
   }
 
