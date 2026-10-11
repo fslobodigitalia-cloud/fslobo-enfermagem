@@ -1,7 +1,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2.112.0";
 import { authorize, cardEnvironment, configured, createCharge, getCharge, asRecord } from "../_shared/efi-card.ts";
 
-const URL = Deno.env.get("SUPABASE_URL");
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 const ORIGIN = Deno.env.get("ALLOWED_ORIGIN");
 const PREVIEW_ORIGIN = Deno.env.get("EFI_CARD_PREVIEW_ORIGIN");
@@ -75,7 +75,15 @@ async function hmac(value: string): Promise<string> {
   return Array.from(new Uint8Array(bytes)).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-async function verifyTurnstile(token: string): Promise<boolean> {
+interface TurnstileVerification {
+  ok: boolean;
+  success: boolean;
+  hostname: string | null;
+  action: string | null;
+  errorCodes: string[];
+}
+
+async function verifyTurnstile(token: string): Promise<TurnstileVerification> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 5000);
   try {
@@ -84,8 +92,19 @@ async function verifyTurnstile(token: string): Promise<boolean> {
       body: new URLSearchParams({ secret: TURNSTILE_SECRET!, response: token }), signal: controller.signal,
     });
     const body = asRecord(await response.json());
-    return response.ok && body?.success === true && isAllowedTurnstileHostname(body?.hostname)
-      && body?.action === TURNSTILE_ACTION;
+    const success = body?.success === true;
+    const hostname = typeof body?.hostname === "string" ? body.hostname : null;
+    const action = typeof body?.action === "string" ? body.action : null;
+    const errorCodes = Array.isArray(body?.["error-codes"])
+      ? body["error-codes"].filter((code): code is string => typeof code === "string")
+      : [];
+    return {
+      ok: response.ok && success && isAllowedTurnstileHostname(hostname) && action === TURNSTILE_ACTION,
+      success,
+      hostname,
+      action,
+      errorCodes,
+    };
   } finally { clearTimeout(timer); }
 }
 
@@ -100,7 +119,7 @@ Deno.serve(async (req: Request) => {
   }
   if (req.method !== "POST") return fail(405, "method_not_allowed", origin);
   if (!isAllowedOrigin(origin)) return fail(403, "origin_not_allowed", origin);
-  if (!URL || !SERVICE_KEY || !ORIGIN || !TURNSTILE_SECRET || !TURNSTILE_HOST || !TURNSTILE_ACTION
+  if (!SUPABASE_URL || !SERVICE_KEY || !ORIGIN || !TURNSTILE_SECRET || !TURNSTILE_HOST || !TURNSTILE_ACTION
     || !RATE_SECRET || RATE_SECRET.length < 32 || !configured()) return fail(500, "server_misconfigured", origin);
   if (!(req.headers.get("content-type") ?? "").startsWith("application/json")) return fail(415, "unsupported_media_type", origin);
   if (Number(req.headers.get("content-length") ?? 0) > 32768) return fail(413, "payload_too_large", origin);
@@ -112,10 +131,24 @@ Deno.serve(async (req: Request) => {
   } catch { return fail(400, "invalid_request", origin); }
   if (!input) return fail(400, "invalid_request", origin);
   try {
-    if (!await verifyTurnstile(input.turnstile)) return fail(403, "human_verification_failed", origin);
+    const verification = await verifyTurnstile(input.turnstile);
+    if (!verification.ok) {
+      // Diagnóstico seguro: nunca registra o token, IP ou dados do comprador.
+      console.error("[create-product-card-order] Turnstile recusado.", {
+        category: "turnstile_verification_failed",
+        success: verification.success,
+        hostname: verification.hostname,
+        action: verification.action,
+        error_codes: verification.errorCodes,
+        expected_hostname: TURNSTILE_HOST,
+        preview_hostname: PREVIEW_HOSTNAME,
+        expected_action: TURNSTILE_ACTION,
+      });
+      return fail(403, "human_verification_failed", origin);
+    }
   } catch { return fail(503, "human_verification_temporarily_unavailable", origin); }
 
-  const db = createClient(URL, SERVICE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
+  const db = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
   const email = input.customerEmail.toLowerCase();
   const forwarded = req.headers.get("cf-connecting-ip") ?? req.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
   const ip = forwarded && (/^(\d{1,3}\.){3}\d{1,3}$/.test(forwarded) || /^[0-9a-fA-F:]+$/.test(forwarded)) ? forwarded : null;
@@ -177,11 +210,11 @@ Deno.serve(async (req: Request) => {
     const id = await createCharge(access, { publicId: order.public_id as string, amountCents: order.amount_cents as number,
       itemNames: order.item_names as string[], customerName: input.customerName, customerEmail: email,
       cpf: input.cpf, phone: input.phone, paymentToken: input.paymentToken,
-      notificationUrl: `${URL}/functions/v1/efi-card-notification` });
+      notificationUrl: `${SUPABASE_URL}/functions/v1/efi-card-notification` });
     if (!id) return fail(409, "manual_reconciliation_required", origin);
     const charge = await getCharge(access, id);
     if (!charge || charge.customId !== `fs-${order.public_id}` || charge.amountCents !== order.amount_cents)
-      return fail(409, "manual_reconciliation_required", origin);
+      return fail(409, "manuaqreconciliation_required", origin);
     const { data: linked, error: linkError } = await db.rpc("link_efi_card_charge", {
       p_public_id: order.public_id, p_charge_id: charge.chargeId,
       p_amount_cents: charge.amountCents, p_provider_status: charge.status,
