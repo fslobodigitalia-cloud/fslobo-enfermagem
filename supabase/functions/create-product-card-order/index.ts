@@ -11,9 +11,16 @@ const TURNSTILE_ACTION = Deno.env.get("TURNSTILE_EXPECTED_ACTION_PRODUCT_ORDER")
 const RATE_SECRET = Deno.env.get("RATE_LIMIT_HASH_SECRET");
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PREVIEW_HOSTNAME = (() => {
+  if (!PREVIEW_ORIGIN) return null;
+  try { return new URL(PREVIEW_ORIGIN).hostname; } catch { return null; }
+})();
 
 function isAllowedOrigin(origin: string | null): origin is string {
   return origin !== null && (origin === ORIGIN || origin === PREVIEW_ORIGIN);
+}
+function isAllowedTurnstileHostname(hostname: unknown): boolean {
+  return typeof hostname === "string" && (hostname === TURNSTILE_HOST || hostname === PREVIEW_HOSTNAME);
 }
 
 function cors(origin: string | null): Headers {
@@ -77,7 +84,8 @@ async function verifyTurnstile(token: string): Promise<boolean> {
       body: new URLSearchParams({ secret: TURNSTILE_SECRET!, response: token }), signal: controller.signal,
     });
     const body = asRecord(await response.json());
-    return response.ok && body?.success === true && body?.hostname === TURNSTILE_HOST && body?.action === TURNSTILE_ACTION;
+    return response.ok && body?.success === true && isAllowedTurnstileHostname(body?.hostname)
+      && body?.action === TURNSTILE_ACTION;
   } finally { clearTimeout(timer); }
 }
 
