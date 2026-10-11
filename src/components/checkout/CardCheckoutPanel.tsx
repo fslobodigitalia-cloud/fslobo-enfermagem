@@ -35,6 +35,15 @@ export function CardCheckoutPanel({ storageKey, productName, productSlugs }: {
   const [restoring, setRestoring] = React.useState(() => readOrderAccess(key) !== null);
   const turnstile = React.useRef<TurnstileWidgetHandle>(null);
   const slugs = productSlugs.join("|");
+  const handleTurnstileToken = React.useCallback((value: string) => {
+    setToken(value);
+  }, []);
+  const handleTurnstileExpire = React.useCallback(() => {
+    setToken(null);
+  }, []);
+  const handleTurnstileError = React.useCallback(() => {
+    setToken(null);
+  }, []);
 
   React.useEffect(() => {
     const previous = readOrderAccess(key);
@@ -147,7 +156,7 @@ export function CardCheckoutPanel({ storageKey, productName, productSlugs }: {
             </div>
             {import.meta.env.VITE_TURNSTILE_SITE_KEY && <TurnstileWidget ref={turnstile}
               siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY} action="create_product_order"
-              onToken={setToken} onExpire={() => setToken(null)} onError={() => setToken(null)} />}
+              onToken={handleTurnstileToken} onExpire={handleTurnstileExpire} onError={handleTurnstileError} />}
             {message && <p role="alert" className="text-sm text-rose-700">{message}</p>}
             <Button type="submit" disabled={busy || !token}>{busy ? "Processando..." : "Confirmar pagamento no crédito"}</Button>
             <p className="text-xs text-slate-500">Pagamento em 1 parcela. Dados do cartão são tokenizados pela Efí.</p>
