@@ -43,8 +43,7 @@ export interface DigitalBump {
 /**
  * Adicionais do Guia (carrossel OrderBumpCarousel). Preço/label são só
  * exibição — o valor cobrado é sempre o do backend (ver cabeçalho do arquivo).
- * image: capa do material (arquivo local em public/ ou URL pública do bucket
- * product-covers). "guia-feridas-cronicas" e "2000-questoes-enfermagem"
+ * image: capa do material (arquivo local em public/). "guia-feridas-cronicas" e "2000-questoes-enfermagem"
  * ficam de fora de propósito: o primeiro é o mesmo material comercial de
  * "feridas-curativos-coberturas" (nunca juntos) e o segundo não é oferecido aqui.
  */
@@ -79,7 +78,7 @@ export const guiaEvolucaoBumps: DigitalBump[] = [
     description: "Entenda os principais exames e valores laboratoriais da rotina clínica.",
     priceCents: 1000,
     priceLabel: "R$ 10,00",
-    image: "https://bwntzilgzwryouvjtibf.supabase.co/storage/v1/object/public/product-covers/exames-laboratoriais/cover-1787280403970.png",
+    image: "/order-bumps/capa-exames-laboratoriais.webp",
   },
   {
     slug: "dicionario-termos-tecnicos",
@@ -87,7 +86,7 @@ export const guiaEvolucaoBumps: DigitalBump[] = [
     description: "Consulte rapidamente os termos mais utilizados na enfermagem.",
     priceCents: 1000,
     priceLabel: "R$ 10,00",
-    image: "https://bwntzilgzwryouvjtibf.supabase.co/storage/v1/object/public/product-covers/dicionario-termos-tecnicos/cover-1787282289773.png",
+    image: "/order-bumps/capa-dicionario-termos-tecnicos.webp",
   },
   {
     slug: "feridas-curativos-coberturas",
@@ -95,9 +94,49 @@ export const guiaEvolucaoBumps: DigitalBump[] = [
     description: "Conheça os cuidados e coberturas indicados para diferentes feridas.",
     priceCents: 1000,
     priceLabel: "R$ 10,00",
-    image: "https://bwntzilgzwryouvjtibf.supabase.co/storage/v1/object/public/product-covers/feridas-curativos-coberturas/cover-1787280737766.png",
+    image: "/order-bumps/capa-feridas-curativos-coberturas.webp",
   },
 ];
+
+/**
+ * Oferta "Kit Completo" do carrossel de adicionais do Guia — em conjunto, os
+ * mesmos seis materiais de guiaEvolucaoBumps. É um produto SEPARADO (o slug
+ * abaixo é o slug definitivo do futuro SKU no catálogo) e NÃO entra no array
+ * dos seis cards. Nesta etapa é só configuração local de desenvolvimento: o
+ * SKU ainda não existe no banco, então o preço cobrado de verdade continuará
+ * sendo o do servidor quando o cadastro existir. priceCents/originalPriceCents
+ * servem apenas para exibição e para a prévia do total (src/lib/guiaKit.ts).
+ */
+export interface BundleOffer {
+  slug: string;
+  name: string;
+  /** Descrição curta — só copy. */
+  description: string;
+  /** Preço do kit (centavos). */
+  priceCents: number;
+  /** Soma dos itens comprados separadamente (centavos) — base do "De R$ 60". */
+  originalPriceCents: number;
+  /** Slugs dos produtos que o kit inclui. */
+  memberSlugs: readonly string[];
+}
+
+export const GUIA_KIT_SLUG = "kit-completo-enfermagem-bump";
+
+export const guiaKitOffer: BundleOffer = {
+  slug: GUIA_KIT_SLUG,
+  name: "Kit Completo de Enfermagem",
+  description: "Os 6 materiais para apoiar seus estudos, concursos e rotina de enfermagem.",
+  priceCents: 3990,
+  originalPriceCents: 6000,
+  memberSlugs: [
+    "medicamentos-na-pratica",
+    "mapa-mental-ilustrado",
+    "balanco-hidrico-bump",
+    "exames-laboratoriais",
+    "dicionario-termos-tecnicos",
+    "feridas-curativos-coberturas",
+  ],
+};
 
 export function formatCents(cents: number): string {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(cents / 100);

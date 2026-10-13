@@ -66,7 +66,8 @@ import { saveOrderAccess, readOrderAccess, clearOrderAccess } from "@/lib/orderA
 import { DownloadButton } from "@/components/downloads/DownloadButton";
 import { InAppDownloadNotice } from "@/components/downloads/InAppDownloadNotice";
 import { useProductCatalog } from "@/hooks/useProductCatalog";
-import { guiaEvolucaoProduct, guiaEvolucaoBumps, formatCents } from "@/config/digitalProducts";
+import { guiaEvolucaoProduct, guiaEvolucaoBumps, guiaKitOffer, formatCents } from "@/config/digitalProducts";
+import { addKit, buildProductSlugs, computeTotalCents, removeKit, toggleIndividual } from "@/lib/guiaKit";
 import { buildPixSupportWhatsAppUrl } from "@/lib/whatsapp";
 import { initGuiaPixel, trackGuiaInitiateCheckout, trackGuiaPurchase } from "@/lib/guiaPixel";
 import { SiteHeader } from "@/components/layout/SiteHeader";
@@ -255,9 +256,11 @@ export default function GuiaEvolucaoEnfermagemPage() {
   const showForm = result === null || (result.kind === "error" && errorCategory === "input");
   const showPixResult = result !== null && result.kind !== "error" && downloads === null;
 
-  const totalCents =
-    guiaPriceCents +
-    guiaEvolucaoBumps.filter((b) => selectedBumps.has(b.slug)).reduce((sum, b) => sum + b.priceCents, 0);
+  // Prévia visual do total (regra pura em src/lib/guiaKit.ts) — nunca enviada ao
+  // backend. Uma seleção inválida não deveria existir (toggleBump/toggleKit mantêm
+  // kit e itens individuais mutuamente exclusivos); se ocorrer, cai no preço base.
+  const totalResult = computeTotalCents(guiaPriceCents, selectedBumps, guiaEvolucaoBumps, guiaKitOffer);
+  const totalCents = totalResult.ok ? totalResult.totalCents : guiaPriceCents;
 
   // ── Retomada: se já existe um pedido salvo (localStorage) para este
   //    produto, consulta get-order-downloads UMA vez ao carregar a página.
@@ -358,13 +361,14 @@ export default function GuiaEvolucaoEnfermagemPage() {
     turnstileRef.current?.reset();
   }, []);
 
+  // Seleção exclusiva: itens individuais OU somente o kit (ver src/lib/guiaKit.ts).
   function toggleBump(slug: string) {
-    setSelectedBumps((prev) => {
-      const next = new Set(prev);
-      if (next.has(slug)) next.delete(slug);
-      else next.add(slug);
-      return next;
-    });
+    setSelectedBumps((prev) => toggleIndividual(prev, slug, guiaEvolucaoBumps, guiaKitOffer));
+  }
+
+  // Adicionar o kit substitui as escolhas individuais; removê-lo volta a nenhum adicional.
+  function toggleKit() {
+    setSelectedBumps((prev) => (prev.has(guiaKitOffer.slug) ? removeKit() : addKit(guiaKitOffer)));
   }
 
   async function submitOrder(name: string, mail: string, productSlugs: string[]) {
@@ -439,7 +443,9 @@ export default function GuiaEvolucaoEnfermagemPage() {
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
 
-    const productSlugs = [guiaEvolucaoProduct.slug, ...Array.from(selectedBumps)];
+    // Sem kit: [principal, ...individuais]. Com kit: [principal, kit] — nunca os seis membros.
+    const productSlugs = buildProductSlugs(guiaEvolucaoProduct.slug, selectedBumps, guiaEvolucaoBumps, guiaKitOffer);
+    if (!productSlugs) return;
     void submitOrder(trimmedName, trimmedEmail, productSlugs);
   }
 
@@ -492,6 +498,8 @@ export default function GuiaEvolucaoEnfermagemPage() {
                   errors={errors}
                   selectedBumps={selectedBumps}
                   onToggleBump={toggleBump}
+                  onToggleKit={toggleKit}
+                  basePriceCents={guiaPriceCents}
                   totalCents={totalCents}
                   submitting={submitting}
                   canSubmit={Boolean(turnstileToken) && !submitting && !turnstileFailed}
@@ -899,6 +907,8 @@ function CheckoutForm({
   errors,
   selectedBumps,
   onToggleBump,
+  onToggleKit,
+  basePriceCents,
   totalCents,
   submitting,
   canSubmit,
@@ -920,6 +930,8 @@ function CheckoutForm({
   errors: FormErrors;
   selectedBumps: Set<string>;
   onToggleBump: (slug: string) => void;
+  onToggleKit: () => void;
+  basePriceCents: number;
   totalCents: number;
   submitting: boolean;
   canSubmit: boolean;
@@ -936,7 +948,14 @@ function CheckoutForm({
 }) {
   return (
     <form id="checkout" onSubmit={onSubmit} noValidate className="flex flex-col gap-5 text-left">
-      <OrderBumpCarousel bumps={guiaEvolucaoBumps} selectedBumps={selectedBumps} onToggle={onToggleBump} />
+      <OrderBumpCarousel
+        bumps={guiaEvolucaoBumps}
+        selectedBumps={selectedBumps}
+        onToggle={onToggleBump}
+        kit={guiaKitOffer}
+        onToggleKit={onToggleKit}
+        basePriceCents={basePriceCents}
+      />
 
       <div className="flex flex-col gap-2.5">
         <Label htmlFor="checkout-nome" className="text-slate-500">

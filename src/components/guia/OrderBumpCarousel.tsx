@@ -1,8 +1,9 @@
 import * as React from "react";
 import { flushSync } from "react-dom";
-import { Check, ChevronLeft, ChevronRight, Pause, Play, X } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, MoveHorizontal, Pause, Play } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { formatCents, type DigitalBump } from "@/config/digitalProducts";
+import { formatCents, type BundleOffer, type DigitalBump } from "@/config/digitalProducts";
+import { getBundleDisplay, type BundleDisplay } from "@/lib/guiaKit";
 
 /**
  * Carrossel de order bumps — SÓ apresentação. Não guarda seleção própria:
@@ -15,14 +16,21 @@ import { formatCents, type DigitalBump } from "@/config/digitalProducts";
  * janela visível ficam `inert` (sem foco e fora da árvore de acessibilidade).
  * Pausa com mouse/foco/interação; sem autoplay em prefers-reduced-motion.
  *
- * Celular (< 768px): cards compactos (capa pequena + texto lado a lado), scroll
- * horizontal nativo com scroll-snap (um card por vez), sem animação automática e
- * sem rolagem horizontal da página.
+ * Todos os cards são verticais e compactos (capa, nome, preço, descrição, botão).
+ * Celular (< 768px): cards de largura fixa (~176px) com scroll horizontal nativo e
+ * scroll-snap (um card por vez), sem animação automática e sem rolagem horizontal
+ * da página; uma parte do próximo card fica visível.
  */
 
 const STEP_MS = 450;
 const AUTOPLAY_MS = 4500;
 const GAP_PX = 16;
+/** Largura do card no celular e alturas da capa (proporção ~0,71 preservada). */
+const MOBILE_CARD_PX = 176;
+const MIN_CARD_PX = 170;
+const MAX_PER_VIEW = 3;
+const COVER_H_COMPACT = 112;
+const COVER_H_DESKTOP = 132;
 const CONTROL_CLASS =
   "flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-slate-300 bg-white text-slate-800 transition-colors hover:border-teal-500 hover:text-teal-800 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-teal-500/40";
 const DESKTOP_QUERY = "(min-width: 768px)";
@@ -49,72 +57,43 @@ function shortPrice(cents: number): string {
 }
 
 /**
- * Capa real do produto (arquivo local ou URL pública do bucket product-covers).
- * Se a imagem falhar, cai numa capa teal com o nome do produto — nunca aparece
- * ícone de imagem quebrada. As caixas têm tamanho fixo: trocar de imagem para
- * fallback não gera layout shift. A capa sempre aparece inteira (object-contain).
+ * Capa real do produto (arquivo local em public/). Se a imagem falhar, cai numa
+ * capa teal com o nome do produto — nunca aparece ícone de imagem quebrada. A
+ * caixa da capa tem tamanho fixo (proporção ~0,71 das capas): trocar de imagem
+ * para fallback não gera layout shift, e a capa sempre aparece inteira
+ * (object-contain, sem cortar nem esticar).
  */
 function BumpMockup({ bump, compact }: { bump: DigitalBump; compact: boolean }) {
   const [failed, setFailed] = React.useState(false);
   const src = failed ? undefined : bump.image;
+  const height = compact ? COVER_H_COMPACT : COVER_H_DESKTOP;
+  const width = Math.round(height * 0.708);
 
-  if (compact) {
-    return (
-      <div className="relative flex h-[120px] w-[88px] shrink-0 items-center justify-center">
+  return (
+    <div className="flex items-center justify-center rounded-2xl bg-gradient-to-b from-slate-50 to-teal-50/60 py-2">
+      <div className="relative shrink-0" style={{ height, width }}>
         {src ? (
           <img
             src={src}
             alt={`Capa de ${bump.name}`}
-            width={88}
-            height={120}
+            width={width}
+            height={height}
             loading="lazy"
             decoding="async"
             draggable={false}
             onError={() => setFailed(true)}
-            className="h-full w-full select-none object-contain drop-shadow-[0_5px_6px_rgba(15,23,42,0.3)]"
+            className="h-full w-full select-none object-contain drop-shadow-[0_6px_8px_rgba(15,23,42,0.28)]"
           />
         ) : (
           <div
             role="img"
             aria-label={`Capa de ${bump.name}`}
-            className="flex h-full w-full items-end overflow-hidden rounded-md bg-gradient-to-br from-teal-700 via-teal-800 to-teal-950 px-1 py-1.5 text-white shadow-[0_5px_6px_-2px_rgba(15,23,42,0.3),inset_3px_0_6px_-4px_rgba(0,0,0,0.45)]"
+            className="flex h-full w-full items-end overflow-hidden rounded-md bg-gradient-to-br from-teal-700 via-teal-800 to-teal-950 px-1 py-1.5 text-white shadow-[0_6px_8px_-2px_rgba(15,23,42,0.3),inset_3px_0_6px_-4px_rgba(0,0,0,0.45)]"
           >
             <span className="line-clamp-5 break-words text-[10px] font-extrabold leading-tight tracking-tight">{bump.name}</span>
           </div>
         )}
       </div>
-    );
-  }
-
-  return (
-    <div className="relative aspect-[4/5] w-full overflow-hidden rounded-2xl bg-gradient-to-b from-slate-50 to-teal-50/60">
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-x-6 bottom-3 h-5 rounded-[50%] bg-slate-900/10 blur-md"
-      />
-      {src ? (
-        <img
-          src={src}
-          alt={`Capa de ${bump.name}`}
-          width={320}
-          height={400}
-          loading="lazy"
-          decoding="async"
-          draggable={false}
-          onError={() => setFailed(true)}
-          className="relative h-full w-full select-none object-contain p-3 drop-shadow-[0_10px_14px_rgba(15,23,42,0.18)]"
-        />
-      ) : (
-        <div
-          role="img"
-          aria-label={`Capa de ${bump.name}`}
-          className="absolute inset-3 flex flex-col justify-end overflow-hidden rounded-xl bg-gradient-to-br from-teal-700 via-teal-800 to-teal-950 p-4 text-white shadow-[inset_5px_0_10px_-6px_rgba(0,0,0,0.45)]"
-        >
-          <span aria-hidden="true" className="mb-3 h-[3px] w-8 rounded-full bg-white/80" />
-          <span className="text-[10.5px] font-bold uppercase tracking-[0.14em] text-white/85">Adicional opcional</span>
-          <span className="mt-2 text-[16px] font-extrabold leading-snug">{bump.name}</span>
-        </div>
-      )}
     </div>
   );
 }
@@ -122,103 +101,161 @@ function BumpMockup({ bump, compact }: { bump: DigitalBump; compact: boolean }) 
 interface BumpCardProps {
   bump: DigitalBump;
   selected: boolean;
+  /** Incluído por um kit ativo: aparece selecionado, mas sem ação individual. */
+  included: boolean;
   onToggle: (bump: DigitalBump) => void;
   inert: boolean;
   width: number | null;
-  /** Celular (< 768px): capa pequena à esquerda e texto ao lado. */
+  /** Celular (< 768px): capa um pouco menor, card de largura fixa. */
   compact: boolean;
 }
 
-const BumpCard = React.memo(function BumpCard({ bump, selected, onToggle, inert, width, compact }: BumpCardProps) {
+const BumpCard = React.memo(function BumpCard({ bump, selected, included, onToggle, inert, width, compact }: BumpCardProps) {
   const price = shortPrice(bump.priceCents);
   const inertProps = (inert ? { inert: "" } : {}) as React.HTMLAttributes<HTMLLIElement>;
-
-  const priceRow = (
-    <div className={cn("flex items-center gap-x-2 gap-y-1", compact ? "flex-wrap" : "min-h-[28px] justify-between")}>
-      <p className="text-[14px] font-extrabold text-teal-800">+ {price}</p>
-      {selected && (
-        <span className="flex items-center gap-1 rounded-full bg-teal-600 px-2.5 py-1 text-[11px] font-extrabold text-white">
-          <Check className="h-3 w-3" strokeWidth={3} aria-hidden="true" /> No pedido
-        </span>
-      )}
-    </div>
-  );
 
   return (
     <li
       {...inertProps}
       style={width !== null ? { width } : undefined}
-      className={cn("shrink-0 list-none snap-start snap-always", width === null && "w-[75vw]")}
+      className={cn("shrink-0 list-none snap-start snap-always", width === null && "w-[176px]")}
     >
       {/* O clique no card inteiro é só conveniência de ponteiro; o controle
-          acessível por teclado/leitor de tela são os botões dentro dele. */}
+          acessível por teclado/leitor de tela é o botão dentro dele. */}
       <div
         onClick={(event) => {
-          if ((event.target as HTMLElement).closest("button")) return;
+          if (included || (event.target as HTMLElement).closest("button")) return;
           onToggle(bump);
         }}
         className={cn(
-          "relative flex h-full cursor-pointer flex-col rounded-3xl border-2 transition-colors duration-150",
-          compact ? "gap-2 p-2" : "gap-3 p-3 sm:p-3.5",
-          selected
+          "relative flex h-full flex-col gap-2 rounded-3xl border-2 p-2 transition-colors duration-150",
+          included ? "cursor-default" : "cursor-pointer",
+          selected || included
             ? "border-teal-600 bg-emerald-50 shadow-[0_10px_28px_-14px_rgba(13,148,136,0.55)]"
             : "border-slate-200 bg-white shadow-[0_2px_4px_rgba(15,23,42,0.04),0_8px_20px_-14px_rgba(15,23,42,0.14)] [@media(hover:hover)]:hover:border-slate-300",
         )}
       >
-        {compact ? (
-          <>
-            <div className="flex items-start gap-2.5">
-              <BumpMockup bump={bump} compact />
-              <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-                <h4 className="line-clamp-3 break-words text-[14px] font-extrabold leading-snug text-slate-900">{bump.name}</h4>
-                {priceRow}
-              </div>
-            </div>
-            <p className="line-clamp-3 break-words px-0.5 text-[12.5px] leading-snug text-slate-600">{bump.description}</p>
-          </>
-        ) : (
-          <>
-            <BumpMockup bump={bump} compact={false} />
-            <div className="flex flex-1 flex-col gap-1.5 px-0.5">
-              <h4 className="text-[15px] font-extrabold leading-snug text-slate-900">{bump.name}</h4>
-              <p className="min-h-[3.6rem] text-[13px] leading-snug text-slate-600">{bump.description}</p>
-              {priceRow}
-            </div>
-          </>
-        )}
+        <BumpMockup bump={bump} compact={compact} />
 
-        <button
-          type="button"
-          aria-pressed={selected}
-          aria-label={selected ? `Remover do pedido: ${bump.name}` : `Adicionar ${bump.name} por ${price}`}
-          onClick={() => onToggle(bump)}
-          className={cn(
-            "mt-auto flex min-h-[48px] w-full items-center justify-center gap-1.5 whitespace-nowrap rounded-2xl border-2 px-2 text-[14px] font-extrabold transition-colors duration-150 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-teal-500/40",
-            selected
-              ? "border-teal-700 bg-white text-teal-800 [@media(hover:hover)]:hover:border-rose-600 [@media(hover:hover)]:hover:bg-rose-50 [@media(hover:hover)]:hover:text-rose-700"
-              : "border-transparent bg-teal-600 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_10px_24px_-12px_rgba(13,148,136,0.6)] hover:bg-teal-700",
-          )}
-        >
-          {selected ? (
-            <>
-              <X className="hidden h-4 w-4 shrink-0 min-[400px]:block" strokeWidth={3} aria-hidden="true" /> Remover do pedido
-            </>
-          ) : (
-            `Adicionar +${price}`
-          )}
-        </button>
+        <div className="flex flex-1 flex-col gap-1 px-0.5">
+          <h4 className="line-clamp-3 break-words text-[14px] font-extrabold leading-snug text-slate-900">{bump.name}</h4>
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <p className={cn("text-[14px] font-extrabold", included ? "text-slate-500 line-through" : "text-teal-800")}>+ {price}</p>
+            {(selected || included) && (
+              <span className="flex items-center gap-1 rounded-full bg-teal-600 px-2 py-0.5 text-[11px] font-extrabold text-white">
+                <Check className="h-3 w-3" strokeWidth={3} aria-hidden="true" /> {included ? "Incluído no pacote" : "No pedido"}
+              </span>
+            )}
+          </div>
+          <p title={bump.description} className="line-clamp-2 break-words text-[12.5px] leading-snug text-slate-600">
+            {bump.description}
+          </p>
+        </div>
+
+        {included ? (
+          /* Estado desabilitado do kit: NÃO é botão nem recebe foco. */
+          <div className="mt-auto flex min-h-[48px] w-full items-center justify-center gap-1.5 rounded-2xl border-2 border-dashed border-teal-300 bg-teal-50 px-1 text-[14px] font-extrabold text-teal-800">
+            <Check className="h-4 w-4" strokeWidth={3} aria-hidden="true" /> Incluído
+            <span className="sr-only"> no pacote completo: {bump.name}</span>
+          </div>
+        ) : (
+          <button
+            type="button"
+            aria-pressed={selected}
+            aria-label={selected ? `Remover do pedido: ${bump.name}` : `Adicionar ${bump.name} por ${price}`}
+            onClick={() => onToggle(bump)}
+            className={cn(
+              "mt-auto flex min-h-[48px] w-full items-center justify-center gap-1.5 whitespace-nowrap rounded-2xl border-2 px-1 text-[14px] font-extrabold transition-colors duration-150 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-teal-500/40",
+              selected
+                ? "border-teal-700 bg-white text-teal-800 [@media(hover:hover)]:hover:border-rose-600 [@media(hover:hover)]:hover:bg-rose-50 [@media(hover:hover)]:hover:text-rose-700"
+                : "border-transparent bg-teal-600 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_10px_24px_-12px_rgba(13,148,136,0.6)] hover:bg-teal-700",
+            )}
+          >
+            {selected ? (
+              "Remover do pedido"
+            ) : (
+              `Adicionar +${price}`
+            )}
+          </button>
+        )}
       </div>
     </li>
   );
 });
 
+function KitOfferBlock({ display, active, onToggle }: { display: BundleDisplay; active: boolean; onToggle: () => void }) {
+  const total = formatCents(display.totalCents);
+  return (
+    <div
+      role="group"
+      aria-labelledby="kit-offer-title"
+      className={cn(
+        "flex flex-col gap-3 rounded-2xl border-2 p-3.5 transition-colors duration-150 sm:flex-row sm:items-center sm:justify-between sm:gap-4",
+        active
+          ? "border-teal-600 bg-emerald-50 shadow-[0_10px_28px_-14px_rgba(13,148,136,0.55)]"
+          : "border-teal-400 bg-gradient-to-br from-white via-teal-50 to-emerald-50 shadow-[0_8px_22px_-14px_rgba(13,148,136,0.5)]",
+      )}
+    >
+      <div className="flex min-w-0 flex-col gap-1.5">
+        <span className="w-fit rounded-full bg-teal-700 px-2.5 py-1 text-[11.5px] font-extrabold text-white">
+          Economize {formatCents(display.savingsCents)}
+        </span>
+        <h4 id="kit-offer-title" className="text-[16px] font-extrabold leading-snug text-slate-900">
+          Leve o pacote completo com 7 materiais
+        </h4>
+        <p className="text-[13px] font-semibold leading-snug text-slate-700">Seu Guia principal + todos os 6 materiais desta seção.</p>
+        <p className="flex flex-wrap items-baseline gap-x-1.5 text-slate-600">
+          <span className="text-[13.5px] font-semibold">
+            De <s className="decoration-slate-500">{shortPrice(display.normalCents)}</s> por
+          </span>
+          <strong className="text-[26px] font-extrabold leading-none text-teal-700">{total}</strong>
+          <span className="text-[13.5px] font-semibold">no total</span>
+        </p>
+        <p className="text-[12.5px] leading-snug text-slate-600">
+          Tenha tudo em um único pedido e prepare-se do plantão aos concursos.
+        </p>
+        {active && (
+          <p id="kit-offer-guidance" className="text-[12.5px] font-bold leading-snug text-teal-800">
+            Remova o pacote completo para escolher os materiais separadamente.
+          </p>
+        )}
+      </div>
+      <div className="flex w-full shrink-0 flex-col gap-2 sm:w-[230px]">
+        {active && (
+          <div className="flex min-h-[48px] w-full items-center justify-center gap-1.5 rounded-2xl border-2 border-teal-600 bg-teal-50 px-2 text-center text-[14px] font-extrabold leading-tight text-teal-800">
+            <Check className="h-4 w-4 shrink-0" strokeWidth={3} aria-hidden="true" /> Pacote completo adicionado
+          </div>
+        )}
+        {/* Mesmo botão nos dois estados (o foco do teclado não se perde ao adicionar). */}
+        <button
+          type="button"
+          onClick={onToggle}
+          className={cn(
+            "flex min-h-[48px] w-full items-center justify-center rounded-2xl border-2 px-3 py-2 text-center text-[14.5px] font-extrabold leading-tight transition-colors duration-150 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-teal-500/40",
+            active
+              ? "border-teal-700 bg-white text-teal-800 [@media(hover:hover)]:hover:border-rose-600 [@media(hover:hover)]:hover:bg-rose-50 [@media(hover:hover)]:hover:text-rose-700"
+              : "border-transparent bg-teal-600 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_10px_24px_-12px_rgba(13,148,136,0.6)] hover:bg-teal-700",
+          )}
+        >
+          {active ? "Remover pacote completo" : `Quero os 7 materiais por ${total}`}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export interface OrderBumpCarouselProps {
   bumps: readonly DigitalBump[];
   selectedBumps: ReadonlySet<string>;
   onToggle: (slug: string) => void;
+  /** Oferta de kit (opcional). O kit está ativo quando selectedBumps contém kit.slug. */
+  kit?: BundleOffer;
+  onToggleKit?: () => void;
+  /** Preço do produto principal (centavos) — base dos valores exibidos na promoção do pacote. */
+  basePriceCents?: number;
 }
 
-export function OrderBumpCarousel({ bumps, selectedBumps, onToggle }: OrderBumpCarouselProps) {
+export function OrderBumpCarousel({ bumps, selectedBumps, onToggle, kit, onToggleKit, basePriceCents }: OrderBumpCarouselProps) {
   const isDesktop = useMediaQuery(DESKTOP_QUERY);
   const reducedMotion = useMediaQuery(REDUCED_MOTION_QUERY);
 
@@ -237,14 +274,16 @@ export function OrderBumpCarousel({ bumps, selectedBumps, onToggle }: OrderBumpC
   const [announcement, setAnnouncement] = React.useState("");
 
   const count = bumps.length;
-  const perView = viewportWidth >= 480 ? 2 : 1;
+  const perView = Math.max(1, Math.min(MAX_PER_VIEW, Math.floor((viewportWidth + GAP_PX) / (MIN_CARD_PX + GAP_PX))));
   const cardWidth = viewportWidth > 0 ? (viewportWidth - GAP_PX * (perView - 1)) / perView : null;
   const looping = isDesktop && cardWidth !== null && count > perView;
   const step = (cardWidth ?? 0) + GAP_PX;
 
   // Última versão do que os handlers estáveis precisam ler.
-  const latest = React.useRef({ onToggle, selectedBumps, looping, step, count, reducedMotion });
-  latest.current = { onToggle, selectedBumps, looping, step, count, reducedMotion };
+  const latest = React.useRef({ onToggle, onToggleKit, kit, selectedBumps, looping, step, count, reducedMotion });
+  latest.current = { onToggle, onToggleKit, kit, selectedBumps, looping, step, count, reducedMotion };
+  const kitActive = kit ? selectedBumps.has(kit.slug) : false;
+  const bundleDisplay = kit && basePriceCents !== undefined ? getBundleDisplay(basePriceCents, kit) : null;
 
   React.useEffect(() => {
     const viewport = viewportRef.current;
@@ -345,11 +384,28 @@ export function OrderBumpCarousel({ bumps, selectedBumps, onToggle }: OrderBumpC
   }, [running, go]);
 
   const handleToggle = React.useCallback((bump: DigitalBump) => {
-    const { onToggle: toggle, selectedBumps: current } = latest.current;
+    const { onToggle: toggle, kit: offer, selectedBumps: current } = latest.current;
+    if (offer && current.has(offer.slug)) return; // com o kit ativo, os cards individuais não respondem
     const wasSelected = current.has(bump.slug);
     toggle(bump.slug);
     setAutoplay(false);
     setAnnouncement(wasSelected ? `${bump.name} removido do pedido.` : `${bump.name} adicionado ao pedido.`);
+  }, []);
+
+  const handleToggleKit = React.useCallback(() => {
+    const { onToggleKit: toggleKit, kit: offer, selectedBumps: current } = latest.current;
+    if (!toggleKit || !offer) return;
+    const wasActive = current.has(offer.slug);
+    const replacedIndividuals = !wasActive && current.size > 0;
+    toggleKit();
+    setAutoplay(false);
+    setAnnouncement(
+      wasActive
+        ? "Pacote completo removido do pedido."
+        : replacedIndividuals
+          ? "Pacote completo adicionado. Ele substituiu as escolhas individuais."
+          : "Pacote completo adicionado ao pedido.",
+    );
   }, []);
 
   const manualGo = (direction: 1 | -1) => {
@@ -411,21 +467,23 @@ export function OrderBumpCarousel({ bumps, selectedBumps, onToggle }: OrderBumpC
           <ul
             ref={trackRef}
             aria-label="Materiais adicionais"
+            aria-describedby={kitActive ? "kit-offer-guidance" : undefined}
             onFocus={() => setFocusInCards(true)}
             onBlur={(event) => {
               if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setFocusInCards(false);
             }}
-            className={cn("flex", !isDesktop && "w-max pr-5", !looping && isDesktop && "justify-center")}
-            style={{ gap: GAP_PX }}
+            className={cn("flex", !isDesktop && "w-max", !looping && isDesktop && "justify-center")}
+            style={{ gap: GAP_PX, paddingRight: !isDesktop ? Math.max(0, viewportWidth - MOBILE_CARD_PX) : undefined }}
           >
             {displayed.map((bump, index) => (
               <BumpCard
                 key={bump.slug}
                 bump={bump}
                 selected={selectedBumps.has(bump.slug)}
+                included={kitActive && Boolean(kit?.memberSlugs.includes(bump.slug))}
                 onToggle={handleToggle}
                 inert={looping && index >= perView}
-                width={isDesktop ? cardWidth : viewportWidth > 0 ? Math.floor(viewportWidth - 20) : null}
+                width={isDesktop ? cardWidth : MOBILE_CARD_PX}
                 compact={!isDesktop}
               />
             ))}
@@ -434,7 +492,22 @@ export function OrderBumpCarousel({ bumps, selectedBumps, onToggle }: OrderBumpC
       </div>
 
       {!isDesktop && count > 1 && (
-        <p className="text-center text-[12px] font-semibold text-slate-500">Arraste para o lado para ver mais materiais</p>
+        <div className="flex flex-col items-center gap-1 px-1 text-center">
+          <p className="flex items-center justify-center gap-1.5 text-[13.5px] font-bold leading-snug text-teal-700">
+            <MoveHorizontal className="h-4 w-4 shrink-0" strokeWidth={2.25} aria-hidden="true" />
+            Quem cuida bem também se prepara bem.
+          </p>
+          <p className="text-[12px] leading-snug text-slate-600">
+            Deslize e veja todos antes de finalizar — o próximo guia pode ser o apoio que faltava no seu plantão. →
+          </p>
+        </div>
+      )}
+
+      {/* Oferta do kit: depois dos cards (e, no celular, depois da mensagem de deslizar). */}
+      {kit && onToggleKit && bundleDisplay && (
+        <div className="mt-2">
+          <KitOfferBlock display={bundleDisplay} active={kitActive} onToggle={handleToggleKit} />
+        </div>
       )}
 
       <p role="status" aria-live="polite" className="sr-only">

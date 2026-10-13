@@ -8,7 +8,8 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "verify:checkout-attempt": "node scripts/verify-checkout-attempt.mjs"
+    "verify:checkout-attempt": "node scripts/verify-checkout-attempt.mjs",
+    "verify:guia-kit": "node scripts/verify-guia-kit.mjs"
   },
   "dependencies": {
     "@radix-ui/react-accordion": "^1.2.3",
