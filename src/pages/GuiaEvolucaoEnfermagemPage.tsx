@@ -1,5 +1,5 @@
 import { GuiaConversationSection } from "../components/guia/GuiaConversationSection";
-import { ConnectedExtrasSection, CONNECTED_EXTRA_SLUGS } from "@/components/guia/ConnectedExtrasSection";
+import { OrderBumpCarousel } from "@/components/guia/OrderBumpCarousel";
 /**
  * Página comercial do Guia de Evolução de Enfermagem. Estrutura e copy
  * reconstroem a landing de referência já validada em conversão
@@ -74,7 +74,6 @@ import { SiteFooter } from "@/components/layout/SiteFooter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
 import { TurnstileWidget, type TurnstileWidgetHandle } from "@/components/checkout/TurnstileWidget";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -483,7 +482,6 @@ export default function GuiaEvolucaoEnfermagemPage() {
             <Hero priceCents={guiaPriceCents} />
             <ModulesSection priceCents={guiaPriceCents} />
             <GuiaConversationSection />
-            <ConnectedExtrasSection />
             <OfferSection priceCents={guiaPriceCents}>
               {showForm && (
                 <CheckoutForm
@@ -938,64 +936,7 @@ function CheckoutForm({
 }) {
   return (
     <form id="checkout" onSubmit={onSubmit} noValidate className="flex flex-col gap-5 text-left">
-      <div className="flex flex-col gap-3 rounded-2xl border border-teal-100 bg-teal-50/80 p-3 sm:p-4">
-        <div className="flex flex-col gap-1">
-          <p className="text-[15.5px] font-extrabold text-slate-900">Complete seu kit de enfermagem</p>
-          <p className="text-[13px] leading-relaxed text-slate-700">
-            Adicione conteúdos que complementam seu Guia. Você recebe tudo junto após a confirmação do pagamento.
-          </p>
-        </div>
-        {guiaEvolucaoBumps.map((bump) => {
-          const checked = selectedBumps.has(bump.slug);
-          // Só os adicionais realmente exibidos em ConnectedExtrasSection
-          // (antes do checkout) ganham o selo "Você viu acima".
-          const previewedAbove = CONNECTED_EXTRA_SLUGS.includes(bump.slug);
-          return (
-            <label
-              key={bump.slug}
-              htmlFor={`bump-${bump.slug}`}
-              className={cn(
-                "group relative flex cursor-pointer items-start justify-between gap-3 rounded-2xl border p-3.5 transition-colors duration-150",
-                // Selecionado: fundo verde claro + borda verde forte (ring evita
-                // deslocar o layout). Não selecionado: sempre neutro — o hover
-                // (só em dispositivos com mouse) nunca usa verde, para não
-                // parecer selecionado.
-                checked
-                  ? "border-teal-600 bg-emerald-50 ring-1 ring-teal-600"
-                  : "border-slate-300 bg-white [@media(hover:hover)]:hover:border-slate-400",
-              )}
-            >
-              {checked && (
-                <span
-                  aria-hidden="true"
-                  className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-teal-600 text-white shadow-sm"
-                >
-                  <Check className="h-3 w-3" strokeWidth={3} />
-                </span>
-              )}
-              <span className="flex items-start gap-3">
-                <Checkbox
-                  id={`bump-${bump.slug}`}
-                  checked={checked}
-                  onCheckedChange={() => onToggleBump(bump.slug)}
-                  className="mt-0.5 border-slate-400 bg-white hover:border-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/40 data-[state=checked]:border-teal-600 data-[state=checked]:bg-teal-600 data-[state=checked]:text-white"
-                />
-                <span className="flex flex-col gap-1">
-                  <span className="w-fit rounded-full bg-white px-2 py-0.5 text-[9.5px] font-extrabold uppercase tracking-wide text-teal-700 ring-1 ring-teal-200">
-                    {previewedAbove ? "Você viu acima" : "Oferta adicional"}
-                  </span>
-                  <span className="text-[15px] font-extrabold leading-snug text-slate-900">{bump.name}</span>
-                  <span className="text-[13px] leading-snug text-slate-700">{bump.description}</span>
-                  {checked && (
-                    <span className="text-[12.5px] font-extrabold text-teal-800">✓ Adicionado — você receberá junto com o Guia</span>
-                  )}
-                </span>
-              </span>
-              <span className="whitespace-nowrap text-[14px] font-extrabold text-teal-800">+ {bump.priceLabel}</span>
-            </label>
-          );
-        })}
-      </div>
+      <OrderBumpCarousel bumps={guiaEvolucaoBumps} selectedBumps={selectedBumps} onToggle={onToggleBump} />
 
       <div className="flex flex-col gap-2.5">
         <Label htmlFor="checkout-nome" className="text-slate-500">

@@ -36,29 +36,66 @@ export interface DigitalBump {
   description: string;
   priceCents: number;
   priceLabel: string;
+  /** Capa exibida no carrossel de adicionais (OrderBumpCarousel) — só apresentação. */
+  image?: string;
 }
 
+/**
+ * Adicionais do Guia (carrossel OrderBumpCarousel). Preço/label são só
+ * exibição — o valor cobrado é sempre o do backend (ver cabeçalho do arquivo).
+ * image: capa do material (arquivo local em public/ ou URL pública do bucket
+ * product-covers). "guia-feridas-cronicas" e "2000-questoes-enfermagem"
+ * ficam de fora de propósito: o primeiro é o mesmo material comercial de
+ * "feridas-curativos-coberturas" (nunca juntos) e o segundo não é oferecido aqui.
+ */
 export const guiaEvolucaoBumps: DigitalBump[] = [
   {
     slug: "medicamentos-na-pratica",
     name: "Medicamentos na Prática",
-    description: "Consulte os medicamentos mais utilizados, vias de administração e principais cuidados de enfermagem.",
+    description: "Consulte os principais medicamentos com mais segurança e agilidade.",
     priceCents: 1000,
     priceLabel: "R$ 10,00",
+    image: "/medicamentos-na-pratica/capa-medicamentos-na-pratica.webp",
   },
   {
     slug: "mapa-mental-ilustrado",
     name: "Mapas Mentais",
-    description: "Revise os principais assuntos de enfermagem de forma visual, rápida e organizada.",
+    description: "Revise conteúdos essenciais de enfermagem de forma visual e rápida.",
     priceCents: 1000,
     priceLabel: "R$ 10,00",
+    image: "/concursos-enfermagem/capa-mapas-mentais.webp",
   },
   {
     slug: "balanco-hidrico-bump",
     name: "Balanço Hídrico Ilustrado",
-    description: "Aprenda a registrar entradas, saídas e calcular o saldo com exemplos práticos e modelos preenchidos.",
+    description: "Aprenda registros e cálculos do balanço hídrico na prática.",
     priceCents: 1000,
     priceLabel: "R$ 10,00",
+    image: "/balanco-hidrico/capa-balanco-hidrico.webp",
+  },
+  {
+    slug: "exames-laboratoriais",
+    name: "Interpretação de Exames Laboratoriais",
+    description: "Entenda os principais exames e valores laboratoriais da rotina clínica.",
+    priceCents: 1000,
+    priceLabel: "R$ 10,00",
+    image: "https://bwntzilgzwryouvjtibf.supabase.co/storage/v1/object/public/product-covers/exames-laboratoriais/cover-1787280403970.png",
+  },
+  {
+    slug: "dicionario-termos-tecnicos",
+    name: "Dicionário de Termos Técnicos",
+    description: "Consulte rapidamente os termos mais utilizados na enfermagem.",
+    priceCents: 1000,
+    priceLabel: "R$ 10,00",
+    image: "https://bwntzilgzwryouvjtibf.supabase.co/storage/v1/object/public/product-covers/dicionario-termos-tecnicos/cover-1787282289773.png",
+  },
+  {
+    slug: "feridas-curativos-coberturas",
+    name: "Feridas, Curativos e Coberturas",
+    description: "Conheça os cuidados e coberturas indicados para diferentes feridas.",
+    priceCents: 1000,
+    priceLabel: "R$ 10,00",
+    image: "https://bwntzilgzwryouvjtibf.supabase.co/storage/v1/object/public/product-covers/feridas-curativos-coberturas/cover-1787280737766.png",
   },
 ];
 
