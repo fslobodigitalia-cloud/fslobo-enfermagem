@@ -77,6 +77,7 @@ import { saveOrderAccess, readOrderAccess, clearOrderAccess } from "@/lib/orderA
 import { DownloadButton } from "@/components/downloads/DownloadButton";
 import { InAppDownloadNotice } from "@/components/downloads/InAppDownloadNotice";
 import { useProductCatalog } from "@/hooks/useProductCatalog";
+import { useScrollToPixResult } from "@/hooks/useScrollToPixResult";
 import {
   comboEvolucaoMedicamentosProduct as comboProduct,
   comboEvolucaoMedicamentosCompleteBumps as comboBumps,
@@ -277,6 +278,10 @@ export default function GuiaEvolucaoMedicamentosPage() {
   const errorCategory = result?.kind === "error" ? classifyCheckoutErrorCode(result.code) : null;
   const showForm = result === null || (result.kind === "error" && errorCategory === "input");
   const showPixResult = result !== null && result.kind !== "error" && downloads === null;
+  // Rola até o resultado do Pix uma vez por pedido novo (ver useScrollToPixResult).
+  const pixResultRef = useScrollToPixResult(
+    result !== null && result.kind !== "error" && downloads === null ? result.order.publicId : null,
+  );
 
   // Prévia visual do total (regra pura em src/lib/guiaKit.ts) — nunca enviada ao
   // backend. Seleção inválida não deveria existir (toggleBump/toggleKit mantêm
@@ -505,7 +510,9 @@ export default function GuiaEvolucaoMedicamentosPage() {
           </div>
         ) : showPixResult && result !== null ? (
           <div className={cn(PANEL_CONTAINER, "py-16")}>
-            <ResultPanel result={result} copied={copied} onCopyCode={handleCopyCode} />
+            <div ref={pixResultRef} role="region" aria-label="Pagamento via Pix" tabIndex={-1} className="scroll-mt-20 focus:outline-none">
+              <ResultPanel result={result} copied={copied} onCopyCode={handleCopyCode} />
+            </div>
           </div>
         ) : (
           <>

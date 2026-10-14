@@ -75,6 +75,7 @@ import { saveOrderAccess, readOrderAccess, clearOrderAccess } from "@/lib/orderA
 import { DownloadButton } from "@/components/downloads/DownloadButton";
 import { InAppDownloadNotice } from "@/components/downloads/InAppDownloadNotice";
 import { useProductCatalog } from "@/hooks/useProductCatalog";
+import { useScrollToPixResult } from "@/hooks/useScrollToPixResult";
 import { medicamentosProduct, medicamentosBumps, formatCents } from "@/config/digitalProducts";
 import { buildPixSupportWhatsAppUrl } from "@/lib/whatsapp";
 import {
@@ -238,6 +239,10 @@ export default function MedicamentosNaPraticaPage() {
   const errorCategory = result?.kind === "error" ? classifyCheckoutErrorCode(result.code) : null;
   const showForm = result === null || (result.kind === "error" && errorCategory === "input");
   const showPixResult = result !== null && result.kind !== "error" && downloads === null;
+  // Rola até o resultado do Pix uma vez por pedido novo (ver useScrollToPixResult).
+  const pixResultRef = useScrollToPixResult(
+    result !== null && result.kind !== "error" && downloads === null ? result.order.publicId : null,
+  );
 
   const totalCents =
     priceCents + medicamentosBumps.filter((b) => selectedBumps.has(b.slug)).reduce((sum, b) => sum + b.priceCents, 0);
@@ -441,7 +446,9 @@ export default function MedicamentosNaPraticaPage() {
           </div>
         ) : showPixResult && result !== null ? (
           <div className={cn(PANEL_CONTAINER, "py-16")}>
-            <ResultPanel result={result} copied={copied} onCopyCode={handleCopyCode} />
+            <div ref={pixResultRef} role="region" aria-label="Pagamento via Pix" tabIndex={-1} className="scroll-mt-20 focus:outline-none">
+              <ResultPanel result={result} copied={copied} onCopyCode={handleCopyCode} />
+            </div>
           </div>
         ) : (
           <>
