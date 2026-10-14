@@ -3,15 +3,23 @@ import { ChevronLeft, ChevronRight, Check, Maximize2, Minus, Plus, RotateCcw, X 
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 
-const MEDICAMENTOS_COVER = {
-  src: "/medicamentos-na-pratica/capa-medicamentos-na-pratica.webp",
-  alt: "Capa do material Medicamentos na Prática",
-};
+interface Slide {
+  src: string;
+  /** Texto curto: "Capa", "Prévia 1"… */
+  short: string;
+  /** Nome acessível completo (também usado como alt). */
+  label: string;
+}
 
-const MEDICAMENTOS_PAGES = [1, 2, 3, 4].map((number) => ({
-  src: `/medicamentos-na-pratica/modulo-${number}.webp`,
-  alt: `Página ${number} de exemplo de Medicamentos na Prática`,
-}));
+/** Capa + as quatro páginas de prévia, sem repetir nenhuma imagem (ordem do carrossel e da ampliação). */
+const SLIDES: Slide[] = [
+  { src: "/medicamentos-na-pratica/capa-medicamentos-na-pratica.webp", short: "Capa", label: "Capa — Medicamentos na Prática" },
+  ...[1, 2, 3, 4].map((number) => ({
+    src: `/medicamentos-na-pratica/modulo-${number}.webp`,
+    short: `Prévia ${number}`,
+    label: `Prévia ${number} de Medicamentos na Prática`,
+  })),
+];
 
 /** Proporção real dos arquivos modulo-N.webp (1200 x 1600). */
 const PAGE_RATIO = 1200 / 1600;
@@ -48,7 +56,7 @@ function PagePreviewViewer({
   const pinchRef = React.useRef<{ distance: number; zoom: number } | null>(null);
   const [dragging, setDragging] = React.useState(false);
 
-  const total = MEDICAMENTOS_PAGES.length;
+  const total = SLIDES.length;
 
   React.useEffect(() => {
     if (open) {
@@ -170,7 +178,7 @@ function PagePreviewViewer({
     if (event.touches.length < 2) pinchRef.current = null;
   };
 
-  const page = MEDICAMENTOS_PAGES[index];
+  const page = SLIDES[index];
   const controlClass =
     "flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white transition hover:bg-teal-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-300 disabled:opacity-40 disabled:hover:bg-white/10";
 
@@ -184,7 +192,7 @@ function PagePreviewViewer({
           <div className="min-w-0">
             <DialogTitle className="truncate text-[14px] font-extrabold sm:text-[17px]">Medicamentos na Prática</DialogTitle>
             <DialogDescription aria-live="polite" className="truncate text-[12px] text-slate-300">
-              Página {index + 1} de {total} · pinça ou +/− para ampliar
+              {page.short} · {index + 1} de {total} · pinça ou +/− para ampliar
             </DialogDescription>
           </div>
           <DialogClose asChild>
@@ -215,7 +223,7 @@ function PagePreviewViewer({
             <img
               key={page.src}
               src={page.src}
-              alt={page.alt}
+              alt={page.label}
               draggable={false}
               data-testid="page-viewer-image"
               style={{ width: imageWidth, height: imageWidth / PAGE_RATIO }}
@@ -226,10 +234,10 @@ function PagePreviewViewer({
 
         <div className="flex items-center justify-between gap-1.5 border-t border-white/10 bg-slate-950 px-3 py-2 sm:px-6">
           <div className="flex items-center gap-1.5">
-            <button type="button" aria-label="Página anterior" onClick={() => goTo(index - 1)} className={controlClass}>
+            <button type="button" aria-label="Imagem anterior" onClick={() => goTo(index - 1)} className={controlClass}>
               <ChevronLeft className="h-6 w-6" aria-hidden="true" />
             </button>
-            <button type="button" aria-label="Próxima página" onClick={() => goTo(index + 1)} className={controlClass}>
+            <button type="button" aria-label="Próxima imagem" onClick={() => goTo(index + 1)} className={controlClass}>
               <ChevronRight className="h-6 w-6" aria-hidden="true" />
             </button>
           </div>
@@ -270,29 +278,49 @@ function PagePreviewViewer({
  * Seção "Medicamentos na Prática" da oferta combo. Diferente de
  * ConnectedExtrasSection (adicionais opcionais, + R$ 10), aqui Medicamentos
  * é CONTEÚDO INCLUÍDO no combo — sem selo de "opcional", sem preço
- * separado, sem "grátis". Capa + as quatro páginas de prévia já existentes,
- * cada uma abrindo em visualização grande com zoom.
+ * separado, sem "grátis". Um único carrossel: capa + as quatro páginas de
+ * prévia já existentes, cada slide abrindo na visualização grande com zoom.
+ *
+ * Carrossel com scroll-snap nativo (swipe no celular), um slide por vez, sem
+ * autoplay. Setas, contador e barras de progresso ficam ABAIXO da imagem para
+ * nunca cobri-la; o slide visível é anunciado em uma região aria-live.
  */
 export function ComboIncludedSection() {
   const [viewerIndex, setViewerIndex] = React.useState<number | null>(null);
-  const [previewIndex, setPreviewIndex] = React.useState(0);
+  const [current, setCurrent] = React.useState(0);
   const lastIndex = React.useRef(0);
   const scrollPosition = React.useRef(0);
-  const touchStart = React.useRef<number | null>(null);
-  const ignoreClick = React.useRef(false);
+  const trackRef = React.useRef<HTMLUListElement | null>(null);
+  const frame = React.useRef(0);
+  const last = SLIDES.length - 1;
 
-  const goToPreview = (step: number) => {
-    setPreviewIndex((current) => (current + step + MEDICAMENTOS_PAGES.length) % MEDICAMENTOS_PAGES.length);
+  const goTo = (next: number) => {
+    const track = trackRef.current;
+    if (!track) return;
+    const index = Math.min(last, Math.max(0, next));
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    track.scrollTo({ left: index * track.clientWidth, behavior: reduce ? "auto" : "smooth" });
+    setCurrent(index);
   };
 
-  const handleTouchEnd = (event: React.TouchEvent) => {
-    if (touchStart.current === null) return;
-    const distance = event.changedTouches[0]?.clientX - touchStart.current;
-    touchStart.current = null;
-    if (Math.abs(distance) < 45) return;
-    ignoreClick.current = true;
-    window.setTimeout(() => { ignoreClick.current = false; }, 400);
-    goToPreview(distance < 0 ? 1 : -1);
+  const handleScroll = () => {
+    window.cancelAnimationFrame(frame.current);
+    frame.current = window.requestAnimationFrame(() => {
+      const track = trackRef.current;
+      if (!track || track.clientWidth === 0) return;
+      setCurrent(Math.min(last, Math.max(0, Math.round(track.scrollLeft / track.clientWidth))));
+    });
+  };
+  React.useEffect(() => () => window.cancelAnimationFrame(frame.current), []);
+
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLUListElement>) => {
+    if (event.key === "ArrowLeft") {
+      event.preventDefault();
+      goTo(current - 1);
+    } else if (event.key === "ArrowRight") {
+      event.preventDefault();
+      goTo(current + 1);
+    }
   };
 
   const openViewer = (index: number) => {
@@ -306,11 +334,17 @@ export function ComboIncludedSection() {
     setViewerIndex(null);
     window.requestAnimationFrame(() => {
       window.scrollTo({ top: scrollPosition.current, left: 0, behavior: "auto" });
+      // Devolve o foco ao slide que abriu a ampliação (sem rolar a página).
+      trackRef.current?.querySelectorAll("button")[lastIndex.current]?.focus({ preventScroll: true });
     });
   };
 
+  const navClass =
+    "flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-teal-50 text-teal-800 transition-colors hover:bg-teal-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 disabled:opacity-40 disabled:hover:bg-teal-50";
+  const slide = SLIDES[current];
+
   return (
-    <section className="relative overflow-hidden bg-white px-3.5 py-14 sm:px-5 sm:py-20" aria-labelledby="combo-included-title">
+    <section className="relative overflow-hidden bg-white px-3.5 py-12 sm:px-5 sm:py-16" aria-labelledby="combo-included-title">
       <div className="pointer-events-none absolute -left-32 top-0 h-72 w-72 rounded-full bg-teal-100/60 blur-3xl" aria-hidden="true" />
       <div className="pointer-events-none absolute -right-32 bottom-0 h-72 w-72 rounded-full bg-emerald-100/60 blur-3xl" aria-hidden="true" />
 
@@ -327,37 +361,74 @@ export function ComboIncludedSection() {
           </p>
         </div>
 
-        <div className="mx-auto mt-8 flex aspect-[3/4] w-full max-w-[210px] items-center justify-center overflow-hidden rounded-2xl bg-slate-50 p-2 shadow-[0_6px_16px_rgba(15,23,42,0.10),0_24px_36px_-22px_rgba(15,23,42,0.25)] sm:max-w-[245px]">
-            <img
-              src={MEDICAMENTOS_COVER.src}
-              alt={MEDICAMENTOS_COVER.alt}
-              loading="lazy"
-              className="h-full w-full rounded-xl object-contain"
-            />
-        </div>
+        <div className="mx-auto mt-6 w-full max-w-[420px] text-center">
+          <p className="text-[13px] font-semibold text-slate-600">
+            <span className="sm:hidden">Deslize para conhecer o material · toque para ampliar</span>
+            <span className="hidden sm:inline">Use as setas para conhecer o material · clique para ampliar</span>
+          </p>
 
-        <div className="mx-auto mt-7 max-w-[400px] text-center">
-          <p className="text-[13px] font-semibold text-slate-600">Veja algumas páginas do material · toque para ampliar</p>
+          <ul
+            ref={trackRef}
+            tabIndex={0}
+            aria-roledescription="carrossel"
+            aria-label="Capa e prévias de Medicamentos na Prática"
+            onScroll={handleScroll}
+            onKeyDown={handleKeyDown}
+            className="mt-3 flex snap-x snap-mandatory overflow-x-auto overscroll-x-contain rounded-2xl [scrollbar-width:none] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 [&::-webkit-scrollbar]:hidden"
+          >
+            {SLIDES.map((item, index) => (
+              <li
+                key={item.src}
+                aria-roledescription="slide"
+                aria-label={`${index + 1} de ${SLIDES.length}: ${item.label}`}
+                className="flex min-w-full snap-center snap-always list-none justify-center py-1"
+              >
+                <button
+                  type="button"
+                  tabIndex={index === current ? 0 : -1}
+                  onClick={() => openViewer(index)}
+                  aria-label={`Ampliar: ${item.label}`}
+                  className="relative flex aspect-[3/4] w-[240px] items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 p-2 shadow-[0_6px_16px_rgba(15,23,42,0.10),0_24px_36px_-22px_rgba(15,23,42,0.25)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 sm:w-[280px]"
+                >
+                  <img
+                    src={item.src}
+                    alt={item.label}
+                    width={1200}
+                    height={1600}
+                    loading={index === 0 ? "eager" : "lazy"}
+                    decoding="async"
+                    draggable={false}
+                    className="h-full w-full select-none rounded-lg object-contain"
+                  />
+                  <span className="absolute bottom-3 right-3 flex h-8 w-8 items-center justify-center rounded-full bg-slate-950/80 text-white" aria-hidden="true">
+                    <Maximize2 className="h-4 w-4" />
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+
           <div className="mt-3 flex items-center justify-center gap-3 sm:gap-5">
-            <button type="button" onClick={() => goToPreview(-1)} aria-label="Página anterior de Medicamentos" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-teal-50 text-teal-800 transition hover:bg-teal-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600">
+            <button type="button" onClick={() => goTo(current - 1)} disabled={current === 0} aria-label="Slide anterior de Medicamentos na Prática" className={navClass}>
               <ChevronLeft className="h-5 w-5" aria-hidden="true" />
             </button>
-            <button
-              type="button"
-              onClick={() => { if (ignoreClick.current) { ignoreClick.current = false; return; } openViewer(previewIndex); }}
-              onTouchStart={(event) => { touchStart.current = event.touches[0]?.clientX ?? null; }}
-              onTouchEnd={handleTouchEnd}
-              aria-label={`Ampliar página ${previewIndex + 1} de Medicamentos na Prática`}
-              className="group relative flex aspect-[3/4] w-full max-w-[160px] items-center justify-center overflow-hidden rounded-xl bg-slate-50 p-1.5 shadow-[0_5px_14px_rgba(15,23,42,0.09),0_16px_28px_-16px_rgba(15,23,42,0.2)] transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 sm:max-w-[190px]"
-            >
-              <img src={MEDICAMENTOS_PAGES[previewIndex].src} alt={MEDICAMENTOS_PAGES[previewIndex].alt} loading="lazy" className="h-full w-full rounded-lg object-contain" />
-              <span className="absolute bottom-2 right-2 flex h-8 w-8 items-center justify-center rounded-full bg-slate-950/80 text-white" aria-hidden="true"><Maximize2 className="h-4 w-4" /></span>
-            </button>
-            <button type="button" onClick={() => goToPreview(1)} aria-label="Próxima página de Medicamentos" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-teal-50 text-teal-800 transition hover:bg-teal-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600">
+            <div className="flex min-w-[150px] flex-col items-center gap-1.5">
+              <p className="text-[13px] font-bold tabular-nums text-slate-700">
+                {current + 1} de {SLIDES.length} · {slide.short}
+              </p>
+              <div className="flex gap-1.5" aria-hidden="true">
+                {SLIDES.map((item, index) => (
+                  <span key={item.src} className={cn("h-1 w-6 rounded-full transition-colors", index === current ? "bg-teal-600" : "bg-slate-200")} />
+                ))}
+              </div>
+            </div>
+            <button type="button" onClick={() => goTo(current + 1)} disabled={current === last} aria-label="Próximo slide de Medicamentos na Prática" className={navClass}>
               <ChevronRight className="h-5 w-5" aria-hidden="true" />
             </button>
           </div>
-          <p aria-live="polite" className="mt-3 text-[13px] font-bold tabular-nums text-slate-600">Página {previewIndex + 1} de {MEDICAMENTOS_PAGES.length}</p>
+          <p aria-live="polite" className="sr-only">
+            {slide.label}, {current + 1} de {SLIDES.length}
+          </p>
         </div>
       </div>
 

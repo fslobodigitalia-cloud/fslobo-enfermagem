@@ -328,3 +328,46 @@ export const comboEvolucaoMedicamentosBumps: DigitalBump[] = [
     priceLabel: "R$ 10,00",
   },
 ];
+
+/**
+ * Cinco adicionais do carrossel do combo: os seis materiais do Guia
+ * (guiaEvolucaoBumps) MENOS "medicamentos-na-pratica", que o combo já inclui.
+ * Selecionados por slug (sem duplicar objetos) e validados na carga do módulo.
+ */
+const COMBO_COMPLETE_BUMP_SLUGS = [
+  "mapa-mental-ilustrado",
+  "balanco-hidrico-bump",
+  "exames-laboratoriais",
+  "dicionario-termos-tecnicos",
+  "feridas-curativos-coberturas",
+] as const;
+
+export const comboEvolucaoMedicamentosCompleteBumps: DigitalBump[] = COMBO_COMPLETE_BUMP_SLUGS.map((slug) => {
+  const bump = guiaEvolucaoBumps.find((item) => item.slug === slug);
+  if (!bump) throw new Error(`comboEvolucaoMedicamentosCompleteBumps: slug ausente em guiaEvolucaoBumps: ${slug}`);
+  return bump;
+});
+
+if (
+  comboEvolucaoMedicamentosCompleteBumps.length !== 5 ||
+  comboEvolucaoMedicamentosCompleteBumps.some((bump) => bump.slug === medicamentosProduct.slug)
+) {
+  throw new Error("comboEvolucaoMedicamentosCompleteBumps: esperados exatamente 5 adicionais, sem Medicamentos.");
+}
+
+/**
+ * Pacote completo do combo: os cinco materiais acima por um incremento de
+ * R$ 32,90 (R$ 17 + 32,90 = R$ 49,90; valor normal R$ 17 + 5 x 10 = R$ 67).
+ * O SKU ainda NÃO existe no banco — aqui é só configuração de exibição e
+ * seleção; o valor cobrado é sempre o do servidor.
+ */
+export const COMBO_COMPLETE_PACKAGE_SLUG = "pacote-completo-combo-medicamentos-bump";
+
+export const comboCompletePackageOffer: BundleOffer = {
+  slug: COMBO_COMPLETE_PACKAGE_SLUG,
+  name: "Pacote Completo do Combo",
+  description: "Os 5 materiais complementares do combo em um único adicional.",
+  priceCents: 3290,
+  originalPriceCents: 5000,
+  memberSlugs: COMBO_COMPLETE_BUMP_SLUGS,
+};

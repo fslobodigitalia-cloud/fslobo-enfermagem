@@ -79,9 +79,12 @@ import { InAppDownloadNotice } from "@/components/downloads/InAppDownloadNotice"
 import { useProductCatalog } from "@/hooks/useProductCatalog";
 import {
   comboEvolucaoMedicamentosProduct as comboProduct,
-  comboEvolucaoMedicamentosBumps as comboBumps,
+  comboEvolucaoMedicamentosCompleteBumps as comboBumps,
+  comboCompletePackageOffer as comboKit,
   formatCents,
 } from "@/config/digitalProducts";
+import { OrderBumpCarousel, type OrderBumpCopy } from "@/components/guia/OrderBumpCarousel";
+import { addKit, buildProductSlugs, computeTotalCents, removeKit, toggleIndividual } from "@/lib/guiaKit";
 import { buildPixSupportWhatsAppUrl } from "@/lib/whatsapp";
 import { initGuiaPixel, trackGuiaInitiateCheckout, trackGuiaPurchase } from "@/lib/guiaPixel";
 import { SiteHeader } from "@/components/layout/SiteHeader";
@@ -89,7 +92,6 @@ import { SiteFooter } from "@/components/layout/SiteFooter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
 import { TurnstileWidget, type TurnstileWidgetHandle } from "@/components/checkout/TurnstileWidget";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -276,9 +278,11 @@ export default function GuiaEvolucaoMedicamentosPage() {
   const showForm = result === null || (result.kind === "error" && errorCategory === "input");
   const showPixResult = result !== null && result.kind !== "error" && downloads === null;
 
-  const totalCents =
-    guiaPriceCents +
-    comboBumps.filter((b) => selectedBumps.has(b.slug)).reduce((sum, b) => sum + b.priceCents, 0);
+  // Prévia visual do total (regra pura em src/lib/guiaKit.ts) — nunca enviada ao
+  // backend. Seleção inválida não deveria existir (toggleBump/toggleKit mantêm
+  // pacote e itens individuais mutuamente exclusivos); se ocorrer, cai no preço base.
+  const totalResult = computeTotalCents(guiaPriceCents, selectedBumps, comboBumps, comboKit);
+  const totalCents = totalResult.ok ? totalResult.totalCents : guiaPriceCents;
 
   // ── Retomada: se já existe um pedido salvo (localStorage) para este
   //    produto, consulta get-order-downloads UMA vez ao carregar a página.
@@ -379,13 +383,14 @@ export default function GuiaEvolucaoMedicamentosPage() {
     turnstileRef.current?.reset();
   }, []);
 
+  // Seleção exclusiva: itens individuais OU somente o pacote (ver src/lib/guiaKit.ts).
   function toggleBump(slug: string) {
-    setSelectedBumps((prev) => {
-      const next = new Set(prev);
-      if (next.has(slug)) next.delete(slug);
-      else next.add(slug);
-      return next;
-    });
+    setSelectedBumps((prev) => toggleIndividual(prev, slug, comboBumps, comboKit));
+  }
+
+  // Adicionar o pacote substitui as escolhas individuais; removê-lo volta a nenhum adicional.
+  function toggleKit() {
+    setSelectedBumps((prev) => (prev.has(comboKit.slug) ? removeKit() : addKit(comboKit)));
   }
 
   async function submitOrder(name: string, mail: string, productSlugs: string[]) {
@@ -461,10 +466,10 @@ export default function GuiaEvolucaoMedicamentosPage() {
     if (Object.keys(nextErrors).length > 0) return;
 
     if (!comboAvailable) return;
-    // SOMENTE o combo + bumps permitidos desta oferta — nunca os slugs
-    // individuais do Guia ou de Medicamentos.
-    const allowedBumps = new Set(comboBumps.map((b) => b.slug));
-    const productSlugs = [comboProduct.slug, ...Array.from(selectedBumps).filter((slug) => allowedBumps.has(slug))];
+    // Sem pacote: [combo, ...individuais]. Com pacote: [combo, pacote] — nunca os
+    // cinco membros junto, nem os slugs individuais do Guia ou de Medicamentos.
+    const productSlugs = buildProductSlugs(comboProduct.slug, selectedBumps, comboBumps, comboKit);
+    if (!productSlugs) return;
     void submitOrder(trimmedName, trimmedEmail, productSlugs);
   }
 
@@ -518,6 +523,8 @@ export default function GuiaEvolucaoMedicamentosPage() {
                   errors={errors}
                   selectedBumps={selectedBumps}
                   onToggleBump={toggleBump}
+                  onToggleKit={toggleKit}
+                  basePriceCents={guiaPriceCents}
                   totalCents={totalCents}
                   submitting={submitting}
                   canSubmit={comboAvailable && Boolean(turnstileToken) && !submitting && !turnstileFailed}
@@ -548,64 +555,104 @@ export default function GuiaEvolucaoMedicamentosPage() {
 
 /* ────────────────────────────────── Hero ────────────────────────────────── */
 
-const HERO_VIDEO_OVERLAY: React.CSSProperties = {
-  backgroundImage:
-    "linear-gradient(100deg, rgba(5,49,48,0.95) 0%, rgba(7,65,60,0.86) 58%, rgba(13,73,65,0.81) 100%), radial-gradient(70% 75% at 100% 5%, rgba(244,201,105,0.18), transparent 75%)",
+/**
+ * Hero editorial: fundo em camadas só de CSS (gradiente profundo, iluminação
+ * radial teal, brilho dourado discreto e uma textura de pontos de 4% de
+ * opacidade) — sem vídeo nem animação contínua. As capas usam as mesmas
+ * imagens de antes (object-contain, sem esticar), com leve rotação e
+ * sobreposição para dar profundidade; a do Guia fica à frente.
+ */
+const HERO_BACKGROUND: React.CSSProperties = {
+  backgroundImage: [
+    "radial-gradient(60% 70% at 85% 45%, rgba(244,211,137,0.16), transparent 70%)",
+    "radial-gradient(55% 60% at 8% 0%, rgba(20,184,166,0.20), transparent 70%)",
+    "radial-gradient(rgba(255,255,255,0.045) 1px, transparent 1px)",
+    "linear-gradient(160deg, #052e2c 0%, #063a37 45%, #04302e 100%)",
+  ].join(", "),
+  backgroundSize: "auto, auto, 22px 22px, auto",
 };
 
+const HERO_COVER_SHADOW =
+  "shadow-[0_2px_4px_rgba(0,0,0,0.25),0_18px_32px_-8px_rgba(0,0,0,0.5),0_40px_60px_-24px_rgba(0,0,0,0.55)]";
+
+const HERO_INDICATORS = [
+  { icon: FileText, label: "2 guias digitais" },
+  { icon: Zap, label: "Acesso imediato" },
+  { icon: ShieldCheck, label: "Pagamento único" },
+];
+
 function Hero({ priceCents }: { priceCents: number }) {
-  const reducedMotion = useReducedMotion();
-
   return (
-    <section className="relative overflow-hidden bg-[#073f3d] px-4 pb-14 pt-14 text-white sm:px-6 sm:pb-20 sm:pt-20">
-      {!reducedMotion && (
-        <video
-          className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-65"
-          src="/guia-evolucao/hero-enfermagem.mp4"
-          autoPlay
-          muted
-          loop
-          playsInline
-          aria-hidden="true"
-        />
-      )}
-      <div className="pointer-events-none absolute inset-0" style={HERO_VIDEO_OVERLAY} aria-hidden="true" />
-
-      <div className="relative mx-auto grid w-full max-w-[1160px] items-center gap-6 lg:grid-cols-[1.06fr_0.94fr] lg:gap-10">
-        <div className="flex flex-col items-center text-center lg:items-start lg:text-left">
-          <h1 className="max-w-[15ch] font-sans text-[2.25rem] font-extrabold leading-[1.08] tracking-tight text-white sm:text-[3rem] lg:text-[3.6rem]">
-            Do prontuário à medicação, <span className="text-[#f4d389]">mais clareza no plantão.</span>
-          </h1>
-          <p className="mt-5 max-w-[52ch] text-[16px] leading-relaxed text-emerald-50 sm:text-[17px]">
-            Um guia com mais de 132 modelos de anotação e evolução para adaptar ao seu paciente, junto com Medicamentos na Prática no mesmo pedido.
+    <section className="relative overflow-hidden px-5 pb-6 pt-7 text-white sm:px-8 sm:pb-12 sm:pt-12 md:py-14 lg:py-20" style={HERO_BACKGROUND}>
+      <div className="relative mx-auto grid w-full max-w-[1160px] gap-y-3.5 md:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] md:gap-x-8 md:gap-y-0 lg:gap-x-12">
+        <div className="flex flex-col items-center text-center md:col-start-1 md:row-start-1 md:items-start md:self-end md:text-left">
+          <p className="rounded-full border border-[#f4d389]/40 bg-[#f4d389]/10 px-3 py-1 text-[10.5px] font-extrabold uppercase tracking-[0.13em] text-[#f4d389] sm:px-3.5 sm:py-1.5 sm:text-[12px]">
+            Combo essencial para enfermagem
           </p>
-          <div className="mt-6 flex flex-wrap items-center justify-center gap-2.5 text-[14px] font-semibold lg:justify-start">
-            <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3.5 py-2 text-white">
-              <FileText className="h-4 w-4" aria-hidden="true" /> 2 materiais digitais em PDF
+          <h1 className="mt-3.5 max-w-[20ch] text-balance font-sans text-[1.75rem] font-extrabold leading-[1.1] tracking-tight text-white sm:mt-5 sm:text-[2.5rem] sm:leading-[1.12] md:max-w-none md:text-[1.85rem] lg:text-[2.1rem] xl:text-[2.5rem]">
+            <span className="block">Mais clareza para registrar.</span>
+            <span className="block">
+              Mais <span className="text-[#f4d389]">confiança</span> para <span className="text-[#f4d389]">consultar.</span>
             </span>
-            <span className="rounded-full bg-[#f4d389] px-3.5 py-2 font-extrabold text-[#173d39]">
-              {formatCents(priceCents)} · pagamento único
-            </span>
+          </h1>
+          <p className="mt-3 max-w-[52ch] text-[14.5px] leading-snug text-emerald-50/90 sm:mt-5 sm:text-[17px] sm:leading-relaxed">
+            Mais de 132 modelos de anotação e evolução, junto com um guia visual de medicamentos para apoiar sua rotina no plantão.
+          </p>
+        </div>
+
+        <div className="relative mx-auto w-full max-w-[285px] sm:max-w-[340px] md:col-start-2 md:row-span-2 md:row-start-1 md:max-w-none md:self-center lg:max-w-[500px]">
+          <div className="pointer-events-none absolute inset-x-[8%] inset-y-[6%] rounded-full bg-[#f4d389]/20 blur-3xl" aria-hidden="true" />
+          <div className="relative aspect-[100/76] w-full lg:aspect-[100/80]">
+            <img
+              src="/medicamentos-na-pratica/capa-medicamentos-na-pratica.webp"
+              alt="Capa de Medicamentos na Prática, incluído no combo"
+              width={1200}
+              height={1600}
+              loading="eager"
+              className={cn("absolute right-[2%] top-0 w-[52%] rotate-[4deg] rounded-md object-contain ring-1 ring-white/15", HERO_COVER_SHADOW)}
+            />
+            <img
+              src="/guia-evolucao/capa-guia.webp"
+              alt="Capa do Guia de Anotação e Evolução de Enfermagem"
+              width={1086}
+              height={1448}
+              loading="eager"
+              className={cn("absolute bottom-0 left-[2%] z-10 w-[52%] -rotate-[4deg] rounded-md object-contain ring-1 ring-white/15", HERO_COVER_SHADOW)}
+            />
           </div>
+          <div className="pointer-events-none absolute inset-x-[12%] -bottom-2 h-4 rounded-[50%] bg-black/40 blur-xl" aria-hidden="true" />
+        </div>
+
+        <div className="flex flex-col items-center text-center md:col-start-1 md:row-start-2 md:items-start md:text-left">
+          <ul className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[12px] font-semibold text-emerald-50 sm:gap-x-5 sm:text-[14px] md:mt-6 md:justify-start">
+            {HERO_INDICATORS.map(({ icon: Icon, label }) => (
+              <li key={label} className="flex items-center gap-1.5">
+                <Icon className="hidden h-4 w-4 text-[#f4d389] sm:block" aria-hidden="true" /> {label}
+              </li>
+            ))}
+          </ul>
+
+          <div className="mt-3 flex flex-col items-center gap-0.5 border-t border-white/15 pt-3 sm:mt-6 sm:gap-1 sm:pt-5 md:items-start">
+            <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-[#f4d389] sm:text-[12px]">Combo completo</p>
+            <p className="flex flex-wrap items-baseline justify-center gap-x-2 md:justify-start">
+              <span className="text-[2rem] font-extrabold leading-none tracking-tight text-white sm:text-[2.25rem]">{formatCents(priceCents)}</span>
+              <span className="text-[13px] font-semibold text-emerald-50/80 sm:text-[14px]">pagamento único</span>
+            </p>
+          </div>
+
           <Button
             size="lg"
             variant="outline"
             full
-            className="mt-7 max-w-[370px] border-transparent bg-[#f4d389] font-extrabold text-[#173d39] shadow-[0_6px_12px_rgba(0,0,0,0.14),0_20px_40px_-18px_rgba(0,0,0,0.45)] transition hover:-translate-y-0.5 hover:border-transparent hover:bg-[#ffe2a4] hover:text-[#173d39] focus-visible:ring-2 focus-visible:ring-white lg:w-auto lg:px-10"
+            className="mt-3.5 min-h-[52px] max-w-[360px] gap-2 border-transparent bg-[#f4d389] font-extrabold text-[#173d39] shadow-[0_2px_4px_rgba(0,0,0,0.15),0_14px_28px_-12px_rgba(0,0,0,0.5)] hover:border-transparent hover:bg-[#ffe2a4] hover:text-[#173d39] active:bg-[#f0c870] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[#052e2c] motion-safe:transition-colors sm:mt-6 md:w-auto md:px-9"
             onClick={scrollToOffer}
           >
-            Quero os 2 materiais por {formatCents(priceCents)}
+            Quero acessar os 2 guias
+            <ArrowRight className="h-4 w-4" aria-hidden="true" />
           </Button>
-        </div>
-
-        <div className="relative mx-auto h-[275px] w-full max-w-[350px] sm:h-[340px] sm:max-w-[460px] lg:h-[440px] lg:max-w-[500px]" aria-label="Capas dos dois materiais incluídos no combo">
-          <div className="pointer-events-none absolute inset-x-8 bottom-5 top-7 rounded-full bg-[#f4d389]/15 blur-3xl" aria-hidden="true" />
-          <div className="absolute left-[7%] top-4 w-[48%] -rotate-[7deg] rounded-2xl bg-white p-1.5 shadow-[0_12px_24px_rgba(0,0,0,0.24),0_32px_54px_-18px_rgba(0,0,0,0.55)] sm:p-2">
-            <img src="/guia-evolucao/capa-guia.webp" alt="Capa do Guia de Anotação e Evolução de Enfermagem" width={1086} height={1448} loading="eager" className="aspect-[3/4] w-full rounded-xl object-contain" />
-          </div>
-          <div className="absolute right-[7%] top-9 w-[48%] rotate-[7deg] rounded-2xl bg-white p-1.5 shadow-[0_12px_24px_rgba(0,0,0,0.24),0_32px_54px_-18px_rgba(0,0,0,0.55)] sm:top-12 sm:p-2">
-            <img src="/medicamentos-na-pratica/capa-medicamentos-na-pratica.webp" alt="Capa de Medicamentos na Prática, incluído no combo" loading="eager" className="aspect-[3/4] w-full rounded-xl object-contain" />
-          </div>
+          <p className="mt-2 max-w-[40ch] text-[12.5px] leading-snug text-emerald-50/75 sm:mt-3 sm:text-[13px]">
+            Acesso digital enviado após a confirmação do pagamento
+          </p>
         </div>
       </div>
     </section>
@@ -793,6 +840,17 @@ function OfferSection({
 
 /* ─────────────────────────────── Checkout ───────────────────────────────── */
 
+/** Textos do carrossel no combo (o Guia principal e Medicamentos já estão incluídos). */
+const COMBO_BUMP_COPY: Partial<OrderBumpCopy> = {
+  title: "Complete sua biblioteca de enfermagem por apenas R$ 10 cada",
+  introduction: "Escolha os materiais que podem facilitar seus estudos, sua rotina e a tomada de decisão no plantão.",
+  kitTitle: "Complete sua biblioteca com os 7 materiais",
+  kitDescription: "Seu combo já inclui o Guia de Evolução e Medicamentos na Prática. Leve também os outros 5 materiais.",
+  kitFooter: "Tenha tudo em um único pedido e prepare-se da rotina no plantão aos estudos e concursos.",
+  ctaLabel: "Quero os 7 materiais por",
+  mobileHint: "Deslize e conheça todos os materiais antes de finalizar — o próximo pode ser o apoio que faltava na sua rotina. →",
+};
+
 function CheckoutForm({
   firstName,
   setFirstName,
@@ -801,6 +859,8 @@ function CheckoutForm({
   errors,
   selectedBumps,
   onToggleBump,
+  onToggleKit,
+  basePriceCents,
   totalCents,
   submitting,
   canSubmit,
@@ -823,6 +883,8 @@ function CheckoutForm({
   errors: FormErrors;
   selectedBumps: Set<string>;
   onToggleBump: (slug: string) => void;
+  onToggleKit: () => void;
+  basePriceCents: number;
   totalCents: number;
   submitting: boolean;
   canSubmit: boolean;
@@ -840,63 +902,15 @@ function CheckoutForm({
 }) {
   return (
     <form id="checkout" onSubmit={onSubmit} noValidate className="flex flex-col gap-5 text-left">
-      <div className="flex flex-col gap-3 rounded-2xl border border-teal-100 bg-teal-50/80 p-3 sm:p-4">
-        <div className="flex flex-col gap-1">
-          <p className="text-[15.5px] font-extrabold text-slate-900">Complete seu kit de enfermagem</p>
-          <p className="text-[13px] leading-relaxed text-slate-700">
-            Adicione conteúdos que complementam o combo. Você recebe tudo junto após a confirmação do pagamento.
-          </p>
-        </div>
-        {comboBumps.map((bump) => {
-          const checked = selectedBumps.has(bump.slug);
-          return (
-            <label
-              key={bump.slug}
-              htmlFor={`bump-${bump.slug}`}
-              className={cn(
-                "group relative flex cursor-pointer items-start justify-between gap-3 rounded-2xl border p-3.5 transition-colors duration-150",
-                // Selecionado: fundo verde claro + borda verde forte. Não
-                // selecionado: sempre neutro — o hover (só com mouse) nunca
-                // usa verde, para não parecer selecionado.
-                checked
-                  ? "border-teal-600 bg-emerald-50 ring-1 ring-teal-600"
-                  : "border-slate-300 bg-white [@media(hover:hover)]:hover:border-slate-400",
-              )}
-            >
-              {checked && (
-                <span
-                  aria-hidden="true"
-                  className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-teal-600 text-white shadow-sm"
-                >
-                  <Check className="h-3 w-3" strokeWidth={3} />
-                </span>
-              )}
-              <span className="flex items-start gap-3">
-                <Checkbox
-                  id={`bump-${bump.slug}`}
-                  checked={checked}
-                  onCheckedChange={() => onToggleBump(bump.slug)}
-                  className="mt-0.5 border-slate-400 bg-white hover:border-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/40 data-[state=checked]:border-teal-600 data-[state=checked]:bg-teal-600 data-[state=checked]:text-white"
-                />
-                <span className="flex flex-col gap-1">
-                  {/* Nenhum adicional deste combo é apresentado antes da oferta
-                      (a seção acima só mostra Medicamentos, já incluído) — por
-                      isso não há selo "Você viu acima" aqui. */}
-                  <span className="w-fit rounded-full bg-white px-2 py-0.5 text-[9.5px] font-extrabold uppercase tracking-wide text-teal-700 ring-1 ring-teal-200">
-                    Oferta adicional
-                  </span>
-                  <span className="text-[15px] font-extrabold leading-snug text-slate-900">{bump.name}</span>
-                  <span className="text-[13px] leading-snug text-slate-700">{bump.description}</span>
-                  {checked && (
-                    <span className="text-[12.5px] font-extrabold text-teal-800">✓ Adicionado — você receberá junto com o combo</span>
-                  )}
-                </span>
-              </span>
-              <span className="whitespace-nowrap text-[14px] font-extrabold text-teal-800">+ {bump.priceLabel}</span>
-            </label>
-          );
-        })}
-      </div>
+      <OrderBumpCarousel
+        bumps={comboBumps}
+        selectedBumps={selectedBumps}
+        onToggle={onToggleBump}
+        kit={comboKit}
+        onToggleKit={onToggleKit}
+        basePriceCents={basePriceCents}
+        copy={COMBO_BUMP_COPY}
+      />
 
       <div className="flex flex-col gap-2.5">
         <Label htmlFor="checkout-nome" className="text-slate-500">

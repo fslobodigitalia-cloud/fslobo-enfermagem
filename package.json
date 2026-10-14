@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "verify:checkout-attempt": "node scripts/verify-checkout-attempt.mjs",
-    "verify:guia-kit": "node scripts/verify-guia-kit.mjs"
+    "verify:guia-kit": "node scripts/verify-guia-kit.mjs",
+    "verify:combo-kit": "node scripts/verify-combo-kit.mjs"
   },
   "dependencies": {
     "@radix-ui/react-accordion": "^1.2.3",

@@ -183,7 +183,17 @@ const BumpCard = React.memo(function BumpCard({ bump, selected, included, onTogg
   );
 });
 
-function KitOfferBlock({ display, active, onToggle }: { display: BundleDisplay; active: boolean; onToggle: () => void }) {
+function KitOfferBlock({
+  display,
+  active,
+  onToggle,
+  copy,
+}: {
+  display: BundleDisplay;
+  active: boolean;
+  onToggle: () => void;
+  copy: OrderBumpCopy;
+}) {
   const total = formatCents(display.totalCents);
   return (
     <div
@@ -201,9 +211,9 @@ function KitOfferBlock({ display, active, onToggle }: { display: BundleDisplay; 
           Economize {formatCents(display.savingsCents)}
         </span>
         <h4 id="kit-offer-title" className="text-[16px] font-extrabold leading-snug text-slate-900">
-          Leve o pacote completo com 7 materiais
+          {copy.kitTitle}
         </h4>
-        <p className="text-[13px] font-semibold leading-snug text-slate-700">Seu Guia principal + todos os 6 materiais desta seção.</p>
+        <p className="text-[13px] font-semibold leading-snug text-slate-700">{copy.kitDescription}</p>
         <p className="flex flex-wrap items-baseline gap-x-1.5 text-slate-600">
           <span className="text-[13.5px] font-semibold">
             De <s className="decoration-slate-500">{shortPrice(display.normalCents)}</s> por
@@ -211,9 +221,7 @@ function KitOfferBlock({ display, active, onToggle }: { display: BundleDisplay; 
           <strong className="text-[26px] font-extrabold leading-none text-teal-700">{total}</strong>
           <span className="text-[13.5px] font-semibold">no total</span>
         </p>
-        <p className="text-[12.5px] leading-snug text-slate-600">
-          Tenha tudo em um único pedido e prepare-se do plantão aos concursos.
-        </p>
+        <p className="text-[12.5px] leading-snug text-slate-600">{copy.kitFooter}</p>
         {active && (
           <p id="kit-offer-guidance" className="text-[12.5px] font-bold leading-snug text-teal-800">
             Remova o pacote completo para escolher os materiais separadamente.
@@ -237,12 +245,44 @@ function KitOfferBlock({ display, active, onToggle }: { display: BundleDisplay; 
               : "border-transparent bg-teal-600 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_10px_24px_-12px_rgba(13,148,136,0.6)] hover:bg-teal-700",
           )}
         >
-          {active ? "Remover pacote completo" : `Quero os 7 materiais por ${total}`}
+          {active ? copy.removeKitLabel : `${copy.ctaLabel} ${total}`}
         </button>
       </div>
     </div>
   );
 }
+
+/**
+ * Textos configuráveis do carrossel. Os padrões são os da página do Guia de
+ * Evolução (R$ 10, 6 materiais + Guia principal = pacote de 7); outras páginas
+ * sobrescrevem só o que precisam. Nenhum valor monetário é escrito aqui: preços
+ * e economia são sempre derivados de basePriceCents e do BundleOffer.
+ */
+export interface OrderBumpCopy {
+  title: string;
+  introduction: string;
+  kitTitle: string;
+  /** Complemento logo abaixo do título do pacote. */
+  kitDescription: string;
+  kitFooter: string;
+  /** Prefixo do botão; o total (derivado) é anexado ao final. Ex.: "Quero os 7 materiais por". */
+  ctaLabel: string;
+  removeKitLabel: string;
+  mobileHeadline: string;
+  mobileHint: string;
+}
+
+export const DEFAULT_ORDER_BUMP_COPY: OrderBumpCopy = {
+  title: "Complete seu material por apenas R$ 10 cada",
+  introduction: "Escolha os materiais que vão ajudar você na rotina, nos estudos e nos concursos.",
+  kitTitle: "Leve o pacote completo com 7 materiais",
+  kitDescription: "Seu Guia principal + todos os 6 materiais desta seção.",
+  kitFooter: "Tenha tudo em um único pedido e prepare-se do plantão aos concursos.",
+  ctaLabel: "Quero os 7 materiais por",
+  removeKitLabel: "Remover pacote completo",
+  mobileHeadline: "Quem cuida bem também se prepara bem.",
+  mobileHint: "Deslize e veja todos antes de finalizar — o próximo guia pode ser o apoio que faltava no seu plantão. →",
+};
 
 export interface OrderBumpCarouselProps {
   bumps: readonly DigitalBump[];
@@ -253,9 +293,12 @@ export interface OrderBumpCarouselProps {
   onToggleKit?: () => void;
   /** Preço do produto principal (centavos) — base dos valores exibidos na promoção do pacote. */
   basePriceCents?: number;
+  /** Sobrescreve parte dos textos (o restante usa DEFAULT_ORDER_BUMP_COPY). */
+  copy?: Partial<OrderBumpCopy>;
 }
 
-export function OrderBumpCarousel({ bumps, selectedBumps, onToggle, kit, onToggleKit, basePriceCents }: OrderBumpCarouselProps) {
+export function OrderBumpCarousel({ bumps, selectedBumps, onToggle, kit, onToggleKit, basePriceCents, copy: copyOverrides }: OrderBumpCarouselProps) {
+  const copy = React.useMemo<OrderBumpCopy>(() => ({ ...DEFAULT_ORDER_BUMP_COPY, ...copyOverrides }), [copyOverrides]);
   const isDesktop = useMediaQuery(DESKTOP_QUERY);
   const reducedMotion = useMediaQuery(REDUCED_MOTION_QUERY);
 
@@ -425,11 +468,9 @@ export function OrderBumpCarousel({ bumps, selectedBumps, onToggle, kit, onToggl
       <div className="flex items-start justify-between gap-3">
         <div className="flex flex-col gap-1">
           <h3 id="order-bumps-title" className="text-[16px] font-extrabold leading-snug text-slate-900">
-            Complete seu material por apenas R$ 10 cada
+            {copy.title}
           </h3>
-          <p className="text-[13px] leading-relaxed text-slate-700">
-            Escolha os materiais que vão ajudar você na rotina, nos estudos e nos concursos.
-          </p>
+          <p className="text-[13px] leading-relaxed text-slate-700">{copy.introduction}</p>
         </div>
       </div>
 
@@ -495,18 +536,16 @@ export function OrderBumpCarousel({ bumps, selectedBumps, onToggle, kit, onToggl
         <div className="flex flex-col items-center gap-1 px-1 text-center">
           <p className="flex items-center justify-center gap-1.5 text-[13.5px] font-bold leading-snug text-teal-700">
             <MoveHorizontal className="h-4 w-4 shrink-0" strokeWidth={2.25} aria-hidden="true" />
-            Quem cuida bem também se prepara bem.
+            {copy.mobileHeadline}
           </p>
-          <p className="text-[12px] leading-snug text-slate-600">
-            Deslize e veja todos antes de finalizar — o próximo guia pode ser o apoio que faltava no seu plantão. →
-          </p>
+          <p className="text-[12px] leading-snug text-slate-600">{copy.mobileHint}</p>
         </div>
       )}
 
       {/* Oferta do kit: depois dos cards (e, no celular, depois da mensagem de deslizar). */}
       {kit && onToggleKit && bundleDisplay && (
         <div className="mt-2">
-          <KitOfferBlock display={bundleDisplay} active={kitActive} onToggle={handleToggleKit} />
+          <KitOfferBlock display={bundleDisplay} active={kitActive} onToggle={handleToggleKit} copy={copy} />
         </div>
       )}
 
