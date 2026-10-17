@@ -13,6 +13,7 @@ import CartPage from "@/pages/CartPage";
 import GuiaEvolucaoEnfermagemPage from "@/pages/GuiaEvolucaoEnfermagemPage";
 import GuiaEvolucaoMedicamentosPage from "@/pages/GuiaEvolucaoMedicamentosPage";
 import MedicamentosNaPraticaPage from "@/pages/MedicamentosNaPraticaPage";
+import ResumoIlustradoEnfermagemPage from "@/pages/ResumoIlustradoEnfermagemPage";
 import ToolsHubPage from "@/pages/tools/ToolsHubPage";
 import CalculadoraEnfermagemPage from "@/pages/tools/CalculadoraEnfermagemPage";
 import ChecklistPlantaoPage from "@/pages/tools/ChecklistPlantaoPage";
@@ -95,6 +96,9 @@ export default function App() {
               mantemos a ordem explícita por clareza, mesmo padrão do
               bloco acima). */}
           <Route path="/produto/balanco-hidrico" element={<BalancoHidricoPage />} />
+          {/* Landing própria do novo Resumo Ilustrado; usa a URL padrão do
+              catálogo e deve ficar antes da rota genérica /produto/:slug. */}
+          <Route path="/produto/resumo-ilustrado-enfermagem" element={<ResumoIlustradoEnfermagemPage />} />
           {/* O combo tem landing exclusiva (/guia-evolucao-medicamentos); a URL
               genérica de produto redireciona para ela, mantendo os parâmetros
               de campanha. Estática: vence /produto/:slug. */}
