@@ -5,6 +5,7 @@ import { useDocumentMeta } from "@/lib/seo";
 import { useProductCatalog } from "@/hooks/useProductCatalog";
 import { formatCents, guiaEvolucaoBumps } from "@/config/digitalProducts";
 import { ProductCheckout } from "@/components/product/ProductCheckout";
+import { initHubrasilPixel, trackHubrasilInitiateCheckout, trackHubrasilPurchase } from "@/lib/hubrasilPixel";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { SiteFooter } from "@/components/layout/SiteFooter";
 import { Button } from "@/components/ui/button";
@@ -55,6 +56,47 @@ const OFFER_NAVY_BG: React.CSSProperties = {
 };
 
 
+/**
+ * Cartão do carrossel. As páginas de prévia (a partir da 2ª) pesam ~220 KB cada
+ * e, só com loading="lazy", o Chrome as baixa já na abertura (a margem nativa
+ * é de ~1250 px) e disputam banda com o script do TikTok Pixel e o catálogo.
+ * Aqui o `src` só é definido quando o cartão chega perto da tela (500 px na
+ * vertical, 100 px na horizontal = o próximo cartão ao deslizar).
+ */
+function PreviewCard({ page, gated, className }: { page: { src: string; alt: string }; gated: boolean; className: string }) {
+  const ref = React.useRef<HTMLDivElement>(null);
+  const [near, setNear] = React.useState(!gated || typeof IntersectionObserver === "undefined");
+
+  React.useEffect(() => {
+    const node = ref.current;
+    if (near || !node) return;
+    const observer = new IntersectionObserver(
+      entries => {
+        if (entries.some(entry => entry.isIntersecting)) {
+          setNear(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: "500px 100px" },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [near]);
+
+  return (
+    <div ref={ref} className={className}>
+      <img
+        src={near ? page.src : undefined}
+        alt={page.alt}
+        width={1200}
+        height={1600}
+        loading="lazy"
+        className="h-full w-full rounded-[16px] object-contain"
+      />
+    </div>
+  );
+}
+
 function scrollToOffer() {
   document.getElementById(OFFER_SECTION_ID)?.scrollIntoView({ behavior: "smooth" });
 }
@@ -71,6 +113,12 @@ export default function ResumoIlustradoEnfermagemPage() {
     : catalog.status === "error"
       ? "Não foi possível consultar a disponibilidade agora. Tente novamente."
       : "Este material ainda não está disponível para compra.";
+
+  // Meta Pixel: init + PageView + ViewContent, uma vez por visita (ver hubrasilPixel.ts).
+  React.useEffect(() => {
+    initHubrasilPixel(priceCents);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useDocumentMeta({
     title: "Resumo Ilustrado de Enfermagem HUBRASIL | FSlobo Enfermagem",
@@ -93,6 +141,8 @@ export default function ResumoIlustradoEnfermagemPage() {
             bumps={HUBRASIL_BUMPS}
             bumpIntroduction={`Complemente sua revisão, se quiser. Os adicionais são opcionais: você também pode comprar somente a apostila HUBRASIL por ${formatCents(priceCents)}.`}
             basePriceCents={priceCents}
+            onInitiateCheckout={({ totalCents, productSlugs }) => trackHubrasilInitiateCheckout(totalCents, productSlugs)}
+            onPurchaseConfirmed={trackHubrasilPurchase}
             canPurchase={canPurchase}
             priceLabel={formatCents(priceCents)}
             availabilityMessage={canPurchase ? undefined : availabilityMessage}
@@ -205,23 +255,11 @@ function ModulesSection({ priceCents }: { priceCents: number }) {
         <p className="mx-auto mt-5 max-w-[640px] text-center text-[15px] leading-relaxed text-slate-600">Comece pela capa e deslize para ver seis páginas reais do PDF que você recebe na compra.</p>
         <div className="mt-8 flex snap-x snap-mandatory gap-5 overflow-x-auto px-1 pb-6 [&::-webkit-scrollbar]:hidden sm:mt-12" style={{ scrollbarWidth: "none" }}>
           {MODULE_PAGES.map((page, i) => (
-            <div
-              key={page.src}
-              className={cn(
-                "flex aspect-[3/4] w-[85vw] shrink-0 snap-center items-center justify-center overflow-hidden rounded-[24px] border border-slate-200 bg-slate-50 p-3 transition-transform duration-200 hover:-translate-y-1.5 hover:rotate-0 sm:w-[280px] lg:w-[300px]",
-                SHADOW_SOFT,
-                i % 2 === 0 ? "rotate-[0.6deg]" : "-rotate-[0.6deg]",
-              )}
-            >
-              <img
-                src={page.src}
-                alt={page.alt}
-                width={1200}
-                height={1600}
-                loading="lazy"
-                className="h-full w-full rounded-[16px] object-contain"
-              />
-            </div>
+            <PreviewCard key={page.src} page={page} gated={i > 0} className={cn(
+              "flex aspect-[3/4] w-[85vw] shrink-0 snap-center items-center justify-center overflow-hidden rounded-[24px] border border-slate-200 bg-slate-50 p-3 transition-transform duration-200 hover:-translate-y-1.5 hover:rotate-0 sm:w-[280px] lg:w-[300px]",
+              SHADOW_SOFT,
+              i % 2 === 0 ? "rotate-[0.6deg]" : "-rotate-[0.6deg]",
+            )} />
           ))}
         </div>
         <p className="mt-3 flex items-center justify-center gap-2 text-[13px] font-semibold uppercase tracking-wide text-slate-400">

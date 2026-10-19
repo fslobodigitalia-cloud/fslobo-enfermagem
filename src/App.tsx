@@ -5,24 +5,30 @@ import { pendingConfigFields } from "@/config/site";
 import { CartProvider } from "@/context/CartContext";
 import { ScrollToTop } from "@/components/layout/ScrollToTop";
 
-import MaterialsPage from "@/pages/MaterialsPage";
-import ProductPage from "@/pages/ProductPage";
-import MapasMentaisPage from "@/pages/MapasMentaisPage";
-import BalancoHidricoPage from "@/pages/BalancoHidricoPage";
-import CartPage from "@/pages/CartPage";
-import GuiaEvolucaoEnfermagemPage from "@/pages/GuiaEvolucaoEnfermagemPage";
-import GuiaEvolucaoMedicamentosPage from "@/pages/GuiaEvolucaoMedicamentosPage";
-import MedicamentosNaPraticaPage from "@/pages/MedicamentosNaPraticaPage";
 import ResumoIlustradoEnfermagemPage from "@/pages/ResumoIlustradoEnfermagemPage";
-import ToolsHubPage from "@/pages/tools/ToolsHubPage";
-import CalculadoraEnfermagemPage from "@/pages/tools/CalculadoraEnfermagemPage";
-import ChecklistPlantaoPage from "@/pages/tools/ChecklistPlantaoPage";
-import DicasPlantaoPage from "@/pages/tools/DicasPlantaoPage";
-import Privacy from "@/pages/Privacy";
-import Terms from "@/pages/Terms";
-import Delivery from "@/pages/Delivery";
-import Refund from "@/pages/Refund";
-import NotFound from "@/pages/NotFound";
+
+/**
+ * Só a landing do HUBRASIL (destino do anúncio) é importada direto: assim o
+ * primeiro paint não espera um segundo round-trip por um chunk de rota. As
+ * demais páginas viram chunks próprios e saem do bundle de entrada.
+ */
+const MaterialsPage = React.lazy(() => import("@/pages/MaterialsPage"));
+const ProductPage = React.lazy(() => import("@/pages/ProductPage"));
+const MapasMentaisPage = React.lazy(() => import("@/pages/MapasMentaisPage"));
+const BalancoHidricoPage = React.lazy(() => import("@/pages/BalancoHidricoPage"));
+const CartPage = React.lazy(() => import("@/pages/CartPage"));
+const GuiaEvolucaoEnfermagemPage = React.lazy(() => import("@/pages/GuiaEvolucaoEnfermagemPage"));
+const GuiaEvolucaoMedicamentosPage = React.lazy(() => import("@/pages/GuiaEvolucaoMedicamentosPage"));
+const MedicamentosNaPraticaPage = React.lazy(() => import("@/pages/MedicamentosNaPraticaPage"));
+const ToolsHubPage = React.lazy(() => import("@/pages/tools/ToolsHubPage"));
+const CalculadoraEnfermagemPage = React.lazy(() => import("@/pages/tools/CalculadoraEnfermagemPage"));
+const ChecklistPlantaoPage = React.lazy(() => import("@/pages/tools/ChecklistPlantaoPage"));
+const DicasPlantaoPage = React.lazy(() => import("@/pages/tools/DicasPlantaoPage"));
+const Privacy = React.lazy(() => import("@/pages/Privacy"));
+const Terms = React.lazy(() => import("@/pages/Terms"));
+const Delivery = React.lazy(() => import("@/pages/Delivery"));
+const Refund = React.lazy(() => import("@/pages/Refund"));
+const NotFound = React.lazy(() => import("@/pages/NotFound"));
 
 /**
  * Redireciona para outro caminho preservando query string (UTMs, fbclid etc.)
@@ -69,6 +75,7 @@ export default function App() {
             depende do carrinho, só está aqui dentro por conveniência de
             posicionamento. Ver src/components/layout/ScrollToTop.tsx. */}
         <ScrollToTop />
+        <React.Suspense fallback={null}>
         <Routes>
           {/* A Home institucional separada foi removida: "/" e "/materiais"
               servem o mesmo componente (MaterialsPage), o catálogo passou a
@@ -130,6 +137,7 @@ export default function App() {
 
           <Route path="*" element={<NotFound />} />
         </Routes>
+        </React.Suspense>
       </CartProvider>
     </BrowserRouter>
   );

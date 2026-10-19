@@ -17,8 +17,6 @@
  * exclusivamente em src/lib/productCheckout.ts (não alterado por este
  * arquivo).
  */
-import { supabase } from "@/lib/supabase";
-
 export interface PublicCatalogProduct {
   slug: string;
   name: string;
@@ -71,8 +69,23 @@ function mapRow(row: Record<string, unknown>): PublicCatalogProduct | null {
   };
 }
 
+// Começa a baixar o chunk do Supabase assim que este módulo é avaliado, em
+// paralelo à primeira renderização, em vez de esperar o useEffect da página.
+// Erros aparecem de novo (e viram `{ kind: "error" }`) no await da busca.
+const supabaseModule = import("@/lib/supabase");
+supabaseModule.catch(() => undefined);
+
 /** Busca o catálogo público ativo. Nunca lança — falha vira `{ kind: "error" }`. */
 export async function fetchActiveProductCatalog(): Promise<CatalogQueryResult> {
+  // Import dinâmico (ver acima): o cliente Supabase (chunk próprio, ~215 KB)
+  // só é usado por esta RPC e não bloqueia a primeira pintura.
+  let supabase: typeof import("@/lib/supabase").supabase;
+  try {
+    ({ supabase } = await supabaseModule);
+  } catch {
+    return { kind: "error" };
+  }
+
   const { data, error } = await supabase.rpc("get_active_product_catalog");
 
   if (error || !Array.isArray(data)) {

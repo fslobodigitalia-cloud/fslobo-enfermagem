@@ -96,9 +96,23 @@ interface ProductCheckoutProps {
   bumps?: readonly DigitalBump[];
   basePriceCents?: number;
   bumpIntroduction?: string;
+  /**
+   * Opcional (rastreamento): chamado quando o formulário foi validado
+   * (inclui Turnstile) e logo antes de criar o pedido — mesmo ponto do
+   * InitiateCheckout do Guia. `totalCents` é o total do frontend, só
+   * sinalização. Sem esta prop o comportamento não muda.
+   */
+  onInitiateCheckout?: (info: { totalCents: number; productSlugs: string[] }) => void;
+  /**
+   * Opcional (rastreamento): chamado uma vez quando o backend confirma o
+   * pagamento de um pedido criado NESTA sessão, com os valores devolvidos
+   * pelo backend. Nunca é chamado ao retomar um pedido antigo. Devolver
+   * `false` indica que o envio não ocorreu e permite nova tentativa.
+   */
+  onPurchaseConfirmed?: (info: { orderPublicId: string; amountCents: number; productSlugs: string[] }) => boolean | void;
 }
 
-export function ProductCheckout({ slug, name, inline = false, canPurchase = true, priceLabel, availabilityMessage, bumps = NO_BUMPS, basePriceCents, bumpIntroduction }: ProductCheckoutProps) {
+export function ProductCheckout({ slug, name, inline = false, canPurchase = true, priceLabel, availabilityMessage, bumps = NO_BUMPS, basePriceCents, bumpIntroduction, onInitiateCheckout, onPurchaseConfirmed }: ProductCheckoutProps) {
   const { ensureAttempt } = useCheckoutAttempt(slug);
   // checkoutAccessToken usado no polling/retomada desta submissão — capturado
   // no momento do envio (ensureAttempt), nunca recalculado por engano depois
@@ -139,6 +153,12 @@ export function ProductCheckout({ slug, name, inline = false, canPurchase = true
   const [copied, setCopied] = React.useState(false);
   const [downloads, setDownloads] = React.useState<DownloadItem[] | null>(null);
   const [resuming, setResuming] = React.useState(true);
+
+  // Guarda do Purchase (mesma regra do Guia): só existe valor confirmado
+  // quando o pedido foi criado NESTA sessão. Na retomada de um pedido
+  // antigo estes refs ficam null e o Purchase nunca é disparado.
+  const purchaseOrderRef = React.useRef<{ orderPublicId: string; amountCents: number; productSlugs: string[] } | null>(null);
+  const purchaseFiredRef = React.useRef(false);
 
   const siteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY;
 
@@ -198,6 +218,15 @@ export function ProductCheckout({ slug, name, inline = false, canPurchase = true
     };
   }, [result, downloads, activeAccessToken]);
 
+  // ── Purchase: uma vez, no instante em que "paid" é confirmado (downloads
+  //    deixa de ser null) para um pedido criado nesta sessão.
+  React.useEffect(() => {
+    if (downloads === null || purchaseFiredRef.current) return;
+    const order = purchaseOrderRef.current;
+    if (!order || !onPurchaseConfirmed) return;
+    if (onPurchaseConfirmed(order) !== false) purchaseFiredRef.current = true;
+  }, [downloads, onPurchaseConfirmed]);
+
   const handleTurnstileToken = React.useCallback((token: string) => {
     setTurnstileToken(token);
     setTurnstileMissing(false);
@@ -229,6 +258,8 @@ export function ProductCheckout({ slug, name, inline = false, canPurchase = true
       return;
     }
 
+    onInitiateCheckout?.({ totalCents: bumpCheckout?.totalCents ?? basePriceCents ?? 0, productSlugs });
+
     setSubmitting(true);
     setTurnstileMissing(false);
 
@@ -254,6 +285,12 @@ export function ProductCheckout({ slug, name, inline = false, canPurchase = true
     turnstileRef.current?.reset();
 
     if (outcome.kind !== "error") {
+      purchaseOrderRef.current = {
+        orderPublicId: outcome.order.publicId,
+        amountCents: outcome.order.amountCents,
+        productSlugs: outcome.order.items.map(item => item.slug),
+      };
+      purchaseFiredRef.current = false;
       setActiveAccessToken(attempt.checkoutAccessToken);
       saveOrderAccess(slug, {
         publicId: outcome.order.publicId,
