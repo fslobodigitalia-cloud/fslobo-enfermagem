@@ -45,10 +45,12 @@ import {
   FileText,
   HeartPulse,
   Loader2,
+  Download,
   Lock,
   MessageCircle,
   ShieldCheck,
   Sparkles,
+  Tag,
   Zap,
 } from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
@@ -74,9 +76,9 @@ import { initGuiaPixel, trackGuiaInitiateCheckout, trackGuiaPurchase } from "@/l
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { SiteFooter } from "@/components/layout/SiteFooter";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { TurnstileWidget, type TurnstileWidgetHandle } from "@/components/checkout/TurnstileWidget";
+import { HubrasilField, PixIcon } from "@/components/product/HubrasilCheckoutParts";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const TURNSTILE_ACTION = "create_product_order";
@@ -103,7 +105,6 @@ const PANEL_CONTAINER = "mx-auto w-full max-w-[640px] px-5";
  * aparecem, coerentes com o fundo escuro que os envolve.
  */
 const SHADOW_SOFT = "shadow-[0_2px_4px_rgba(15,23,42,0.04),0_8px_20px_-14px_rgba(15,23,42,0.12)]";
-const SHADOW_MEDIUM = "shadow-[0_4px_8px_rgba(15,23,42,0.05),0_20px_40px_-20px_rgba(15,23,42,0.16)]";
 
 /**
  * Botão CTA "premium": sombra de contato + realce interno sutil no topo
@@ -112,6 +113,10 @@ const SHADOW_MEDIUM = "shadow-[0_4px_8px_rgba(15,23,42,0.05),0_20px_40px_-20px_r
  * Reaproveitado em TODOS os CTAs principais da página para manter um
  * sistema único e consistente.
  */
+/** Botão Pix do checkout do Guia: texto e ícone brancos em todos os estados (o variant "outline" do Button define cores próprias no hover/foco). */
+const GUIA_PIX_BUTTON_CLASS =
+  "rounded-full border-transparent bg-gradient-to-b from-[#12a37c] to-[#0a7a5f] text-[17px] font-extrabold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.28),0_3px_6px_rgba(8,70,55,0.2),0_14px_24px_-10px_rgba(10,122,95,0.6)] hover:from-[#0f9370] hover:to-[#08694f] hover:text-white focus-visible:from-[#0f9370] focus-visible:to-[#08694f] focus-visible:text-white focus-visible:ring-4 focus-visible:ring-teal-500/40 active:from-[#0c8062] active:to-[#07604a] active:text-white disabled:cursor-not-allowed disabled:from-[#5d8c81] disabled:to-[#4f7a70] disabled:text-white disabled:opacity-100 disabled:shadow-none";
+
 const CTA_BUTTON_CLASS = cn(
   "border-transparent bg-teal-600 text-white transition-all duration-200",
   "shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_2px_4px_rgba(15,23,42,0.08),0_10px_24px_-10px_rgba(13,148,136,0.55)]",
@@ -842,60 +847,74 @@ function OfferSection({ children, priceCents }: { children: React.ReactNode; pri
   const priceDigits = formatCents(priceCents).replace("R$", "").trim();
 
   return (
-    <section id={OFFER_SECTION_ID} className="relative scroll-mt-[76px] overflow-hidden px-5 py-16 sm:py-28" style={OFFER_NAVY_BG}>
+    <section id={OFFER_SECTION_ID} className="relative scroll-mt-[76px] overflow-hidden px-3 py-10 sm:px-5 sm:py-24" style={OFFER_NAVY_BG}>
       {/* Fio de luz no topo — separa da seção clara anterior sem borda dura, mesmo tratamento da Hero. */}
       <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/[0.08]" aria-hidden="true" />
       {/* Vinheta lateral sutil, só para os cantos não ficarem "mortos". */}
       <div aria-hidden="true" className="pointer-events-none absolute -left-24 top-1/3 h-72 w-72 rounded-full bg-teal-400/10 blur-3xl" />
       <div aria-hidden="true" className="pointer-events-none absolute -right-20 bottom-10 h-80 w-80 rounded-full bg-emerald-400/10 blur-3xl" />
 
-      <div className="relative mx-auto w-full max-w-[680px]">
-        {/* Cartão único e centralizado: nome → descrição → preço → adicionais → formulário. */}
-        <div className={cn("relative overflow-hidden rounded-[28px] border border-white/10 bg-white p-6 sm:p-10", "shadow-[0_8px_16px_rgba(0,0,0,0.2),0_40px_90px_-30px_rgba(0,0,0,0.6)]")}>
-          <div className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-teal-50/80 blur-3xl" aria-hidden="true" />
-          <div className="pointer-events-none absolute -bottom-20 -left-16 h-56 w-56 rounded-full bg-emerald-50/70 blur-3xl" aria-hidden="true" />
+      <div className="relative mx-auto w-full max-w-[720px]">
+        {/* Painel único: nome → descrição → oferta (capa + preço) → adicionais → formulário. */}
+        <div className="relative isolate overflow-hidden rounded-[28px] bg-white px-4 pb-6 pt-5 shadow-[0_8px_16px_rgba(0,0,0,0.25),0_40px_90px_-30px_rgba(0,0,0,0.65)] sm:rounded-[32px] sm:px-8 sm:pb-8 sm:pt-7">
+          <div aria-hidden="true" className="pointer-events-none absolute -right-20 -top-24 -z-10 h-72 w-72 rounded-full bg-gradient-to-br from-[#d4f1ec] via-[#e9f8f5] to-transparent blur-2xl" />
+          <div aria-hidden="true" className="pointer-events-none absolute -bottom-24 -left-20 -z-10 h-64 w-64 rounded-full bg-gradient-to-tr from-[#d9f4ee] to-transparent blur-2xl" />
+          <svg aria-hidden="true" viewBox="0 0 24 24" className="pointer-events-none absolute right-[9%] top-[2.2%] -z-10 h-9 w-9 text-[#cdeee6] sm:h-12 sm:w-12">
+            <path d="M9 1h6v8h8v6h-8v8H9v-8H1V9h8z" fill="currentColor" />
+          </svg>
 
-          <span className={cn("relative inline-flex items-center gap-2 rounded-full bg-teal-50 px-4 py-1.5 text-[12px] font-bold uppercase tracking-wide text-teal-700", SHADOW_SOFT)}>
-            <Sparkles className="h-3.5 w-3.5" aria-hidden="true" /> Acesso imediato
+          <span className="relative inline-flex items-center gap-2 rounded-full bg-[#dff5ee] px-4 py-2 text-[12.5px] font-extrabold uppercase tracking-wide text-[#0b6b52]">
+            <Sparkles className="h-4 w-4" aria-hidden="true" /> Acesso imediato
           </span>
-          <h2 className="relative mt-5 font-sans text-[1.9rem] font-extrabold leading-tight tracking-tight text-slate-900 sm:text-[2.15rem]">
+          <h2 className="relative mt-4 max-w-[560px] font-sans text-[1.85rem] font-extrabold leading-[1.1] tracking-tight text-[#0b1f3a] sm:text-[2.3rem]">
             {guiaEvolucaoProduct.name}
           </h2>
-          <p className="relative mt-3 text-[15.5px] leading-relaxed text-slate-600">
+          <p className="relative mt-3 max-w-[540px] text-[15.5px] leading-relaxed text-[#4a5b70] sm:text-[17px]">
             Guia digital de anotação e evolução com exemplos e modelos para consultar e adaptar aos registros do plantão.
           </p>
 
-          {/* Bloco do preço — mais presença: gradiente mais rico, borda dupla
-              (anel + borda), glow por trás, número maior. Preço/produto em si
-              (priceDigits, priceLabel) inalterados — só o invólucro visual. */}
-          <div
-            className={cn(
-              "relative mt-7 flex flex-col items-center gap-1 overflow-hidden rounded-[24px] border-2 border-teal-200 bg-gradient-to-b from-teal-50 via-white to-white py-8 text-center ring-1 ring-teal-100",
-              SHADOW_MEDIUM,
-            )}
-          >
-            <div className="pointer-events-none absolute -top-10 left-1/2 h-24 w-48 -translate-x-1/2 rounded-full bg-teal-300/25 blur-3xl" aria-hidden="true" />
-            <span className="relative text-[13px] font-semibold text-slate-500 line-through">De R$ 47,90 por apenas:</span>
-            <span className="relative flex items-start font-sans text-[3.5rem] font-extrabold leading-none text-slate-900 sm:text-[3.75rem]">
-              <span className="mr-1 mt-2.5 text-[1.4rem] text-teal-600">R$</span>
-              {priceDigits}
-            </span>
-            <span className="relative mt-2 text-[12px] font-bold uppercase tracking-wide text-slate-500">
-              Pagamento único · sem mensalidade
-            </span>
-            <span className="relative text-[13px] font-medium text-slate-500">
-              Material digital em PDF · acesso após a confirmação do Pix
-            </span>
+          <div className="relative mt-5 grid grid-cols-[37%_1fr] items-center gap-3 overflow-hidden rounded-[24px] border border-[#cdece5] bg-gradient-to-br from-[#f3fbf9] via-white to-[#eaf8f5] p-3.5 shadow-[0_10px_28px_-18px_rgba(15,138,108,0.5)] sm:grid-cols-[210px_1fr] sm:gap-6 sm:p-6">
+            <div className="relative flex justify-center [perspective:900px]">
+              <span aria-hidden="true" className="absolute inset-x-[8%] bottom-[-4%] h-[10%] rounded-[50%] bg-[#0b3d3a]/25 blur-md" />
+              <div className="relative w-[88%] [transform-style:preserve-3d] [transform:rotateY(-16deg)_rotateX(2deg)]">
+                <img
+                  src="/guia-evolucao/capa-guia.webp"
+                  alt="Capa do Guia de Evolução de Enfermagem"
+                  width={1086}
+                  height={1448}
+                  loading="lazy"
+                  decoding="async"
+                  className="h-auto w-full rounded-[3px_8px_8px_3px] shadow-[8px_10px_18px_-6px_rgba(8,50,50,0.55)]"
+                />
+                <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-0 w-[7%] rounded-l-[3px] bg-gradient-to-r from-black/35 via-white/15 to-transparent" />
+                <span aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-[3px_8px_8px_3px] bg-gradient-to-br from-white/20 via-transparent to-black/10" />
+              </div>
+            </div>
+            <div className="min-w-0">
+              <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-[#dff5ee] px-2.5 py-1.5 text-[11.5px] font-extrabold text-[#0b6b52] sm:gap-1.5 sm:px-3 sm:text-[14px]">
+                <Tag className="h-3.5 w-3.5 sm:h-4 sm:w-4" aria-hidden="true" /> De R$ 47,90 por apenas:
+              </span>
+              <p className="mt-1.5 flex items-start font-sans text-[2.6rem] font-extrabold leading-none tracking-tight text-[#0b1f3a] sm:text-[4rem]">
+                <span className="mr-1 mt-[0.35em] text-[0.42em] text-[#0f8a6c]">R$</span>
+                {priceDigits}
+              </p>
+              <p className="mt-2 flex items-center gap-1.5 text-[12px] font-extrabold uppercase leading-tight tracking-wide text-[#0b1f3a] sm:text-[14px]">
+                <FileText className="h-4 w-4 shrink-0 text-[#0f8a6c]" aria-hidden="true" /> Pagamento único · sem mensalidade
+              </p>
+              <p className="mt-2.5 flex items-start gap-1.5 border-t border-[#d5ebe6] pt-2.5 text-[13px] leading-snug text-[#4a5b70] sm:text-[15px]">
+                <Download className="mt-0.5 h-4 w-4 shrink-0 text-[#0f8a6c]" aria-hidden="true" /> PDF digital · acesso após a confirmação do Pix
+              </p>
+            </div>
           </div>
 
-          <div className="relative mt-8">{children}</div>
+          <div className="relative mt-5">{children}</div>
 
-          <div className="relative mt-6 flex flex-wrap items-center justify-center gap-5 text-[12.5px] font-semibold text-slate-500">
+          <div className="relative mt-5 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 border-t border-[#e3eeee] pt-4 text-[13px] font-semibold text-[#41546b]">
             <span className="flex items-center gap-1.5">
-              <Lock className="h-3.5 w-3.5" aria-hidden="true" /> Pagamento via Pix, 100% seguro
+              <Lock className="h-4 w-4 text-[#0f8a6c]" aria-hidden="true" /> Pagamento via Pix, 100% seguro
             </span>
             <span className="flex items-center gap-1.5">
-              <Zap className="h-3.5 w-3.5 text-teal-600" aria-hidden="true" /> Liberado logo após a confirmação do Pix
+              <Zap className="h-4 w-4 text-[#0f8a6c]" aria-hidden="true" /> Download liberado nesta página
             </span>
           </div>
         </div>
@@ -962,70 +981,45 @@ function CheckoutForm({
         kit={guiaKitOffer}
         onToggleKit={onToggleKit}
         basePriceCents={basePriceCents}
+        appearance="premium"
+        copy={{ introduction: `Os adicionais são opcionais. Você também pode comprar somente o Guia por ${formatCents(basePriceCents)}.` }}
       />
 
-      <div className="flex flex-col gap-2.5">
-        <Label htmlFor="checkout-nome" className="text-slate-500">
-          Nome
-        </Label>
-        <Input
-          id="checkout-nome"
-          autoComplete="given-name"
-          placeholder="Como podemos te chamar?"
-          value={firstName}
-          onChange={(event) => setFirstName(event.target.value)}
-          aria-invalid={Boolean(errors.name)}
-          maxLength={80}
-          className="border-slate-300 bg-white text-slate-900 placeholder:text-slate-400 shadow-[0_1px_2px_rgba(15,23,42,0.04)] hover:border-teal-400 focus:border-teal-600 focus:bg-white focus:ring-2 focus:ring-teal-500/20"
-        />
-        {errors.name && (
-          <p role="alert" className="text-[13px] text-rose-600">
-            {errors.name}
-          </p>
-        )}
-      </div>
+      <HubrasilField
+        id="checkout-nome"
+        label="Nome"
+        icon="user"
+        error={errors.name}
+        inputProps={{ autoComplete: "given-name", placeholder: "Como podemos te chamar?", value: firstName, onChange: (event) => setFirstName(event.target.value), "aria-invalid": Boolean(errors.name), maxLength: 80 }}
+      />
+      <HubrasilField
+        id="checkout-email"
+        label="E-mail"
+        icon="mail"
+        error={errors.email}
+        hint="Use um e-mail que você acessa: ele fica vinculado ao seu pedido."
+        inputProps={{ type: "email", inputMode: "email", autoComplete: "email", placeholder: "seuemail@exemplo.com", value: email, onChange: (event) => setEmail(event.target.value), "aria-invalid": Boolean(errors.email), maxLength: 254 }}
+      />
 
-      <div className="flex flex-col gap-2.5">
-        <Label htmlFor="checkout-email" className="text-slate-500">
-          E-mail
-        </Label>
-        <Input
-          id="checkout-email"
-          type="email"
-          inputMode="email"
-          autoComplete="email"
-          placeholder="seuemail@exemplo.com"
-          value={email}
-          onChange={(event) => setEmail(event.target.value)}
-          aria-invalid={Boolean(errors.email)}
-          maxLength={254}
-          className="border-slate-300 bg-white text-slate-900 placeholder:text-slate-400 shadow-[0_1px_2px_rgba(15,23,42,0.04)] hover:border-teal-400 focus:border-teal-600 focus:bg-white focus:ring-2 focus:ring-teal-500/20"
-        />
-        <p className="text-[12.5px] leading-relaxed text-slate-500">
-          Use um e-mail que você acessa: ele fica vinculado ao seu pedido. Depois da confirmação do Pix, o material é liberado nesta mesma página.
-        </p>
-        {errors.email && (
-          <p role="alert" className="text-[13px] text-rose-600">
-            {errors.email}
-          </p>
-        )}
-      </div>
-
-      <div className={cn("relative flex items-center justify-between overflow-hidden rounded-2xl border border-teal-200 bg-gradient-to-b from-teal-50 to-white px-5 py-4", SHADOW_SOFT)}>
-        <span aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-white/70 to-transparent" />
-        <span className="relative text-[13px] font-semibold uppercase tracking-[0.1em] text-slate-500">Total</span>
-        <span className="relative font-sans text-[1.55rem] font-extrabold text-teal-700">{formatCents(totalCents)}</span>
+      <div className="relative flex items-center justify-between overflow-hidden rounded-2xl border border-[#bfe9de] bg-gradient-to-b from-[#effbf7] to-[#e3f6f0] px-5 py-4">
+        <span className="relative text-[14px] font-extrabold uppercase tracking-[0.18em] text-[#0b4f43]">Total</span>
+        <span className="relative font-sans text-[1.75rem] font-extrabold text-[#0f8a6c]">{formatCents(totalCents)}</span>
       </div>
 
       {siteKey ? (
-        <TurnstileWidget
-          ref={turnstileRef}
-          siteKey={siteKey}
-          action={TURNSTILE_ACTION}
-          onToken={onTurnstileToken}
-          onExpire={onTurnstileExpire}
-          onError={onTurnstileError}
-        />
+        <div className="rounded-2xl border border-[#d5ebe6] bg-[#f6fbfa] px-3 py-3">
+          <p className="mb-2 text-center text-[13px] leading-snug text-slate-600">
+            <strong className="font-bold text-[#0b1f3a]">Verificação de segurança</strong> · protege o pedido contra acessos automatizados
+          </p>
+          <TurnstileWidget
+            ref={turnstileRef}
+            siteKey={siteKey}
+            action={TURNSTILE_ACTION}
+            onToken={onTurnstileToken}
+            onExpire={onTurnstileExpire}
+            onError={onTurnstileError}
+          />
+        </div>
       ) : (
         <p role="alert" className="text-center text-[13px] text-rose-600">
           Não foi possível carregar a verificação de segurança. Recarregue a página.
@@ -1059,7 +1053,8 @@ function CheckoutForm({
         </div>
       )}
 
-      <Button type="submit" variant="outline" size="lg" full disabled={submitting || !canSubmit} className={CTA_BUTTON_CLASS}>
+      <Button type="submit" variant="outline" size="lg" full disabled={submitting || !canSubmit} className={GUIA_PIX_BUTTON_CLASS}>
+        {submitting ? <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" /> : <PixIcon className="h-6 w-6" />}
         {submitting ? "Gerando seu Pix..." : "Gerar meu Pix e receber o material"}
       </Button>
     </form>
