@@ -18,6 +18,7 @@ import { Label } from "@/components/ui/label";
 import { TurnstileWidget, type TurnstileWidgetHandle } from "@/components/checkout/TurnstileWidget";
 import { ProductPixResult } from "./ProductPixResult";
 import { ProductDownloads } from "./ProductDownloads";
+import { HubrasilBumps, HubrasilField, PixIcon } from "./HubrasilCheckoutParts";
 
 /**
  * Checkout genérico de um produto principal — usado por src/pages/ProductPage.tsx
@@ -83,6 +84,10 @@ function errorMessageFor(code: string): string {
   return ERROR_MESSAGES[code] ?? GENERIC_ERROR_MESSAGE;
 }
 
+/** CTA do checkout HUBRASIL: texto e ícones brancos em todos os estados (o variant do Button define cores próprias no hover/foco). */
+const HUBRASIL_SUBMIT_CLASS =
+  "rounded-full border-transparent bg-gradient-to-b from-[#12a37c] to-[#0a7a5f] text-[17px] font-extrabold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.28),0_3px_6px_rgba(8,70,55,0.2),0_14px_24px_-10px_rgba(10,122,95,0.6)] hover:from-[#0f9370] hover:to-[#08694f] hover:text-white focus-visible:text-white active:text-white disabled:text-white disabled:shadow-none";
+
 const INPUT_CLASS =
   "border-slate-300 bg-white text-slate-900 placeholder:text-slate-400 shadow-[0_1px_2px_rgba(15,23,42,0.04)] hover:border-teal-400 focus:border-teal-600 focus:bg-white focus:ring-2 focus:ring-teal-500/20";
 
@@ -96,6 +101,8 @@ interface ProductCheckoutProps {
   bumps?: readonly DigitalBump[];
   basePriceCents?: number;
   bumpIntroduction?: string;
+  /** Variante visual da landing HUBRASIL. Só muda a apresentação do formulário; sem ela, nada muda. */
+  variant?: "hubrasil";
   /**
    * Opcional (rastreamento): chamado quando o formulário foi validado
    * (inclui Turnstile) e logo antes de criar o pedido — mesmo ponto do
@@ -112,7 +119,8 @@ interface ProductCheckoutProps {
   onPurchaseConfirmed?: (info: { orderPublicId: string; amountCents: number; productSlugs: string[] }) => boolean | void;
 }
 
-export function ProductCheckout({ slug, name, inline = false, canPurchase = true, priceLabel, availabilityMessage, bumps = NO_BUMPS, basePriceCents, bumpIntroduction, onInitiateCheckout, onPurchaseConfirmed }: ProductCheckoutProps) {
+export function ProductCheckout({ slug, name, inline = false, canPurchase = true, priceLabel, availabilityMessage, bumps = NO_BUMPS, basePriceCents, bumpIntroduction, variant, onInitiateCheckout, onPurchaseConfirmed }: ProductCheckoutProps) {
+  const hub = variant === "hubrasil";
   const { ensureAttempt } = useCheckoutAttempt(slug);
   // checkoutAccessToken usado no polling/retomada desta submissão — capturado
   // no momento do envio (ensureAttempt), nunca recalculado por engano depois
@@ -357,83 +365,117 @@ export function ProductCheckout({ slug, name, inline = false, canPurchase = true
           {hasBumps && (
             <fieldset disabled={submitting} className="min-w-0 border-0 p-0">
               <legend className="sr-only">Materiais adicionais opcionais</legend>
-              <OrderBumpCarousel
-                bumps={bumps}
-                selectedBumps={selectedBumps}
-                onToggle={toggleBump}
-                copy={bumpIntroduction ? { introduction: bumpIntroduction } : undefined}
-              />
+              {hub ? (
+                <HubrasilBumps bumps={bumps} selected={selectedBumps} onToggle={toggleBump} introduction={bumpIntroduction} />
+              ) : (
+                <OrderBumpCarousel
+                  bumps={bumps}
+                  selectedBumps={selectedBumps}
+                  onToggle={toggleBump}
+                  copy={bumpIntroduction ? { introduction: bumpIntroduction } : undefined}
+                />
+              )}
             </fieldset>
           )}
           {hasBumps && !selectionValid && (
             <p role="alert" className="text-sm text-rose-700">Não foi possível calcular os adicionais. Recarregue a página.</p>
           )}
-          <div className="flex flex-col gap-2">
-            <Label htmlFor={`checkout-nome-${slug}`} className="text-slate-500">
-              Nome
-            </Label>
-            <Input
-              id={`checkout-nome-${slug}`}
-              autoComplete="given-name"
-              placeholder="Como podemos te chamar?"
-              value={firstName}
-              onChange={(event) => setFirstName(event.target.value)}
-              aria-invalid={Boolean(errors.name)}
-              maxLength={80}
-              className={INPUT_CLASS}
-            />
-            {errors.name && (
-              <p role="alert" className="text-[13px] text-rose-600">
-                {errors.name}
-              </p>
-            )}
-          </div>
+          {hub ? (
+            <>
+              <HubrasilField
+                id={`checkout-nome-${slug}`}
+                label="Nome"
+                icon="user"
+                error={errors.name}
+                inputProps={{ autoComplete: "given-name", placeholder: "Como podemos te chamar?", value: firstName, onChange: event => setFirstName(event.target.value), "aria-invalid": Boolean(errors.name), maxLength: 80 }}
+              />
+              <HubrasilField
+                id={`checkout-email-${slug}`}
+                label="E-mail"
+                icon="mail"
+                error={errors.email}
+                hint="Use um e-mail que você acessa: ele ficará vinculado ao seu pedido."
+                inputProps={{ type: "email", inputMode: "email", autoComplete: "email", placeholder: "seuemail@exemplo.com", value: email, onChange: event => setEmail(event.target.value), "aria-invalid": Boolean(errors.email), maxLength: 254 }}
+              />
+            </>
+          ) : (
+            <>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor={`checkout-nome-${slug}`} className="text-slate-500">
+                Nome
+              </Label>
+              <Input
+                id={`checkout-nome-${slug}`}
+                autoComplete="given-name"
+                placeholder="Como podemos te chamar?"
+                value={firstName}
+                onChange={(event) => setFirstName(event.target.value)}
+                aria-invalid={Boolean(errors.name)}
+                maxLength={80}
+                className={INPUT_CLASS}
+              />
+              {errors.name && (
+                <p role="alert" className="text-[13px] text-rose-600">
+                  {errors.name}
+                </p>
+              )}
+            </div>
 
-          <div className="flex flex-col gap-2">
-            <Label htmlFor={`checkout-email-${slug}`} className="text-slate-500">
-              E-mail
-            </Label>
-            <Input
-              id={`checkout-email-${slug}`}
-              type="email"
-              inputMode="email"
-              autoComplete="email"
-              placeholder="seuemail@exemplo.com"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              aria-invalid={Boolean(errors.email)}
-              maxLength={254}
-              className={INPUT_CLASS}
-            />
-            {inline && (
-              <p className="text-[12.5px] leading-relaxed text-slate-500">
-                Use um e-mail que você acessa: ele ficará vinculado ao seu pedido.
-              </p>
-            )}
-            {errors.email && (
-              <p role="alert" className="text-[13px] text-rose-600">
-                {errors.email}
-              </p>
-            )}
-          </div>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor={`checkout-email-${slug}`} className="text-slate-500">
+                E-mail
+              </Label>
+              <Input
+                id={`checkout-email-${slug}`}
+                type="email"
+                inputMode="email"
+                autoComplete="email"
+                placeholder="seuemail@exemplo.com"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                aria-invalid={Boolean(errors.email)}
+                maxLength={254}
+                className={INPUT_CLASS}
+              />
+              {inline && (
+                <p className="text-[12.5px] leading-relaxed text-slate-500">
+                  Use um e-mail que você acessa: ele ficará vinculado ao seu pedido.
+                </p>
+              )}
+              {errors.email && (
+                <p role="alert" className="text-[13px] text-rose-600">
+                  {errors.email}
+                </p>
+              )}
+            </div>
+
+            </>
+          )}
 
           {displayedPriceLabel && (
-            <div className="relative flex items-center justify-between overflow-hidden rounded-2xl border border-teal-200 bg-gradient-to-b from-teal-50 to-white px-5 py-4 shadow-[0_2px_4px_rgba(15,23,42,0.04),0_8px_20px_-14px_rgba(15,23,42,0.12)]">
-              <span className="text-[13px] font-semibold uppercase tracking-[0.1em] text-slate-500">Total</span>
-              <span className="font-sans text-[1.55rem] font-extrabold text-teal-700" role="status" aria-live="polite" aria-atomic="true">{displayedPriceLabel}</span>
+            <div className={hub ? "relative flex items-center justify-between overflow-hidden rounded-2xl border border-[#bfe9de] bg-gradient-to-b from-[#effbf7] to-[#e3f6f0] px-5 py-4" : "relative flex items-center justify-between overflow-hidden rounded-2xl border border-teal-200 bg-gradient-to-b from-teal-50 to-white px-5 py-4 shadow-[0_2px_4px_rgba(15,23,42,0.04),0_8px_20px_-14px_rgba(15,23,42,0.12)]"}>
+              <span className={hub ? "text-[14px] font-extrabold uppercase tracking-[0.18em] text-[#0b4f43]" : "text-[13px] font-semibold uppercase tracking-[0.1em] text-slate-500"}>Total</span>
+              <span className={hub ? "font-sans text-[1.75rem] font-extrabold text-[#0f8a6c]" : "font-sans text-[1.55rem] font-extrabold text-teal-700"} role="status" aria-live="polite" aria-atomic="true">{displayedPriceLabel}</span>
             </div>
           )}
           {availabilityMessage && <p role="status" className="text-[13px] leading-relaxed text-slate-600">{availabilityMessage}</p>}
 
           {siteKey ? (
-            <TurnstileWidget
-              ref={turnstileRef}
-              siteKey={siteKey}
-              action={TURNSTILE_ACTION}
-              onToken={handleTurnstileToken}
-              onExpire={handleTurnstileExpire}
-              onError={handleTurnstileError}
-            />
+            <div className={hub ? "rounded-2xl border border-[#d5ebe6] bg-[#f6fbfa] px-3 py-3" : undefined}>
+              {hub && (
+                <p className="mb-2 text-center text-[13px] leading-snug text-slate-600">
+                  <strong className="font-bold text-[#0b1f3a]">Verificação de segurança</strong> · protege o pedido contra acessos automatizados
+                </p>
+              )}
+              <TurnstileWidget
+                ref={turnstileRef}
+                siteKey={siteKey}
+                action={TURNSTILE_ACTION}
+                onToken={handleTurnstileToken}
+                onExpire={handleTurnstileExpire}
+                onError={handleTurnstileError}
+              />
+            </div>
           ) : (
             <p role="alert" className="text-center text-[13px] text-rose-600">
               Não foi possível carregar a verificação de segurança. Recarregue a página.
@@ -461,11 +503,12 @@ export function ProductCheckout({ slug, name, inline = false, canPurchase = true
             </div>
           )}
 
-          {inline && (
+          {inline && !hub && (
             <p className="text-center text-[13px] leading-relaxed text-slate-600">Após a confirmação do Pix, os arquivos ficam disponíveis para download nesta página.</p>
           )}
 
-          <Button type="submit" size="lg" full disabled={!canPurchase || !selectionValid || submitting || !turnstileToken || turnstileFailed} className={inline ? "border-transparent bg-teal-600 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_2px_4px_rgba(15,23,42,0.08),0_10px_24px_-10px_rgba(13,148,136,0.55)] hover:bg-teal-700" : undefined}>
+          <Button type="submit" size="lg" full disabled={!canPurchase || !selectionValid || submitting || !turnstileToken || turnstileFailed} className={hub ? HUBRASIL_SUBMIT_CLASS : inline ? "border-transparent bg-teal-600 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_2px_4px_rgba(15,23,42,0.08),0_10px_24px_-10px_rgba(13,148,136,0.55)] hover:bg-teal-700" : undefined}>
+            {hub && (submitting ? <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" /> : <PixIcon className="h-6 w-6" />)}
             {submitting ? "Gerando seu Pix..." : "Gerar meu Pix e receber o material"}
           </Button>
         </form>

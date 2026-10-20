@@ -73,6 +73,21 @@
       />
     </noscript>
 
+    <!-- Pré-carga da imagem principal da landing HUBRASIL, só nesta rota e antes de o
+         React montar. srcset/sizes idênticos ao <img> da hero (ResumoIlustradoEnfermagemPage),
+         para o navegador reaproveitar o mesmo download. -->
+    <script>
+      if (location.pathname.replace(/\/$/, "") === "/produto/resumo-ilustrado-enfermagem") {
+        var l = document.createElement("link");
+        l.rel = "preload";
+        l.as = "image";
+        l.type = "image/webp";
+        l.setAttribute("fetchpriority", "high");
+        l.setAttribute("imagesrcset", "/resumo-ilustrado-enfermagem/hero-hubrasil-480.webp 480w, /resumo-ilustrado-enfermagem/hero-hubrasil-720.webp 720w, /resumo-ilustrado-enfermagem/hero-hubrasil-941.webp 941w");
+        l.setAttribute("imagesizes", "(min-width: 640px) 360px, 90vw");
+        document.head.appendChild(l);
+      }
+    </script>
     <style>
       /* Cor de fundo aplicada antes do CSS principal: garante a primeira
          pintura já na cor final, sem depender do carregamento do CSS. */
