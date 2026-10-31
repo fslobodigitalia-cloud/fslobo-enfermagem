@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 const HUBRASIL_PRODUCT = {
   slug: "resumo-ilustrado-enfermagem",
   name: "Apostila de Resumos de Enfermagem HUBRASIL",
-  priceCents: 1990,
+  priceCents: 1470,
 };
 const OFFER_SECTION_ID = "comprar";
 // The existing kit includes Mapas Mentais, so this offer uses individual additions only.
@@ -121,7 +121,7 @@ export default function ResumoIlustradoEnfermagemPage() {
 
   useDocumentMeta({
     title: "Resumo Ilustrado de Enfermagem HUBRASIL | FSlobo Enfermagem",
-    description: "Apostila HUBRASIL com 108 páginas de resumos ilustrados de enfermagem em PDF. R$ 19,90, pagamento único.",
+    description: "Apostila HUBRASIL com 108 páginas de resumos ilustrados de enfermagem em PDF, com pagamento único e acesso após a confirmação do pagamento.",
     path: `/produto/${HUBRASIL_PRODUCT.slug}`,
   });
 
