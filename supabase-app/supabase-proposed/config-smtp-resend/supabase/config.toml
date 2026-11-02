@@ -1,0 +1,16 @@
+# PROPOSTA — NÃO APLICADA. Declara SOMENTE o SMTP do projeto de HOMOLOGAÇÃO do app.
+# O `config push` só altera o que está declarado aqui: confirmação de e-mail obrigatória, política de senha,
+# site_url, redirecionamentos e limites continuam exatamente como estão.
+#
+# A chave NUNCA fica neste arquivo: `pass` lê a variável de ambiente RESEND_APP_SMTP_KEY só durante o push.
+# Remetente: um endereço NOVO no domínio já verificado (não altera nenhum remetente existente da loja).
+project_id = "fslobo-enfermagem-app-homolog"
+
+[auth.email.smtp]
+enabled = true
+host = "smtp.resend.com"
+port = 465
+user = "resend"
+pass = "env(RESEND_APP_SMTP_KEY)"
+admin_email = "app@fsloboenfermagem.com.br"
+sender_name = "FSLOBO Enfermagem App"

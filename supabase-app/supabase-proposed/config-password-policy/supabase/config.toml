@@ -1,0 +1,18 @@
+# Declara SOMENTE o que o app precisa no projeto de HOMOLOGAÇÃO. `supabase config push` só altera as
+# propriedades declaradas aqui; todo o resto do projeto remoto fica como está.
+project_id = "fslobo-enfermagem-app-homolog"
+
+[auth]
+# Fallback dos e-mails; o app sempre envia um redirecionamento explícito (permitido abaixo).
+site_url = "https://fslobo-guia-enfermagem-13yqtq2ry-flavio11.vercel.app"
+# Redirecionamentos permitidos: Previews deste projeto da Vercel e o servidor local de testes.
+additional_redirect_urls = [
+  "https://fslobo-guia-enfermagem-*-flavio11.vercel.app/**",
+  "http://127.0.0.1:4173/**",
+]
+# Política de senha
+minimum_password_length = 10
+password_requirements = "lower_upper_letters_digits"
+
+[auth.email]
+enable_confirmations = true

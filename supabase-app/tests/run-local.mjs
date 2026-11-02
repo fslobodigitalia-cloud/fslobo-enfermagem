@@ -14,6 +14,13 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, "..");
 // layout do repositório: <raiz>/migrations; layout da CLI: <raiz>/supabase/migrations
 const migDir = [path.join(root, "supabase", "migrations"), path.join(root, "migrations")].find((d) => fs.existsSync(d));
+const proposedDir = path.join(root, "supabase-proposed", "migrations");
+const INCLUDE_PROPOSED = process.env.FSL_INCLUDE_PROPOSED === "1" && fs.existsSync(proposedDir);
+// lista [{ file, dir }] na ordem de aplicação; a proposta (0005) só entra com FSL_INCLUDE_PROPOSED=1
+const allMigrations = () => [
+  ...fs.readdirSync(migDir).filter((f) => f.endsWith(".sql")).sort().map((f) => ({ f, dir: migDir })),
+  ...(INCLUDE_PROPOSED ? fs.readdirSync(proposedDir).filter((f) => f.endsWith(".sql")).sort().map((f) => ({ f, dir: proposedDir })) : []),
+];
 
 export async function run(PGlite) {
   const db = new PGlite();
@@ -23,9 +30,12 @@ export async function run(PGlite) {
 
   // ── carga: stub do Supabase + migrations na ordem ───────────────────────────
   await db.exec(fs.readFileSync(path.join(here, "stubs", "supabase_stub.sql"), "utf8"));
-  const migs = fs.readdirSync(migDir).filter((f) => f.endsWith(".sql")).sort();
-  for (const f of migs) await db.exec(fs.readFileSync(path.join(migDir, f), "utf8"));
-  console.log("migrations aplicadas (somente no banco local em memória):", migs.join(", "));
+  const migs = allMigrations();
+  for (const m of migs) await db.exec(fs.readFileSync(path.join(m.dir, m.f), "utf8"));
+  console.log("migrations aplicadas (somente no banco local em memória):", migs.map((m) => m.f).join(", "));
+
+  // a 0005 (correção da exclusão de administrador + trilha de auditoria) já faz parte de supabase/migrations
+  const has0005 = (await db.query("select 1 from information_schema.columns where table_schema='public' and table_name='study_questions' and column_name='created_by_ref'")).rows.length > 0;
 
   // ── helpers ─────────────────────────────────────────────────────────────────
   const U1 = "11111111-1111-1111-1111-111111111111";
@@ -34,6 +44,8 @@ export async function run(PGlite) {
   async function as(role, uid, sql, params) {
     await db.exec("reset role");
     await db.query("select set_config('request.jwt.claim.sub', $1, false)", [uid ?? ""]);
+    // claims do JWT: aal2 = MFA verificado (a 0007 exige aal2 nas escritas administrativas; sem a 0007 o claim é ignorado)
+    await db.query("select set_config('request.jwt.claims', $1, false)", [uid ? JSON.stringify({ sub: uid, aal: "aal2" }) : ""]);
     await db.exec(`set role ${role}`);
     try { return await db.query(sql, params); } finally { await db.exec("reset role"); }
   }
@@ -140,7 +152,8 @@ export async function run(PGlite) {
   }
   const rls = (await db.query(`select relname, relrowsecurity from pg_class c join pg_namespace n on n.oid=c.relnamespace
                                 where n.nspname='public' and c.relkind='r' and relname like 'study\\_%'`)).rows;
-  ok(rls.length === tables.length && rls.every((r) => r.relrowsecurity), "RLS ligado em todas as tabelas study_*");
+  // >= : com a 0007 há mais 2 tabelas (study_question_meta, study_admin_audit), ambas com RLS (conferidas em run-0007.mjs)
+  ok(rls.length >= tables.length && rls.every((r) => r.relrowsecurity), "RLS ligado em todas as tabelas study_*");
 
   // ── 4. Perfil e início de tentativa ─────────────────────────────────────────
   await fails(rpc(U1, "study_start_attempt", [null, "practice", 5]), /profile_required/, "tentativa exige perfil");
@@ -196,13 +209,13 @@ export async function run(PGlite) {
   ok(mid.items[0].answer?.is_correct === true && mid.items[1].answer?.is_correct === false && mid.items.slice(2).every((i) => i.answer === null), "gabarito só aparece nos itens já respondidos");
   ok(!JSON.stringify(mid.items.slice(2)).match(/correct_option_id|explanation/), "itens ainda não respondidos continuam sem gabarito");
 
-  // conclui com 2 de 5 respondidas: sem bônus
-  const done = await rpc(U1, "study_complete_attempt", [a1.attempt.id]);
-  ok(done.attempt.status === "completed" && done.attempt.correct_count === 1 && done.attempt.points_awarded === 10, "pontos = 10 por acerto, sem bônus se faltou responder");
-  const done2 = await rpc(U1, "study_complete_attempt", [a1.attempt.id]);
-  ok(done2.attempt.points_awarded === 10, "concluir de novo é idempotente");
-  ok((await svc("select count(*)::int c from public.study_points_ledger where user_id=$1", [U1])).rows[0].c === 1, "livro-razão sem duplicidade");
-  await fails(rpc(U1, "study_submit_answer", [items[2].item_id, label(items[2], "A")]), /attempt_not_open/, "tentativa concluída não aceita resposta");
+  // migration 0006: com 2 de 5 respondidas NÃO conclui (antes concluía e pontuava); as respostas ficam e dá para encerrar sem concluir
+  await fails(rpc(U1, "study_complete_attempt", [a1.attempt.id]), /attempt_incomplete/, "treino com 2 de 5 respondidas não conclui");
+  ok((await svc("select status, points_awarded from public.study_attempts where id=$1", [a1.attempt.id])).rows[0].status === "in_progress", "tentativa incompleta continua em andamento, sem pontos");
+  ok((await svc("select count(*)::int c from public.study_points_ledger where user_id=$1", [U1])).rows[0].c === 0, "nenhum ponto foi gravado pela tentativa incompleta");
+  await rpc(U1, "study_abandon_attempt", [a1.attempt.id]);
+  ok((await svc("select count(*)::int c from public.study_attempt_answers a join public.study_attempt_items i on i.id=a.item_id where i.attempt_id=$1", [a1.attempt.id])).rows[0].c === 2, "encerrar sem concluir preserva as 2 respostas no histórico");
+  await fails(rpc(U1, "study_submit_answer", [items[2].item_id, label(items[2], "A")]), /attempt_not_open/, "tentativa encerrada não aceita resposta");
 
   // tentativa completa: 20 de bônus
   const a2 = await rpc(U1, "study_start_attempt", ["clinica-medica", "practice", 3]);
@@ -210,7 +223,7 @@ export async function run(PGlite) {
   const d2 = await rpc(U1, "study_complete_attempt", [a2.attempt.id]);
   ok(d2.attempt.points_awarded === 50 && d2.attempt.correct_count === 3, "3 acertos + bônus de conclusão = 50");
   const prog = await rpc(U1, "study_my_progress");
-  ok(prog.points === 60 && prog.attempts_completed === 2 && prog.answered === 5 && prog.correct === 4, "progresso calculado no servidor");
+  ok(prog.points === 50 && prog.attempts_completed === 1 && prog.answered === 5 && prog.correct === 4, "progresso calculado no servidor (a tentativa incompleta encerrada não conta como treino concluído nem pontua) " + JSON.stringify({p:prog.points,c:prog.attempts_completed,a:prog.answered,k:prog.correct}));
   ok(prog.pending_review === 1 && prog.weekly_goal === 5 && prog.study_days >= 1, "revisão pendente e metas no progresso");
 
   // ── 6. Revisão de erros ─────────────────────────────────────────────────────
@@ -225,7 +238,7 @@ export async function run(PGlite) {
   await fails(rpc(U1, "study_start_attempt", [null, "review", 5]), /no_questions_available/, "sem erros pendentes não há revisão");
   {
     const p = await rpc(U1, "study_my_progress");
-    ok(p.points === 70 && p.scored_questions === 5, "acertar na revisão pontua uma única vez (a questão ainda não tinha sido acertada): 70 pontos, 5 questões pontuadas");
+    ok(p.points === 60 && p.scored_questions === 4, "acertar na revisão pontua uma única vez (a questão ainda não tinha sido acertada): 60 pontos, 4 questões pontuadas");
   }
 
   // ── 6b. Anti-acúmulo: repetir as mesmas questões NÃO pontua ─────────────────
@@ -234,7 +247,9 @@ export async function run(PGlite) {
     ok(farm.items.length === 5, "repetição " + round + ": 5 itens (todas já acertadas)");
     for (const it of farm.items) await rpc(U1, "study_submit_answer", [it.item_id, await keyOf(it.item_id)]);
     const fd = await rpc(U1, "study_complete_attempt", [farm.attempt.id]);
-    ok(fd.attempt.correct_count === 5 && fd.attempt.points_awarded === 0 && fd.attempt.scored_questions === 0, "repetição " + round + ": 5 acertos, 0 pontos, sem bônus");
+    // a questão acertada só na tentativa incompleta encerrada nunca foi pontuada: rende 10 uma única vez, na 1ª repetição (sem bônus: só 1 inédita)
+    const first = round === 1;
+    ok(fd.attempt.correct_count === 5 && fd.attempt.points_awarded === (first ? 10 : 0) && fd.attempt.scored_questions === (first ? 1 : 0), "repetição " + round + ": 5 acertos, " + (first ? "10 pontos (1 questão inédita, sem bônus)" : "0 pontos, sem bônus") + " " + JSON.stringify({p:fd.attempt.points_awarded,s:fd.attempt.scored_questions}));
   }
   {
     const p = await rpc(U1, "study_my_progress");
@@ -449,6 +464,38 @@ export async function run(PGlite) {
   }
   ok(limitHit, "limite diário de tentativas freia varredura do banco de questões");
   ok((await svc("select count(*)::int c from public.study_attempts where user_id=$1 and started_at >= date_trunc('day', now())", [U2])).rows[0].c <= 20, "padrão: no máximo 20 tentativas novas por dia");
+
+  // ── 9. Exclusão de conta de administrador que publicou questões ────────────
+  {
+    const pubQ = published[0].q;
+    const before = (await db.query("select created_by, reviewed_by from public.study_questions where id=$1", [pubQ])).rows[0];
+    ok(before.created_by === ADM && before.reviewed_by === ADM, "(antes) a questão publicada aponta para o administrador");
+    if (has0005) {
+      const pre = (await db.query("select created_by_ref, reviewed_by_ref from public.study_questions where id=$1", [pubQ])).rows[0];
+      ok(pre.created_by_ref === ADM && pre.reviewed_by_ref === ADM, "0005: referências opacas de auditoria preenchidas (backfill/trigger) com a conta do administrador");
+      await fails(db.query("update public.study_questions set reviewed_by_ref = $2 where id=$1", [pubQ, U1]), /imut/, "0005: referência de auditoria não pode ser reescrita em questão publicada");
+      await fails(db.query("update public.study_questions set created_by_ref = null where id=$1", [pubQ]), /imut/, "0005: referência de auditoria não pode ser apagada em questão publicada");
+      const forged = (await db.query("insert into public.study_questions (subject_id, stem, created_by, created_by_ref, reviewed_by_ref) values ($1, 'Questão para testar referência forjada.', $2, $3, $3) returning created_by_ref, reviewed_by_ref", [subj, ADM, U1])).rows[0];
+      ok(forged.created_by_ref === ADM && forged.reviewed_by_ref === null, "0005: o cliente não consegue gravar referência arbitrária em INSERT (sempre derivada da conta)");
+      const forged2 = (await db.query("insert into public.study_questions (subject_id, stem, created_by_ref) values ($1, 'Outra questão para referência forjada.', $2) returning created_by_ref", [subj, U1])).rows[0];
+      ok(forged2.created_by_ref === null, "0005: sem conta, a referência enviada pelo cliente é descartada");
+      const nRef = (await db.query("select count(*)::int c from public.study_questions where reviewed_by_ref=$1 and status in ('published','archived')", [ADM])).rows[0].c;
+      await fails(db.query("update public.study_questions set created_by = null where id=$1", [pubQ]), /imut/, "0005: anular a autoria por UPDATE direto continua recusado");
+      await fails(db.query("update public.study_questions set reviewed_by = $2 where id=$1", [pubQ, U1]), /imut/, "0005: trocar o revisor continua recusado");
+      await fails(db.query("update public.study_questions set status='published', reviewed_by=null, no_real_patient_data_confirmed=true, reviewed_at=now(), published_at=now() where id=$1", [qNoKey.q]), /publicar exige/, "0005: publicar sem reviewed_by continua recusado");
+      await db.query("delete from auth.users where id=$1", [ADM]);
+      const after = (await db.query("select created_by, reviewed_by, status, reviewed_at is not null ra, published_at is not null pa, no_real_patient_data_confirmed ok from public.study_questions where id=$1", [pubQ])).rows[0];
+      ok(after.created_by === null && after.reviewed_by === null && after.ra && after.pa && after.ok, "0005: apagar a conta do administrador funciona; autoria/revisão viram NULL e a auditoria (datas e atestado) permanece");
+      const post = (await db.query("select created_by_ref, reviewed_by_ref from public.study_questions where id=$1", [pubQ])).rows[0];
+      ok(post.created_by_ref === ADM && post.reviewed_by_ref === ADM, "0005: RASTREABILIDADE: depois de apagada a conta, as referências opacas continuam identificando quem criou e revisou");
+      ok((await db.query("select count(*)::int c from public.study_questions where reviewed_by_ref=$1 and reviewed_by is null and status in ('published','archived')", [ADM])).rows[0].c === nRef && nRef >= 4, "0005: todas as questões revisadas pela conta apagada continuam agrupáveis pela mesma referência (" + nRef + ")");
+      ok((await db.query("select count(*)::int c from auth.users where id=$1", [ADM])).rows[0].c === 0 && (await db.query("select count(*)::int c from public.study_admins where user_id=$1", [ADM])).rows[0].c === 0, "0005: a conta e a permissão de administrador foram realmente removidas");
+      await fails(user(U1, "select created_by_ref from public.study_questions"), /permission denied/, "0005: aluno não lê as referências de auditoria");
+      ok((await db.query("select count(*)::int c from public.study_questions where status='published'")).rows[0].c >= 4, "0005: o conteúdo publicado continua publicado");
+    } else {
+      await fails(db.query("delete from auth.users where id=$1", [ADM]), /imut|check|violat/i, "(DEFEITO conhecido, sem a 0005) apagar a conta de um administrador que publicou questões FALHA");
+    }
+  }
 
   console.log(`\n${pass} verificações passaram, ${failures.length} falharam`);
   await db.close();

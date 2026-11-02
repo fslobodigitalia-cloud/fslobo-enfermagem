@@ -1,0 +1,12 @@
+# Estado local da CLI (ref vinculado, URL do pooler): cada máquina refaz com `supabase link`
+**/.temp/
+supabase/.temp/
+node_modules/
+# Segredos e dados nunca entram aqui
+.env
+.env.*
+*.pem
+*.crt
+*.dump
+*.backup
+*.log

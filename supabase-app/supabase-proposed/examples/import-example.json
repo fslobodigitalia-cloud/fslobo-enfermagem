@@ -1,0 +1,38 @@
+{
+  "format": "fslobo.study-import/1",
+  "batch_id": "exemplo-lote",
+  "questions": [
+    {
+      "external_key": "EXEMPLO-Q01",
+      "version": 1,
+      "subject_slug": "politicas-saude-sus",
+      "stem": "[EXEMPLO — NÃO PUBLICAR] Qual alternativa é a correta neste exemplo de formato de importação?",
+      "difficulty": 2,
+      "options": {
+        "A": "Alternativa A do exemplo",
+        "B": "Alternativa B do exemplo",
+        "C": "Alternativa C do exemplo",
+        "D": "Alternativa D do exemplo",
+        "E": "Alternativa E do exemplo"
+      },
+      "correct": "C",
+      "explanation": "[EXEMPLO] A alternativa C é a correta apenas neste exemplo; serve para mostrar o formato do arquivo.",
+      "meta": {
+        "technical_references": [
+          { "title": "Fonte técnica do conteúdo (exemplo)", "url": "https://exemplo.test/fonte", "note": "página ou seção", "verified": false }
+        ],
+        "origin_status": "not_proven",
+        "origin_note": "origem a confirmar pelo responsável",
+        "editorial_note": "exemplo de nota editorial"
+      }
+    },
+    {
+      "external_key": "EXEMPLO-Q02",
+      "subject_slug": "calculo-medicacao",
+      "stem": "[EXEMPLO — NÃO PUBLICAR] Segundo item do exemplo, sem difficulty, version nem meta (usa os padrões).",
+      "options": { "A": "A2", "B": "B2", "C": "C2", "D": "D2", "E": "E2" },
+      "correct": "A",
+      "explanation": "[EXEMPLO] Campos opcionais omitidos: difficulty vira 2, version vira 1 e meta vira vazio."
+    }
+  ]
+}

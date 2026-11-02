@@ -17,6 +17,11 @@ create function auth.uid() returns uuid
   language sql stable
   as $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
 
+-- auth.jwt(): o Supabase real devolve os claims do JWT da requisição (request.jwt.claims); a 0007 lê o claim 'aal' (MFA).
+create function auth.jwt() returns jsonb
+  language sql stable
+  as $$ select coalesce(nullif(current_setting('request.jwt.claims', true), ''), '{}')::jsonb $$;
+
 grant usage on schema public, auth to anon, authenticated, service_role;
 grant select on auth.users to service_role;
 

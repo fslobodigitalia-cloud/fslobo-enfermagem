@@ -17,6 +17,13 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, "..");
 // layout do repositório: <raiz>/migrations; layout da CLI: <raiz>/supabase/migrations
 const migDir = [path.join(root, "supabase", "migrations"), path.join(root, "migrations")].find((d) => fs.existsSync(d));
+const proposedDir = path.join(root, "supabase-proposed", "migrations");
+const INCLUDE_PROPOSED = process.env.FSL_INCLUDE_PROPOSED === "1" && fs.existsSync(proposedDir);
+// lista [{ file, dir }] na ordem de aplicação; a proposta (0005) só entra com FSL_INCLUDE_PROPOSED=1
+const allMigrations = () => [
+  ...fs.readdirSync(migDir).filter((f) => f.endsWith(".sql")).sort().map((f) => ({ f, dir: migDir })),
+  ...(INCLUDE_PROPOSED ? fs.readdirSync(proposedDir).filter((f) => f.endsWith(".sql")).sort().map((f) => ({ f, dir: proposedDir })) : []),
+];
 const PORT = Number(process.env.FSL_PG_PORT) || 54329;
 const PW = "descartavel-local";
 
@@ -39,8 +46,8 @@ export async function run({ EmbeddedPostgres, pg }) {
     const pidInfo = (await admin.query("select version() v, (select count(*)::int from pg_stat_activity) conns")).rows[0];
     console.log("servidor:", pidInfo.v.split(",")[0]);
     await admin.query(fs.readFileSync(path.join(here, "stubs", "supabase_stub.sql"), "utf8"));
-    for (const f of fs.readdirSync(migDir).filter((x) => x.endsWith(".sql")).sort())
-      await admin.query(fs.readFileSync(path.join(migDir, f), "utf8"));
+    for (const m of allMigrations())
+      await admin.query(fs.readFileSync(path.join(m.dir, m.f), "utf8"));
 
     const ADM = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
     const uid = (n) => `00000000-0000-0000-0000-${String(n).padStart(12, "0")}`;
@@ -121,6 +128,9 @@ export async function run({ EmbeddedPostgres, pg }) {
       const sharedPr = pr.items.find((i) => i.stem === q0item.stem);
       const sharedRv = rv.items.find((i) => i.stem === q0item.stem);
       ok(!!sharedPr && !!sharedRv, "C: a mesma questão está em duas tentativas abertas (pontuado e revisão)");
+      // migration 0006: só conclui treino com TODAS as questões respondidas. As outras questões do treino pontuado
+      // são respondidas antes; a questão disputada é respondida nas duas tentativas ao mesmo tempo.
+      for (const it of pr.items) if (it.item_id !== sharedPr.item_id) await call(c1, "study_submit_answer", [it.item_id, await keyOf(it.item_id)]);
       await Promise.all([
         call(c1, "study_submit_answer", [sharedPr.item_id, await keyOf(sharedPr.item_id)]),
         call(c2, "study_submit_answer", [sharedRv.item_id, await keyOf(sharedRv.item_id)]),
@@ -128,8 +138,11 @@ export async function run({ EmbeddedPostgres, pg }) {
       const done = await Promise.all([call(c1, "study_complete_attempt", [pr.attempt.id]), call(c2, "study_complete_attempt", [rv.attempt.id])]);
       ok(done.every((r) => r.ok), "C: as duas conclusões simultâneas terminam sem erro");
       ok(n(await admin.query("select count(*) c from public.study_points_ledger where user_id=$1 and question_id=(select question_id from public.study_attempt_items where id=$2)", [u.id, sharedPr.item_id])) === 1, "C: a questão pontuou UMA vez no total (índice único decide a corrida)");
-      const awarded = done.map((r) => r.v.attempt.points_awarded).sort((a, b) => a - b);
-      ok(awarded[0] === 0 && awarded[1] === 10, "C: uma tentativa recebeu os 10 pontos e a outra 0");
+      // outras = questões inéditas do treino pontuado (10 cada; +20 de bônus com 3 ou mais pontuadas e tudo respondido)
+      const others = pr.items.length - 1;
+      const expectPr = (won) => 10 * (others + (won ? 1 : 0)) + (others + (won ? 1 : 0) >= 3 ? 20 : 0);
+      const [awPr, awRv] = [done[0].v.attempt.points_awarded, done[1].v.attempt.points_awarded];
+      ok((awRv === 10 && awPr === expectPr(false)) || (awRv === 0 && awPr === expectPr(true)), `C: a questão disputada rendeu os 10 pontos a UMA só tentativa (treino=${awPr}, revisão=${awRv})`);
     }
 
     // ── D. Início simultâneo: mesma tentativa; e limite diário com disputa ───────
@@ -157,7 +170,9 @@ export async function run({ EmbeddedPostgres, pg }) {
 
     // ── E. Resposta x conclusão ao mesmo tempo: nada entra depois de concluir ─────
     {
-      let bad = 0, completedOk = 0;
+      // migration 0006: se a conclusão chegar antes da última resposta, o desfecho correto é attempt_incomplete (e nada é gravado);
+      // depois que todas as respostas entram, a conclusão tem de funcionar.
+      let bad = 0, completedOk = 0, racedIncomplete = 0, unexpected = 0;
       for (let round = 0; round < 15; round++) {
         const u = await makeUser(100 + round, 4);
         const att = (await call(u.cs[0], "study_start_attempt", [null, "practice", 4])).v;
@@ -165,11 +180,17 @@ export async function run({ EmbeddedPostgres, pg }) {
         const tasks = att.items.slice(1).map((it, i) => call(u.cs[1 + (i % 3)], "study_submit_answer", [it.item_id, keys[i + 1]]));
         tasks.push(call(u.cs[0], "study_complete_attempt", [att.attempt.id]));
         await call(u.cs[0], "study_submit_answer", [att.items[0].item_id, keys[0]]);
-        await Promise.all(tasks);
+        const res = await Promise.all(tasks);
+        const comp = res[res.length - 1];
+        if (!comp.ok) { if (/attempt_incomplete/.test(comp.e)) racedIncomplete++; else unexpected++; }
+        const after = (await admin.query("select status, correct_count, points_awarded from public.study_attempts where id=$1", [att.attempt.id])).rows[0];
+        if (!comp.ok && (after.status !== "in_progress" || after.points_awarded !== null)) bad++;   // recusa não pode deixar rastro
+        const fin = await call(u.cs[0], "study_complete_attempt", [att.attempt.id]);               // todas as respostas já entraram
+        if (!fin.ok) unexpected++;
         const row = (await admin.query("select status, correct_count, (select count(*)::int from public.study_attempt_answers a join public.study_attempt_items i on i.id=a.item_id where i.attempt_id=$1 and a.is_correct) real from public.study_attempts where id=$1", [att.attempt.id])).rows[0];
         if (row.status === "completed") { completedOk++; if (row.correct_count !== row.real) bad++; }
       }
-      ok(completedOk > 0 && bad === 0, `E: em 15 rodadas de resposta x conclusão simultâneas, correct_count sempre igual às respostas gravadas (concluídas: ${completedOk}, divergências: ${bad})`);
+      ok(completedOk === 15 && bad === 0 && unexpected === 0, `E: em 15 rodadas de resposta x conclusão simultâneas, correct_count sempre igual às respostas gravadas (concluídas: ${completedOk}, conclusões que chegaram cedo e foram recusadas: ${racedIncomplete}, divergências: ${bad}, erros inesperados: ${unexpected})`);
     }
 
 
@@ -222,6 +243,7 @@ export async function run({ EmbeddedPostgres, pg }) {
     {
       const adm = await connect();
       await adm.query("select set_config('request.jwt.claim.sub', $1, false)", [ADM]);
+      await adm.query("select set_config('request.jwt.claims', $1, false)", [JSON.stringify({ sub: ADM, aal: "aal2" })]);   // MFA (exigido pela 0007 nas escritas)
       await adm.query("set role authenticated");
       const other = await connect();
       let broken = 0, pubOk = 0, delOk = 0;
