@@ -223,10 +223,23 @@ export async function run(db, label = "") {
 
   // ════════════════ permissões e funções ══════════════════════════════════════
   const fns = (await owner(`select p.proname, p.prosecdef, p.proconfig::text cfg,
-      has_function_privilege('anon', p.oid, 'execute') a, has_function_privilege('authenticated', p.oid, 'execute') u
+      has_function_privilege('anon', p.oid, 'execute') a, has_function_privilege('authenticated', p.oid, 'execute') u,
+      has_function_privilege('service_role', p.oid, 'execute') s
       from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and (p.proname like 'study%' or p.proname='is_study_admin')`)).rows;
-  const rpcs = ["study_upsert_my_profile", "study_list_subjects", "study_start_attempt", "study_get_attempt", "study_submit_answer", "study_complete_attempt", "study_abandon_attempt", "study_my_progress", "study_list_my_attempts", "study_list_my_review_items", "study_admin_publish_question", "is_study_admin"].sort();
-  ok(fns.filter((f) => f.u).map((f) => f.proname).sort().join() === rpcs.join(), "3.1 authenticated continua executando exatamente as 12 RPCs previstas");
+  // Lista EXATA (allow-list) do que o navegador logado pode executar, com todas as migrations atuais (0001-0008):
+  //  - 9 RPCs do aluno + is_study_admin (já existiam na 0006);
+  //  - 13 RPCs de administração (contrato em supabase-proposed/docs/0007-admin-contract.md), cada uma SECURITY DEFINER com search_path
+  //    fixo e protegida por study__admin_guard (confere admin ativo e MFA aal2; verificado em run-0007.mjs);
+  //  - NENHUMA função da 0008 (study_ai_acquire / study_ai_release): essas só o service_role executa.
+  // Qualquer função nova executável pelo navegador, ou uma prevista que sumiu, reprova este teste.
+  const studentRpcs = ["study_upsert_my_profile", "study_list_subjects", "study_start_attempt", "study_get_attempt", "study_submit_answer", "study_complete_attempt", "study_abandon_attempt", "study_my_progress", "study_list_my_attempts", "study_list_my_review_items", "is_study_admin"];
+  const adminRpcs = ["study_admin_archive_question", "study_admin_create_new_version", "study_admin_delete_draft", "study_admin_get_question", "study_admin_import_questions", "study_admin_list_audit", "study_admin_list_questions", "study_admin_list_subjects", "study_admin_publish_question", "study_admin_publish_questions", "study_admin_save_draft_question", "study_admin_save_question_meta", "study_admin_save_subject"];
+  const rpcs = [...studentRpcs, ...adminRpcs].sort();
+  const actual = fns.filter((f) => f.u).map((f) => f.proname).sort();
+  ok(actual.join() === rpcs.join(), `3.1 authenticated executa exatamente as ${rpcs.length} RPCs previstas (11 do aluno/is_study_admin + 13 de administração)`);
+  if (actual.join() !== rpcs.join()) console.log("   a mais:", actual.filter((x) => !rpcs.includes(x)).join(",") || "-", "| a menos:", rpcs.filter((x) => !actual.includes(x)).join(",") || "-");
+  const ai = fns.filter((f) => /^study_ai_/.test(f.proname));
+  ok(ai.length === 2 && ai.every((f) => !f.a && !f.u && f.s && f.prosecdef && /search_path/.test(f.cfg || "")), "3.1b as funções da 0008 (study_ai_*) só o service_role executa (nem anon nem authenticated), SECURITY DEFINER com search_path fixo");
   ok(fns.every((f) => !f.a), "3.2 anon continua sem EXECUTE em qualquer função study_*");
   ok(fns.find((f) => f.proname === "study__answered_count") && !fns.find((f) => f.proname === "study__answered_count").u, "3.3 a função interna nova não é executável pelo navegador");
   ok(fns.filter((f) => f.prosecdef).every((f) => /search_path/.test(f.cfg || "")), "3.4 toda SECURITY DEFINER segue com search_path fixo");

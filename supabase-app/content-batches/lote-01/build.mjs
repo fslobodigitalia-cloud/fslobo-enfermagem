@@ -1,6 +1,7 @@
 // Gera, a partir do Markdown editorial, o manifesto e o SQL de importação de RASCUNHOS do lote 01.
-// NÃO conecta em banco nenhum. Uso:  node build.mjs <caminho-do-markdown>
-// Saídas (nesta pasta): lote-01.manifest.json, lote-01.import.sql, lote-01.validate.sql
+// NÃO conecta em banco nenhum. Uso:  node build.mjs <caminho-do-markdown> [--out <pasta>]
+// Saídas (em --out; padrão: esta pasta): lote-01.manifest.json, lote-01.import.sql, lote-01.validate.sql
+// Os TESTES não usam o lote real: geram um lote ARTIFICIAL com tests/fixtures/artificial-batch.mjs e --out em pasta temporária.
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
@@ -9,6 +10,10 @@ import { fileURLToPath } from "node:url";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const src = process.argv[2];
 if (!src) throw new Error("informe o caminho do Markdown do lote");
+const outArg = process.argv.indexOf("--out");
+const outDir = outArg > 0 ? path.resolve(process.argv[outArg + 1] ?? "") : here;
+if (outArg > 0 && !process.argv[outArg + 1]) throw new Error("--out exige uma pasta");
+fs.mkdirSync(outDir, { recursive: true });
 const raw = fs.readFileSync(src, "utf8");
 const sha = (s) => crypto.createHash("sha256").update(s).digest("hex");
 
@@ -90,7 +95,7 @@ const manifest = {
   ],
   questions: items,
 };
-fs.writeFileSync(path.join(here, "lote-01.manifest.json"), JSON.stringify(manifest, null, 2) + "\n");
+fs.writeFileSync(path.join(outDir, "lote-01.manifest.json"), JSON.stringify(manifest, null, 2) + "\n");
 
 // ── SQL (importação e validação compartilham a MESMA consulta de divergências) ─────────────────────
 const dq = (s) => { for (let n = 0; ; n++) { const tag = `$t${n}$`; if (!s.includes(tag)) return tag + s + tag; } };
@@ -236,7 +241,7 @@ $cnt$;
 
 commit;
 `;
-fs.writeFileSync(path.join(here, "lote-01.import.sql"), importSql);
+fs.writeFileSync(path.join(outDir, "lote-01.import.sql"), importSql);
 
 // ── validação SOMENTE LEITURA: conteúdo integral, sem confiar no hash de source_note ─────────────────
 const validateSql = `-- Validação do lote 01 (SOMENTE LEITURA). Compara o banco com o conteúdo integral esperado
@@ -265,5 +270,5 @@ union all select 'nada visível ao aluno (publicadas em assuntos ativos = 0)',
        (select count(*) from public.study_questions q2 join public.study_subjects s on s.id = q2.subject_id where q2.status = 'published' and s.active) = 0,
        (select count(*) from public.study_questions q2 join public.study_subjects s on s.id = q2.subject_id where q2.status = 'published' and s.active)::text;
 `;
-fs.writeFileSync(path.join(here, "lote-01.validate.sql"), validateSql);
+fs.writeFileSync(path.join(outDir, "lote-01.validate.sql"), validateSql);
 console.log(JSON.stringify({ version, questions: qs.length, options: qs.length * 5, subjects: SUBJECTS.length, finalKey: finalKey.length, sha: manifest.source_sha256.slice(0, 16) }));

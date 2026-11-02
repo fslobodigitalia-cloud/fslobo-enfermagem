@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { EXPECTED, parsePooler, tlsOptions, checkLinkedRef } from "./guards.mjs";
+import { artificialBatch } from "../../tests/fixtures/artificial-batch.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, "..", "..");
@@ -13,9 +14,11 @@ export async function run(db, label = "") {
   let pass = 0; const failures = [];
   const ok = (c, name, extra) => { if (c) pass++; else { failures.push(name); console.log("FAIL", name, extra ?? ""); } };
   const q = async (sql, p) => (await db.query(sql, p)).rows;
-  const importSql = fs.readFileSync(path.join(here, "lote-01.import.sql"), "utf8");
-  const validateSql = fs.readFileSync(path.join(here, "lote-01.validate.sql"), "utf8");
-  const manifest = JSON.parse(fs.readFileSync(path.join(here, "lote-01.manifest.json"), "utf8"));
+  // lote ARTIFICIAL gerado em pasta temporária pelo mesmo build.mjs: o lote editorial real nunca é lido pelos testes
+  const batch = artificialBatch();
+  const importSql = fs.readFileSync(batch.importSql, "utf8");
+  const validateSql = fs.readFileSync(batch.validateSql, "utf8");
+  const manifest = JSON.parse(fs.readFileSync(batch.manifest, "utf8"));
 
   // ── 0) travas de conexão (puras, sem rede) ──────────────────────────────────────────────────────
   const goodUrl = `postgresql://${EXPECTED.user}@${EXPECTED.host}:5432/postgres`;
@@ -44,7 +47,13 @@ export async function run(db, label = "") {
   const migDir = path.join(root, "supabase", "migrations");
   const files = fs.readdirSync(migDir).filter((f) => f.endsWith(".sql")).sort();
   for (const f of files) await db.exec(fs.readFileSync(path.join(migDir, f), "utf8"));
-  ok(files.length === 6, "as 6 migrations aplicadas no banco local (" + files.length + ")");
+  // conjunto EXATO de migrations versionadas (aplicadas na homologação): se alguém acrescentar ou remover uma, este teste avisa
+  const EXPECTED_MIGRATIONS = [
+    "20261031120001_study_foundation.sql", "20261031120002_study_content.sql", "20261031120003_study_attempts.sql", "20261031120004_study_rpcs.sql",
+    "20261031130001_fix_admin_deletion_and_indexes.sql", "20261031140001_complete_attempts_and_review_scope.sql",
+    "20261101120001_admin_rpcs_and_versioning.sql", "20261102120001_practice_ai_feedback_usage.sql",
+  ];
+  ok(JSON.stringify(files) === JSON.stringify(EXPECTED_MIGRATIONS), "as 8 migrations versionadas aplicadas no banco local (" + files.length + ")");
 
   // fotografia completa do conteúdo (para provar "sem gravações parciais")
   const snap = async () => (await q(`select md5(coalesce(string_agg(x, '|' order by x), '')) h, count(*)::int n from (
@@ -108,9 +117,12 @@ export async function run(db, label = "") {
   // E) gabarito errado
   const setKey = (n, l) => db.exec(`delete from public.study_answer_keys where question_id = ${idOf(n)};
     insert into public.study_answer_keys (question_id, option_id) select o.question_id, o.id from public.study_question_options o where o.question_id = ${idOf(n)} and o.label = '${l}'`);
-  await setKey("10", "B");
+  // letras derivadas do próprio manifesto (o teste não pressupõe o gabarito de nenhum lote): "errada" = qualquer letra diferente da correta
+  const q10 = manifest.questions.find((x) => x.key === "FSLOBO-L01-Q10").correct;
+  const wrong10 = q10 === "B" ? "C" : "B";
+  await setKey("10", wrong10);
   await expectAbort("E) gabarito errado", /FSLOBO-L01-Q10 \[gabarito\]/);
-  await setKey("10", "A");
+  await setKey("10", q10);
   ok((await snap()).h === s1.h && (await validate()).every((r) => r.ok === true), "E) restaurado: banco idêntico e validação toda ok");
 
   // F) Q25 substituída por Q99 (falta Q25, sobra Q99)

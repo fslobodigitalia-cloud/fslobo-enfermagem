@@ -1,0 +1,19 @@
+{
+  "name": "fslobo-app-backend-tests",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Testes locais do backend do app FSLOBO Enfermagem (banco descartável; nenhuma conexão remota)",
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "test": "npm run test:sql && npm run test:concurrency && npm run test:function",
+    "test:sql": "node tests/run-pglite.mjs",
+    "test:concurrency": "node tests/run-concurrency.mjs",
+    "test:function": "deno test --config supabase/functions/practice-feedback/deno.json -A tests/practice-feedback.test.ts"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.5.14",
+    "embedded-postgres": "18.6.0-beta.19",
+    "pg": "8.23.1"
+  }
+}

@@ -35,12 +35,18 @@ Migration já aplicada **nunca** é editada: correções entram como migration n
 4. `db push` sempre com `--dry-run` primeiro; aplicar e publicar só com autorização explícita.
 5. Segredos (senha do banco, chaves, `ANTHROPIC_API_KEY`) ficam fora do repositório, no cofre da CLI ou nos Secrets do Supabase.
 
-## Testes
+## Testes (locais; nunca tocam o banco remoto)
+Pré-requisitos: **Node 20+** e **npm** para as suítes SQL; **Deno 2.x** só para o teste da função. Tudo roda a partir de `supabase-app/`.
 ```
-# função practice-feedback (Deno; lê o caso do app em ../src/app-enfermagem/data/practice.ts)
-deno test --config supabase/functions/practice-feedback/deno.json -A tests/practice-feedback.test.ts
-# SQL local: tests/run-local.mjs, run-0006.mjs, run-0007.mjs, run-concurrency.mjs (dependências `pg` e `@electric-sql/pglite`, instaladas à parte)
+npm ci                      # instala as dependências FIXADAS em package-lock.json (pglite, embedded-postgres, pg) dentro de supabase-app/node_modules
+npm run test:sql            # 4 suítes em PGlite (banco em memória): run-local, run-0006, run-0007 e importador do lote (lote artificial)
+npm run test:concurrency    # corridas em PostgreSQL real DESCARTÁVEL (embedded-postgres: baixa o binário do npm, sobe em porta local e apaga no fim)
+npm run test:function       # função practice-feedback (Deno); lê o caso do app em ../src/app-enfermagem/data/practice.ts
+npm test                    # as três acima
 ```
+- Não há conexão com o Supabase remoto, nem leitura de segredos. `tests/run-remote-homolog.mjs` é um script **separado, remoto**, que só deve ser rodado de propósito (não faz parte de `npm test`).
+- Os testes de importação usam um **lote ARTIFICIAL** (`tests/fixtures/artificial-batch.mjs`): 25 questões genéricas geradas em pasta temporária pelo mesmo `build.mjs` do lote real. Nenhum arquivo editorial é necessário.
+- Migrations: as suítes aplicam as 8 migrations de `supabase/migrations` num banco vazio, com o stub de `auth` em `tests/stubs/`.
 
 ## Correção por IA: pausada
 A função `practice-feedback` está implantada na homologação, mas sem chave (`ANTHROPIC_API_KEY`): responde "não configurada". O app não chama a função.
@@ -48,6 +54,6 @@ O modelo padrão no código é `claude-sonnet-5-5`; a função implantada ainda 
 Detalhes e rubrica: `docs/rubrica-anotacao-dispneia.md`.
 
 ## Conteúdo (questões)
-Os dados editoriais do lote 01 (`content-batches/lote-01/*.json` e `*.sql`) estão marcados como rascunho, **sem revisão clínica e sem
-confirmação de origem/direitos**. Por isso não são enviados a um repositório público; ficam no histórico local até a decisão do responsável.
-Os testes `run-0007.mjs` e `content-batches/lote-01/test-local.mjs` precisam desses arquivos presentes.
+Os dados editoriais REAIS do lote 01 (`content-batches/lote-01/lote-01.*.json` e `*.sql`) são rascunho, **sem revisão clínica e sem confirmação de origem/direitos**, e o
+repositório é público. Por isso **não são versionados aqui** (estão no `.gitignore`; ficam só no computador do responsável). Os testes não dependem deles.
+Para importar o lote real na homologação (`apply.mjs`) é preciso gerá-lo localmente com `build.mjs <markdown-editorial>` e ter autorização explícita.

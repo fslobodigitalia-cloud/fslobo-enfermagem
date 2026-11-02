@@ -8,12 +8,14 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { artificialBatch } from "./fixtures/artificial-batch.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, "..");
 const migDir = path.join(root, "supabase", "migrations");
 const propDir = path.join(root, "supabase-proposed", "migrations");
-const lote01 = path.join(root, "content-batches", "lote-01", "lote-01.import.sql");
+// lote ARTIFICIAL (tests/fixtures/artificial-batch.mjs): os testes nunca leem o lote editorial real
+const lote01 = artificialBatch().importSql;
 
 export async function run(db, label = "") {
   let pass = 0; const failures = [];
@@ -46,10 +48,12 @@ export async function run(db, label = "") {
   // ════════════ FASE 1 — estado anterior à 0007 + preservação ════════════
   await db.exec(fs.readFileSync(path.join(here, "stubs", "supabase_stub.sql"), "utf8"));
   const is0007 = (f) => /admin_rpcs_and_versioning/.test(f);
-  const applied = fs.readdirSync(migDir).filter((f) => f.endsWith(".sql") && !is0007(f)).sort();   // as 6 anteriores (a 0007, se já promovida, é aplicada à parte)
-  for (const f of applied) await db.exec(fs.readFileSync(path.join(migDir, f), "utf8"));
   const dir0007 = fs.readdirSync(migDir).some(is0007) ? migDir : propDir;      // depois de promovida, a 0007 fica em supabase/migrations
   const propFile = fs.readdirSync(dir0007).find(is0007);
+  // As 6 migrations ANTERIORES à 0007 (por ordem de nome/data). Migrations posteriores (ex.: a 0008, da correção por IA) não fazem
+  // parte do estado "antes da 0007" que esta fase reproduz; elas têm suíte própria (run-local.mjs aplica todas).
+  const applied = fs.readdirSync(migDir).filter((f) => f.endsWith(".sql") && !is0007(f) && (!propFile || f < propFile)).sort();
+  for (const f of applied) await db.exec(fs.readFileSync(path.join(migDir, f), "utf8"));
   ok(applied.length === 6 && !!propFile, `fase 1: 6 migrations aplicadas e a 0007 é a proposta (${applied.length}, ${propFile ? "0007 achada" : "sem 0007"})`);
 
   await owner(`insert into auth.users (id, email) values ('${ADM}','admin-teste@example.test'),('${STU}','aluno@example.test'),('${INA}','inativo@example.test'),('${OTH}','outro@example.test')`);
@@ -237,7 +241,7 @@ export async function run(db, label = "") {
   ok(l2.items.length === 4, "paginação: offset 20 devolve as 4 restantes");
   ok((await call(A1, "study_admin_list_questions", [null, null, null, 9999, 0, false], ["text[]", "uuid", "text", "integer", "integer", "boolean"])).limit === 200, "limite máximo de 200 por página");
   ok((await call(A1, "study_admin_list_questions", [null, null, "fslobo-l01-q07"], ["text[]", "uuid", "text"])).total === 1, "busca por chave externa (sem diferenciar maiúsculas)");
-  ok((await call(A1, "study_admin_list_questions", [null, null, "notificação"], ["text[]", "uuid", "text"])).total >= 1, "busca no enunciado");
+  ok((await call(A1, "study_admin_list_questions", [null, null, "CONJUNTO de Teste"], ["text[]", "uuid", "text"])).total >= 1, "busca no enunciado (sem diferenciar maiúsculas)");
   ok((await call(A1, "study_admin_list_questions", [null, null, "%%"], ["text[]", "uuid", "text"])).total === 0, "busca por '%%' é literal (não vira curinga que casaria tudo)");
   ok((await call(A1, "study_admin_list_questions", [null, sus.id], ["text[]", "uuid"])).total === 4, "filtro por assunto");
   await fails(call(A1, "study_admin_list_questions", [arr(["publicada"])], ["text[]"]), /invalid_filter/, "status inválido -> invalid_filter");

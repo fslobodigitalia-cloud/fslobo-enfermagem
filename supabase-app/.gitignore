@@ -10,3 +10,11 @@ node_modules/
 *.dump
 *.backup
 *.log
+
+# Dados editoriais REAIS (questões do lote, em rascunho e sem direitos confirmados): ficam só no computador do responsável.
+# Os testes usam um lote ARTIFICIAL gerado em pasta temporária (tests/fixtures/artificial-batch.mjs).
+content-batches/*/lote-*.import.sql
+content-batches/*/lote-*.validate.sql
+content-batches/*/lote-*.manifest.json
+content-batches/*/lote-*.editorial.json
+content-batches/*/lote-*.publicacao-proposta.sql
