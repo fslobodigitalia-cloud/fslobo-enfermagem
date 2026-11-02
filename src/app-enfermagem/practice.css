@@ -693,3 +693,209 @@
 .fsl-sync-backup {
   margin: 0;
 }
+
+/* ── Biblioteca "Modelos de registros" ── */
+.fsl-lib-entry {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+  color: inherit;
+  min-width: 0;
+}
+.fsl-lib-entry-body {
+  display: grid;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+.fsl-lib-entry strong {
+  color: var(--fsl-navy);
+  font-size: 18px;
+}
+.fsl-lib-filters {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+.fsl-lib-searchbox {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+.fsl-lib-searchbox > svg {
+  position: absolute;
+  left: 14px;
+  color: var(--fsl-muted);
+  pointer-events: none;
+}
+.fsl-lib-searchbox .fsl-input {
+  padding-left: 42px;
+  padding-right: 44px;
+  width: 100%;
+}
+.fsl-lib-clear {
+  position: absolute;
+  right: 4px;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  color: var(--fsl-navy);
+  border-radius: 50%;
+  cursor: pointer;
+}
+.fsl-lib-kinds {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.fsl-lib-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.fsl-lib-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: 999px;
+  border: 2px solid #cfd8e3;
+  background: #fff;
+  font-weight: 700;
+  color: var(--fsl-navy);
+  cursor: pointer;
+}
+.fsl-lib-chip input {
+  position: absolute;
+  opacity: 0;
+  inset: 0;
+  cursor: pointer;
+}
+.fsl-lib-chip.is-on {
+  background: var(--fsl-navy);
+  border-color: var(--fsl-navy);
+  color: #fff;
+}
+.fsl-lib-chip:focus-within {
+  outline: 3px solid #7fb8ff;
+  outline-offset: 2px;
+}
+.fsl-lib-count {
+  margin: 0;
+  font-weight: 700;
+  color: var(--fsl-navy);
+}
+.fsl-lib-results {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 12px;
+}
+.fsl-lib-card {
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+  border-radius: 20px;
+  background: #fff;
+  border: 1px solid #dbe3ec;
+  text-decoration: none;
+  color: inherit;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.fsl-lib-card:focus-visible {
+  outline: 3px solid #7fb8ff;
+  outline-offset: 2px;
+}
+.fsl-lib-title {
+  font-size: 18px;
+  line-height: 1.25;
+  color: var(--fsl-navy);
+}
+.fsl-lib-summary {
+  color: #3d4b5c;
+  line-height: 1.45;
+}
+.fsl-lib-open {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 800;
+  color: #0b6b55;
+}
+.fsl-lib-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+}
+.fsl-lib-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: #eef2f7;
+  color: var(--fsl-navy);
+  font-size: 13px;
+  font-weight: 800;
+}
+.fsl-lib-badge.is-anotacao {
+  background: var(--fsl-mint-2);
+}
+.fsl-lib-badge.is-evolucao {
+  background: #e9eefc;
+}
+.fsl-lib-badge.is-demo {
+  background: #fff3cf;
+}
+.fsl-lib-empty {
+  display: grid;
+  gap: 10px;
+  justify-items: start;
+  min-width: 0;
+}
+.fsl-lib-tips {
+  margin: 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 4px;
+}
+.fsl-lib-section {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+.fsl-lib-list {
+  margin: 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 8px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.fsl-lib-review {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: #fff7e6;
+}
+.fsl-lib-list,
+.fsl-lib-tips {
+  list-style: disc;
+}
+/* o botão × próprio substitui o do navegador (evita dois ×) */
+.fsl-lib-searchbox input[type="search"]::-webkit-search-cancel-button,
+.fsl-lib-searchbox input[type="search"]::-webkit-search-decoration {
+  -webkit-appearance: none;
+  appearance: none;
+  display: none;
+}

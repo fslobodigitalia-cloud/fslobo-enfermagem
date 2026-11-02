@@ -1,7 +1,7 @@
 import * as React from "react";
 import { Link, Navigate, Route, Routes } from "react-router-dom";
 import { useP } from "../base";
-import { ArrowLeft, ArrowRight, Info } from "lucide-react";
+import { ArrowLeft, ArrowRight, BookOpen, Info } from "lucide-react";
 import { BarChart3, FilePenLine } from "../components/icons";
 import { Illustration } from "../components/Illustration";
 import { LocalNote, PracticeTopbar, SourcesBlock } from "../components/PracticeParts";
@@ -9,6 +9,8 @@ import { EXERCISES, MODALITIES, NOT_REAL_DATA } from "../data/practice";
 import { hasAnyPracticeText, isDirty, usePracticeData, usePracticeStore, type ExerciseProgress } from "../practiceStore";
 import { usePracticeSync } from "../practiceSyncContext";
 import PracticeExercise from "./PracticeExercise";
+import LibraryScreen from "./LibraryScreen";
+import LibraryModelScreen from "./LibraryModelScreen";
 
 function statusOf(pr: ExerciseProgress | undefined, account: boolean): string {
   if (!pr) return "Não iniciado";
@@ -63,6 +65,15 @@ function PracticeHome({ avatarInitial }: { avatarInitial?: string }) {
         </p>
         <p className="fsl-note"><strong>{NOT_REAL_DATA}</strong></p>
       </section>
+
+      <Link to={p("/pratica/modelos")} className="fsl-card fsl-lib-entry">
+        <span className="fsl-px-mod-icon"><BookOpen size={28} aria-hidden="true" /></span>
+        <span className="fsl-lib-entry-body">
+          <strong>Modelos de registros</strong>
+          <span className="fsl-note">Biblioteca pesquisável de exemplos para consultar e adaptar. Conteúdo demonstrativo.</span>
+        </span>
+        <ArrowRight size={24} aria-hidden="true" />
+      </Link>
 
       {MODALITIES.map((m) => {
         const list = EXERCISES.filter((e) => e.mode === m.mode);
@@ -148,6 +159,9 @@ export default function PracticeRoutes({ avatarInitial }: { avatarInitial?: stri
   return (
     <Routes>
       <Route index element={<PracticeHome avatarInitial={avatarInitial} />} />
+      {/* a biblioteca vem ANTES de :id (senão "modelos" seria lido como id de exercício) */}
+      <Route path="modelos" element={<LibraryScreen avatarInitial={avatarInitial} />} />
+      <Route path="modelos/:slug" element={<LibraryModelScreen avatarInitial={avatarInitial} />} />
       <Route path=":id" element={<PracticeExercise avatarInitial={avatarInitial} />} />
       <Route path="*" element={<Navigate to={p("/pratica")} replace />} />
     </Routes>

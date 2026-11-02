@@ -18,3 +18,8 @@ content-batches/*/lote-*.validate.sql
 content-batches/*/lote-*.manifest.json
 content-batches/*/lote-*.editorial.json
 content-batches/*/lote-*.publicacao-proposta.sql
+
+# Conteúdo dos e-books (biblioteca "Modelos de registros"): nunca no repositório público; entra pelo backend
+content-private/
+*.epub
+*.mobi

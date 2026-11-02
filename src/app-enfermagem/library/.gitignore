@@ -1,0 +1,4 @@
+# Conteudo dos e-books nunca entra aqui (repositorio publico): so o backend carrega o acervo real.
+private/
+*.epub
+*.mobi
