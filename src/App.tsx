@@ -29,6 +29,8 @@ const Terms = React.lazy(() => import("@/pages/Terms"));
 const Delivery = React.lazy(() => import("@/pages/Delivery"));
 const Refund = React.lazy(() => import("@/pages/Refund"));
 const NotFound = React.lazy(() => import("@/pages/NotFound"));
+/** App de estudo (demonstração), isolado em /app/*: código, CSS e ilustrações só carregam nessas rotas. */
+const AppEnfermagem = React.lazy(() => import("@/app-enfermagem"));
 
 /**
  * Redireciona para outro caminho preservando query string (UTMs, fbclid etc.)
@@ -130,6 +132,7 @@ export default function App() {
               (replace: não empilha entrada no histórico, então o botão
               "voltar" do navegador não fica preso em /balanco-hidrico). */}
           <Route path="/balanco-hidrico" element={<Navigate to="/produto/balanco-hidrico" replace />} />
+          <Route path="/app/*" element={<AppEnfermagem />} />
           <Route path="/privacidade" element={<Privacy />} />
           <Route path="/termos" element={<Terms />} />
           <Route path="/entrega" element={<Delivery />} />

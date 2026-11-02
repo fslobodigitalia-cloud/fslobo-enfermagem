@@ -1,0 +1,598 @@
+/* Aba Prática (anotação e evolução). Só classes fsl-px-* e afins; nada aqui afeta a loja. */
+
+.fsl-px-intro,
+.fsl-px-mod,
+.fsl-px-local {
+  gap: 12px;
+}
+.fsl-app .fsl-px-flow {
+  list-style: decimal;
+  padding-left: 24px;
+  display: grid;
+  gap: 4px;
+  font-size: 16.5px;
+}
+.fsl-px-mod-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--fsl-navy);
+}
+.fsl-px-mod-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: var(--fsl-mint);
+  color: var(--fsl-green-d);
+  flex: none;
+}
+.fsl-px-list {
+  list-style: none;
+  display: grid;
+  gap: 10px;
+  margin-top: 4px !important;
+}
+.fsl-px-ex {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 64px;
+  padding: 14px 16px;
+  border: 1.5px solid var(--fsl-line);
+  border-radius: 20px;
+  background: #fff;
+  color: var(--fsl-navy);
+  text-decoration: none;
+}
+.fsl-px-ex:hover {
+  background: var(--fsl-mint-2);
+}
+.fsl-px-ex:focus-visible {
+  outline: 3px solid var(--fsl-navy);
+  outline-offset: 2px;
+}
+.fsl-px-ex-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.fsl-px-ex-body strong {
+  font-size: 18px;
+  line-height: 1.25;
+}
+.fsl-px-status {
+  font-size: 13.5px;
+  font-weight: 800;
+  color: var(--fsl-green-d);
+}
+.fsl-px-confirm {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 18px;
+  background: var(--fsl-error-bg);
+}
+.fsl-sources {
+  display: grid;
+  gap: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--fsl-line);
+}
+.fsl-source-list {
+  list-style: none;
+  display: grid;
+  gap: 14px;
+}
+.fsl-source-list li {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.fsl-source-list a {
+  font-weight: 800;
+  font-size: 16px;
+}
+
+/* Exercício */
+.fsl-px-kicker {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--fsl-green-d);
+  margin-bottom: 2px;
+}
+.fsl-px-h1 {
+  font-size: clamp(26px, 7vw, 34px);
+}
+.fsl-steps {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 4px;
+}
+.fsl-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  text-align: center;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--fsl-muted);
+}
+.fsl-step-n {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 2px solid var(--fsl-line);
+  background: #fff;
+  font-size: 14px;
+  font-weight: 800;
+}
+.fsl-step.is-done .fsl-step-n {
+  background: var(--fsl-green);
+  border-color: var(--fsl-green);
+  color: #fff;
+}
+.fsl-step.is-current {
+  color: var(--fsl-navy);
+}
+.fsl-step.is-current .fsl-step-n {
+  border-color: var(--fsl-navy);
+  color: var(--fsl-navy);
+}
+.fsl-px-banner {
+  border-radius: 14px;
+}
+.fsl-px-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.fsl-px-right {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+.fsl-px-left {
+  min-width: 0;
+}
+.fsl-px-task {
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: #fff;
+}
+.fsl-px-table-wrap {
+  min-width: 0;
+}
+.fsl-px-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 14px;
+  line-height: 1.3;
+  background: #fff;
+  border-radius: 12px;
+}
+.fsl-px-table caption {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font-weight: 800;
+  font-size: 15px;
+  padding: 0 0 6px;
+  color: var(--fsl-navy);
+}
+.fsl-px-table th,
+.fsl-px-table td {
+  border: 1px solid var(--fsl-line);
+  padding: 6px 5px;
+  text-align: left;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+.fsl-px-table thead th {
+  background: var(--fsl-mint);
+  color: var(--fsl-navy);
+  font-weight: 800;
+}
+.fsl-px-table tbody th {
+  width: 25%;
+  background: #f4f7fa;
+  font-weight: 800;
+  color: var(--fsl-navy);
+}
+.fsl-model {
+  list-style: none;
+  display: grid;
+  gap: 12px;
+}
+.fsl-model li {
+  display: grid;
+  gap: 4px;
+  padding-bottom: 12px;
+  border-bottom: 1px dashed #9fd9c5;
+}
+.fsl-model li:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+.fsl-model-text {
+  font-weight: 400;
+}
+.fsl-model-text strong,
+.fsl-model-concise strong,
+.fsl-model-comment strong {
+  font-weight: 800;
+  color: var(--fsl-navy);
+}
+.fsl-model-comment {
+  font-size: 14.5px;
+  line-height: 1.4;
+  color: var(--fsl-muted);
+}
+.fsl-px-missing {
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: #fff7e6;
+  border: 1px solid #f0d9a8;
+  font-size: 15.5px;
+}
+.fsl-px-missing ul {
+  padding-left: 20px !important;
+  margin-top: 4px !important;
+  list-style: disc;
+}
+.fsl-px-local-ex {
+  display: grid;
+  gap: 10px;
+}
+.fsl-compare .fsl-btn-block {
+  margin-top: 4px;
+}
+.fsl-compare h2:focus {
+  outline: none;
+}
+.fsl-compare h2:focus-visible {
+  outline: 3px solid var(--fsl-navy);
+  outline-offset: 4px;
+}
+
+/* Correção assistida por IA (piloto) */
+.fsl-ai {
+  gap: 12px;
+  border-color: #bfd0e6;
+}
+.fsl-ai-pilot {
+  display: inline-block;
+  vertical-align: middle;
+  margin-left: 6px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: var(--fsl-mint);
+  color: var(--fsl-green-d);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.fsl-ai-off {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 18px;
+  background: #f4f7fa;
+}
+.fsl-ai-result {
+  display: grid;
+  gap: 14px;
+}
+.fsl-ai-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: #eef3fb;
+  color: var(--fsl-navy);
+  font-size: 14.5px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+.fsl-ai-banner svg {
+  flex: none;
+  margin-top: 2px;
+}
+.fsl-ai-h {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--fsl-navy);
+  margin-bottom: 6px !important;
+}
+.fsl-ai-hits,
+.fsl-ai-list,
+.fsl-ai-prev {
+  list-style: none;
+  display: grid;
+  gap: 10px;
+}
+.fsl-ai-hits li {
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: var(--fsl-ok-bg);
+  font-size: 15.5px;
+}
+.fsl-ai-quote {
+  font-weight: 700;
+  overflow-wrap: anywhere;
+  quotes: "“" "”";
+}
+.fsl-ai-card {
+  display: grid;
+  gap: 6px;
+  padding: 14px;
+  border-radius: 18px;
+  border: 1.5px solid var(--fsl-line);
+  background: #fff;
+  min-width: 0;
+}
+.fsl-ai-card.is-contradicao,
+.fsl-ai-card.is-nao_fornecida {
+  border-color: #e3b5ae;
+  background: #fff8f7;
+}
+.fsl-ai-card.is-ausente {
+  border-color: #e8cf9a;
+  background: #fffaf0;
+}
+.fsl-ai-card.is-clareza {
+  border-color: #bfd0e6;
+  background: #f7faff;
+}
+.fsl-ai-tag {
+  font-size: 12.5px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--fsl-navy);
+}
+.fsl-ai-title {
+  font-weight: 800;
+  line-height: 1.3;
+}
+.fsl-ai-dl {
+  display: grid;
+  gap: 2px;
+  font-size: 15.5px;
+}
+.fsl-ai-dl dt {
+  margin-top: 6px;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--fsl-muted);
+}
+.fsl-ai-dl dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.fsl-ai-cert {
+  font-size: 14px;
+  font-weight: 700;
+  color: #7a4b00;
+}
+.fsl-ai-flag {
+  justify-self: start;
+  font-size: 15px;
+}
+.fsl-ai-flagged {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--fsl-green-d);
+}
+.fsl-ai-unsure,
+.fsl-ai-none {
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: #fff7e6;
+  border: 1px solid #f0d9a8;
+}
+.fsl-ai-error {
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: var(--fsl-error-bg);
+  color: #5b1511;
+  display: grid;
+  gap: 4px;
+}
+.fsl-ai-versions {
+  display: grid;
+  gap: 8px;
+}
+.fsl-ai-first summary {
+  cursor: pointer;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  font-weight: 800;
+  color: var(--fsl-navy);
+}
+.fsl-ai-first[open] summary {
+  margin-bottom: 4px;
+}
+.fsl-ai-prev li {
+  display: grid;
+  gap: 4px;
+  font-size: 15px;
+}
+
+/* Celular: cada parâmetro vira um bloco (rótulo + os três dias), sem colunas espremidas. */
+@media (max-width: 640px) {
+  .fsl-px-left .fsl-case-icon {
+    display: none;
+  }
+  .fsl-px-table,
+  .fsl-px-table tbody,
+  .fsl-px-table tr,
+  .fsl-px-table th,
+  .fsl-px-table td {
+    display: block;
+    width: 100%;
+  }
+  .fsl-px-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+  .fsl-px-table tr {
+    margin-bottom: 10px;
+    border: 1px solid var(--fsl-line);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .fsl-px-table th,
+  .fsl-px-table td {
+    border: 0;
+    padding: 6px 10px;
+  }
+  .fsl-px-table tbody th {
+    width: 100%;
+    background: var(--fsl-mint);
+    font-size: 14.5px;
+  }
+  .fsl-px-table td {
+    display: grid;
+    grid-template-columns: 92px minmax(0, 1fr);
+    gap: 8px;
+    border-top: 1px solid var(--fsl-line);
+    font-size: 15px;
+  }
+  .fsl-px-table td::before {
+    content: attr(data-label);
+    font-weight: 800;
+    color: var(--fsl-muted);
+    font-size: 13px;
+  }
+}
+
+@media (min-width: 900px) {
+  .fsl-px-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 40px;
+    align-items: start;
+  }
+  .fsl-px-left {
+    position: sticky;
+    top: 24px;
+    max-height: calc(100vh - 48px);
+    overflow: auto;
+  }
+  .fsl-px-table {
+    font-size: 15px;
+  }
+}
+
+/* ── Prática simplificada: roteiro, exemplo conciso e blocos recolhidos ── */
+.fsl-link-strong .fsl-rot-up {
+  transform: rotate(180deg);
+}
+.fsl-px-guide {
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: var(--fsl-mint-2);
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+.fsl-px-guide-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--fsl-navy);
+}
+.fsl-px-guide ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: roteiro;
+  display: grid;
+  gap: 6px;
+}
+.fsl-px-guide li {
+  counter-increment: roteiro;
+  display: grid;
+  gap: 1px;
+  padding-left: 30px;
+  position: relative;
+  font-size: 15.5px;
+  line-height: 1.4;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.fsl-px-guide li::before {
+  content: counter(roteiro);
+  position: absolute;
+  left: 0;
+  top: 1px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--fsl-navy);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+  display: grid;
+  place-items: center;
+}
+.fsl-px-guide li span {
+  color: #3d4b5c;
+}
+.fsl-model-concise {
+  padding: 2px 0;
+}
+.fsl-px-more {
+  border-radius: 16px;
+  background: #f4f7fa;
+  padding: 0 14px;
+  min-width: 0;
+}
+.fsl-px-more summary {
+  cursor: pointer;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  font-weight: 800;
+  color: var(--fsl-navy);
+}
+.fsl-px-more[open] summary {
+  margin-bottom: 4px;
+}
+.fsl-px-more-body {
+  display: grid;
+  gap: 10px;
+  padding-bottom: 14px;
+  min-width: 0;
+}
+.fsl-px-refs-title {
+  margin: 6px 0 0;
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--fsl-navy);
+}

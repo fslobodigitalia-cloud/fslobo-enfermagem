@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex, nofollow" />
+  <meta name="referrer" content="no-referrer" />
+  <title>Confirmando seu e-mail…</title>
+  <style>
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #fbfbf8; color: #13294b;
+           font-family: system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 18px; }
+    p { max-width: 28em; padding: 24px; text-align: center; }
+    a { color: #13294b; font-weight: 700; }
+  </style>
+</head>
+<body>
+  <!--
+    Página ESTÁTICA que recebe o redirecionamento do link de confirmação de e-mail. Não carrega o app,
+    o Supabase nem scripts de rastreamento. A confirmação já foi concluída no servidor antes de chegar
+    aqui; o script só descarta qualquer parâmetro/token da URL e leva à tela de entrada.
+  -->
+  <p>Confirmando seu e-mail… Se nada acontecer, <a href="/app/entrar">clique aqui para entrar</a>.</p>
+  <script src="/fslobo-app/confirmado.js"></script>
+</body>
+</html>
