@@ -405,3 +405,13 @@ Deno.test("SDK simulado: falha de rede (servidor inexistente)", async () => {
     if (prev === undefined) Deno.env.delete("ANTHROPIC_BASE_URL"); else Deno.env.set("ANTHROPIC_BASE_URL", prev);
   }
 });
+
+// ─────────────────────────── catálogo de exercícios da Prática (migration 0009) x app ───────────────────────────
+Deno.test("Prática na conta: o catálogo aceito pelo servidor é exatamente o dos exercícios do app (id, versão e nº de perguntas)", async () => {
+  const mod = await import(new URL("../../src/app-enfermagem/data/practice.ts", import.meta.url).href);
+  const sql = await Deno.readTextFile(new URL("../supabase/migrations/20261103120001_practice_progress.sql", import.meta.url));
+  const block = sql.split("insert into public.study_practice_exercises")[1].split(";")[0];
+  const rows = [...block.matchAll(/\('([a-z0-9-]+)',\s*(\d+),\s*(\d+)\)/g)].map((m) => `${m[1]}|${m[2]}|${m[3]}`).sort();
+  const app = (mod.EXERCISES as { id: string; version: number; checklist: string[] }[]).map((e) => `${e.id}|${e.version}|${e.checklist.length}`).sort();
+  assertEquals(rows, app, "o app e o catálogo do servidor divergiram: nova versão/exercício exige nova migration");
+});

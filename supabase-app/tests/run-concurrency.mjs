@@ -266,6 +266,28 @@ export async function run({ EmbeddedPostgres, pg }) {
       ok(broken === 0, "I: em 25 corridas publicar x apagar alternativa, nunca sobra questão publicada com menos de 2 alternativas (publicações " + pubOk + ", exclusões " + delOk + ")");
     }
 
+    // ── J. Prática: gravações simultâneas de vários aparelhos da MESMA conta (migration 0009) ───────────────
+    {
+      const u = await makeUser(30, 8);
+      const EX = "anotacao-dispneia-noite", T = [true, false, true];
+      const save = (c, txt, exp) => call(c, "study_practice_save_progress", [EX, 1, txt, null, T, exp]);
+      // 8 aparelhos gravam a PRIMEIRA vez ao mesmo tempo, com textos diferentes: exatamente 1 vence, os outros 7 recebem conflito
+      const first = await Promise.all(u.cs.map((c, i) => call(c, "study_practice_save_progress", [EX, 1, `texto do aparelho ${i}`, null, T, 0])));
+      ok(first.every((r) => r.ok), "J: nenhuma gravação simultânea dá erro (só 'saved' ou 'conflict')");
+      ok(first.filter((r) => r.v.status === "saved").length === 1 && first.filter((r) => r.v.status === "conflict").length === 7, "J: 8 primeiras gravações simultâneas -> 1 saved e 7 conflict");
+      ok(n(await admin.query("select count(*) c from public.study_practice_progress where user_id=$1", [u.id])) === 1, "J: uma única linha para o exercício");
+      const winner = first.find((r) => r.v.status === "saved").v.row;
+      ok(first.filter((r) => r.v.status === "conflict").every((r) => r.v.row && r.v.row.draft === winner.draft && r.v.row.rev === 1), "J: todo conflito devolve a versão vencedora (rev 1) para o aparelho recuperar");
+      // 8 aparelhos com a MESMA rev conhecida (1) gravam ao mesmo tempo: 1 vence (rev 2), 7 conflito
+      const second = await Promise.all(u.cs.map((c, i) => save(c, `segunda rodada, aparelho ${i}`, 1)));
+      ok(second.filter((r) => r.v.status === "saved").length === 1 && second.filter((r) => r.v.status === "conflict").length === 7, "J: 8 gravações com a mesma rev conhecida -> 1 saved e 7 conflict");
+      ok(n(await admin.query("select rev c from public.study_practice_progress where user_id=$1", [u.id])) === 2, "J: a rev subiu só uma vez (2), sem perda nem duplicidade");
+      // apagar x gravar ao mesmo tempo: nunca fica estado inconsistente e nenhuma chamada dá erro
+      const mixed = await Promise.all([call(u.cs[0], "study_practice_delete_progress", [EX]), save(u.cs[1], "depois de apagar?", 2)]);
+      ok(mixed.every((r) => r.ok), "J: apagar x gravar simultâneos não geram erro");
+      ok(n(await admin.query("select count(*) c from public.study_practice_progress where user_id=$1", [u.id])) <= 1, "J: no máximo 1 linha ao final");
+    }
+
     console.log(`\n${pass} verificações de concorrência passaram, ${failures.length} falharam`);
   } finally {
     for (const c of open) await c.end().catch(() => {});

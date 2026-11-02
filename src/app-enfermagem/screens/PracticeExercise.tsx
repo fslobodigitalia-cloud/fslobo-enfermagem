@@ -4,7 +4,9 @@ import { useP } from "../base";
 import { ArrowLeft, ArrowRight, ChevronDown, FileText, Info, RotateCcw } from "lucide-react";
 import { AlertCircle } from "../components/icons";
 import { exerciseById, GUIDES, NOT_REAL_DATA } from "../data/practice";
-import { MAX_TEXT, clearExercise, patchExercise, useExerciseProgress, usePracticeData } from "../practiceStore";
+import { MAX_TEXT, useExerciseProgress, usePracticeData, usePracticeStore } from "../practiceStore";
+import { usePracticeSync } from "../practiceSyncContext";
+import PracticeSyncPanel from "../components/PracticeSyncPanel";
 import { LocalNote, PracticeTopbar, Rich, SourcesList } from "../components/PracticeParts";
 
 const smooth = () =>
@@ -27,6 +29,8 @@ function ExerciseBody({ exId, avatarInitial }: { exId: string; avatarInitial?: s
   const p = useP();
   const ex = exerciseById(exId)!;
   const guide = GUIDES[ex.mode];
+  const store = usePracticeStore();
+  const sync = usePracticeSync(); // nulo na demonstração: tudo só neste navegador
   const pr = useExerciseProgress(exId);
   const { storageOk } = usePracticeData();
   const [detailsOpen, setDetailsOpen] = React.useState(false);
@@ -41,7 +45,7 @@ function ExerciseBody({ exId, avatarInitial }: { exId: string; avatarInitial?: s
 
   const openExample = () => {
     setShowExample(true);
-    patchExercise(exId, { compared: true });
+    store.patch(exId, { compared: true });
     requestAnimationFrame(() => {
       exampleHeadRef.current?.focus({ preventScroll: true });
       exampleHeadRef.current?.scrollIntoView({ block: "start", behavior: smooth() });
@@ -50,7 +54,7 @@ function ExerciseBody({ exId, avatarInitial }: { exId: string; avatarInitial?: s
 
   const startRevision = () => {
     // Começa a revisão com a primeira versão, para a pessoa editar em vez de reescrever do zero.
-    if (pr.revision === null) patchExercise(exId, { revision: pr.draft });
+    if (pr.revision === null) store.patch(exId, { revision: pr.draft });
     requestAnimationFrame(() => {
       revisionRef.current?.focus({ preventScroll: true });
       revisionRef.current?.scrollIntoView({ block: "center", behavior: smooth() });
@@ -58,7 +62,7 @@ function ExerciseBody({ exId, avatarInitial }: { exId: string; avatarInitial?: s
   };
 
   const toggle = (i: number) =>
-    patchExercise(exId, (s) => ({ checks: ex.checklist.map((_, idx) => (idx === i ? !s.checks[idx] : !!s.checks[idx])) }));
+    store.patch(exId, (s) => ({ checks: ex.checklist.map((_, idx) => (idx === i ? !s.checks[idx] : !!s.checks[idx])) }));
 
   return (
     <div className="fsl-screen">
@@ -161,7 +165,7 @@ function ExerciseBody({ exId, avatarInitial }: { exId: string; avatarInitial?: s
               maxLength={MAX_TEXT}
               value={pr.draft}
               placeholder={ex.placeholder}
-              onChange={(e) => patchExercise(exId, { draft: e.target.value })}
+              onChange={(e) => store.patch(exId, { draft: e.target.value })}
               autoComplete="off"
               autoCapitalize="sentences"
               spellCheck
@@ -174,6 +178,9 @@ function ExerciseBody({ exId, avatarInitial }: { exId: string; avatarInitial?: s
             </div>
             <p className="fsl-note">{NOT_REAL_DATA}</p>
           </section>
+
+          {/* só na conta: salvar, estados, conflito entre aparelhos e rascunho antigo (na demonstração o contexto é nulo) */}
+          <PracticeSyncPanel exId={exId} />
 
           {!showExample ? (
             <>
@@ -273,7 +280,7 @@ function ExerciseBody({ exId, avatarInitial }: { exId: string; avatarInitial?: s
                 rows={9}
                 maxLength={MAX_TEXT}
                 value={pr.revision ?? ""}
-                onChange={(e) => patchExercise(exId, { revision: e.target.value })}
+                onChange={(e) => store.patch(exId, { revision: e.target.value })}
                 autoComplete="off"
                 spellCheck
               />
@@ -289,18 +296,24 @@ function ExerciseBody({ exId, avatarInitial }: { exId: string; avatarInitial?: s
           ) : null}
 
           <section className="fsl-px-local-ex" aria-label="Seus textos deste exercício">
-            <LocalNote storageOk={storageOk} />
+            {sync ? <PracticeSyncPanel exId={exId} compact /> : <LocalNote storageOk={storageOk} />}
             {confirmClear ? (
               <div className="fsl-px-confirm" role="alert">
-                <p>Apagar o texto, a autoavaliação e a revisão deste exercício?</p>
+                <p>
+                  {sync
+                    ? "Apagar o texto, a autoavaliação e a revisão deste exercício, na sua conta e neste navegador? Isto não pode ser desfeito."
+                    : "Apagar o texto, a autoavaliação e a revisão deste exercício?"}
+                </p>
                 <div className="fsl-compare-actions">
                   <button type="button" className="fsl-btn fsl-btn-outline" onClick={() => setConfirmClear(false)}>Cancelar</button>
                   <button
                     type="button"
                     className="fsl-btn fsl-btn-navy"
-                    onClick={() => {
-                      clearExercise(exId);
+                    onClick={async () => {
+                      // na conta: apaga primeiro no servidor; se falhar, o texto continua aqui e dá para tentar de novo
+                      const done = sync ? await sync.remove(exId) : (store.clearExercise(exId), true);
                       setConfirmClear(false);
+                      if (!done) return;
                       setShowExample(false);
                       setDetailsOpen(false);
                       window.scrollTo({ top: 0 });
@@ -314,7 +327,7 @@ function ExerciseBody({ exId, avatarInitial }: { exId: string; avatarInitial?: s
               <button
                 type="button"
                 className="fsl-btn fsl-btn-outline"
-                disabled={!pr.draft && !pr.compared && pr.revision === null && !pr.checks.some(Boolean) && pr.aiRounds.length === 0}
+                disabled={!pr.draft && !pr.compared && pr.revision === null && !pr.checks.some(Boolean) && pr.aiRounds.length === 0 && !((pr.sync?.rev ?? 0) > 0)}
                 onClick={() => setConfirmClear(true)}
               >
                 <RotateCcw size={20} aria-hidden="true" /> Apagar este exercício

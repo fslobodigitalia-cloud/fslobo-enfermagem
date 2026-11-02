@@ -305,8 +305,13 @@ export async function run(PGlite) {
       }
     }
     ok(bad.length === 0, "grants exatos: anon nada; authenticated só SELECT nas 6 tabelas do próprio histórico; service_role sem TRUNCATE/TRIGGER/REFERENCES" + (bad.length ? " -> " + bad.slice(0, 5).join("; ") : ""));
-    const pol = (await db.query("select tablename, cmd, roles::text r, qual from pg_policies where schemaname='public' and tablename like 'study\\_%'")).rows;
+    const allPol = (await db.query("select tablename, policyname, cmd, roles::text r, qual, with_check from pg_policies where schemaname='public' and tablename like 'study\\_%'")).rows;
+    // as 6 tabelas de histórico (0001-0004): só SELECT do próprio dono
+    const pol = allPol.filter((p) => p.tablename !== "study_practice_progress");
     ok(pol.length === 6 && pol.every((p) => p.cmd === "SELECT" && p.r === "{authenticated}" && /auth\.uid\(\)/.test(p.qual)), "6 políticas, todas SELECT para authenticated e amarradas a auth.uid() (" + pol.length + ")");
+    // 0009: lista EXPLÍCITA das 4 políticas da Prática (defesa em profundidade; a tabela não tem GRANT), cada uma amarrada à própria linha
+    const pp = allPol.filter((p) => p.tablename === "study_practice_progress").sort((x, y) => x.policyname.localeCompare(y.policyname));
+    ok(pp.map((p) => p.policyname + ":" + p.cmd).join() === "study_practice_progress_own_delete:DELETE,study_practice_progress_own_insert:INSERT,study_practice_progress_own_select:SELECT,study_practice_progress_own_update:UPDATE" && pp.every((p) => p.r === "{authenticated}" && /auth\.uid\(\)/.test((p.qual ?? "") + (p.with_check ?? ""))), "4 políticas da Prática (select/insert/update/delete), só authenticated, amarradas a auth.uid()");
     const defs = (await db.query("select p.proname, p.proconfig::text cfg, has_function_privilege('authenticated', p.oid, 'execute') auth_x, has_function_privilege('service_role', p.oid, 'execute') svc_x from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and (p.proname like 'study%' or p.proname = 'is_study_admin')")).rows;
     const internal = ["study__attempt_payload", "study__complete_attempt_row", "study__expire_attempt_row", "study__setting", "study_touch_updated_at",
       "study_guard_published_question", "study_guard_published_children", "study_block_truncate", "study_guard_append_only", "study_expire_stale_attempts"];

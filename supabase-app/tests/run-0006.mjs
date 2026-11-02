@@ -230,13 +230,15 @@ export async function run(db, label = "") {
   //  - 9 RPCs do aluno + is_study_admin (já existiam na 0006);
   //  - 13 RPCs de administração (contrato em supabase-proposed/docs/0007-admin-contract.md), cada uma SECURITY DEFINER com search_path
   //    fixo e protegida por study__admin_guard (confere admin ativo e MFA aal2; verificado em run-0007.mjs);
+  //  - 3 RPCs da Prática na conta (0009): study_practice_list_my_progress / save_progress / delete_progress (identidade só por auth.uid(); detalhes em run-0009.mjs);
   //  - NENHUMA função da 0008 (study_ai_acquire / study_ai_release): essas só o service_role executa.
   // Qualquer função nova executável pelo navegador, ou uma prevista que sumiu, reprova este teste.
   const studentRpcs = ["study_upsert_my_profile", "study_list_subjects", "study_start_attempt", "study_get_attempt", "study_submit_answer", "study_complete_attempt", "study_abandon_attempt", "study_my_progress", "study_list_my_attempts", "study_list_my_review_items", "is_study_admin"];
   const adminRpcs = ["study_admin_archive_question", "study_admin_create_new_version", "study_admin_delete_draft", "study_admin_get_question", "study_admin_import_questions", "study_admin_list_audit", "study_admin_list_questions", "study_admin_list_subjects", "study_admin_publish_question", "study_admin_publish_questions", "study_admin_save_draft_question", "study_admin_save_question_meta", "study_admin_save_subject"];
-  const rpcs = [...studentRpcs, ...adminRpcs].sort();
+  const practiceRpcs = ["study_practice_list_my_progress", "study_practice_save_progress", "study_practice_delete_progress"];
+  const rpcs = [...studentRpcs, ...adminRpcs, ...practiceRpcs].sort();
   const actual = fns.filter((f) => f.u).map((f) => f.proname).sort();
-  ok(actual.join() === rpcs.join(), `3.1 authenticated executa exatamente as ${rpcs.length} RPCs previstas (11 do aluno/is_study_admin + 13 de administração)`);
+  ok(actual.join() === rpcs.join(), `3.1 authenticated executa exatamente as ${rpcs.length} RPCs previstas (11 do aluno/is_study_admin + 13 de administração + 3 da Prática)`);
   if (actual.join() !== rpcs.join()) console.log("   a mais:", actual.filter((x) => !rpcs.includes(x)).join(",") || "-", "| a menos:", rpcs.filter((x) => !actual.includes(x)).join(",") || "-");
   const ai = fns.filter((f) => /^study_ai_/.test(f.proname));
   ok(ai.length === 2 && ai.every((f) => !f.a && !f.u && f.s && f.prosecdef && /search_path/.test(f.cfg || "")), "3.1b as funções da 0008 (study_ai_*) só o service_role executa (nem anon nem authenticated), SECURITY DEFINER com search_path fixo");

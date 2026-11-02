@@ -10,7 +10,7 @@ Projeto remoto de homologação: `fslobo-enfermagem-app-homolog` (ref `pmmxjohix
 ```
 supabase-app/
   supabase/config.toml                  config da CLI (project_id próprio)
-  supabase/migrations/                  8 migrations, APLICADAS na homologação — não editar
+  supabase/migrations/                  9 migrations (0001-0008 aplicadas na homologação — não editar; 0009 = Prática na conta)
   supabase/functions/practice-feedback/ Edge Function da correção por IA (PAUSADA, ver abaixo)
   tests/                                suítes locais (PGlite / PostgreSQL descartável) e testes Deno da função
   scripts/                              check-target.mjs (trava de destino), check-smtp-handshake.mjs
@@ -25,13 +25,14 @@ supabase-app/
 1. `20261031120001_study_foundation` · 2. `…120002_study_content` · 3. `…120003_study_attempts` · 4. `…120004_study_rpcs`
 5. `20261031130001_fix_admin_deletion_and_indexes` · 6. `20261031140001_complete_attempts_and_review_scope`
 7. `20261101120001_admin_rpcs_and_versioning` · 8. `20261102120001_practice_ai_feedback_usage`
+9. `20261103120001_practice_progress` (persistência da Prática na conta: tabelas sem GRANT, 3 RPCs por `auth.uid()`, conflito por revisão)
 
 Migration já aplicada **nunca** é editada: correções entram como migration nova.
 
 ## Regras de ouro
 1. Rode a CLI **dentro de `supabase-app/`** (é onde está o `supabase/config.toml` do app).
 2. Depois de clonar: `npx supabase link --project-ref pmmxjohixttivxbmdnhp` (o estado fica em `supabase/.temp/`, ignorado pelo git).
-3. Antes de qualquer `db push` ou `functions deploy`: `node scripts/check-target.mjs pmmxjohixttivxbmdnhp 8` deve imprimir `OK`.
+3. Antes de qualquer `db push` ou `functions deploy`: `node scripts/check-target.mjs pmmxjohixttivxbmdnhp 9` deve imprimir `OK`.
 4. `db push` sempre com `--dry-run` primeiro; aplicar e publicar só com autorização explícita.
 5. Segredos (senha do banco, chaves, `ANTHROPIC_API_KEY`) ficam fora do repositório, no cofre da CLI ou nos Secrets do Supabase.
 
@@ -39,14 +40,14 @@ Migration já aplicada **nunca** é editada: correções entram como migration n
 Pré-requisitos: **Node 20+** e **npm** para as suítes SQL; **Deno 2.x** só para o teste da função. Tudo roda a partir de `supabase-app/`.
 ```
 npm ci                      # instala as dependências FIXADAS em package-lock.json (pglite, embedded-postgres, pg) dentro de supabase-app/node_modules
-npm run test:sql            # 4 suítes em PGlite (banco em memória): run-local, run-0006, run-0007 e importador do lote (lote artificial)
+npm run test:sql            # 5 suítes em PGlite (banco em memória): run-local, run-0006, run-0007, run-0009 (Prática na conta) e importador do lote (lote artificial)
 npm run test:concurrency    # corridas em PostgreSQL real DESCARTÁVEL (embedded-postgres: baixa o binário do npm, sobe em porta local e apaga no fim)
 npm run test:function       # função practice-feedback (Deno); lê o caso do app em ../src/app-enfermagem/data/practice.ts
 npm test                    # as três acima
 ```
 - Não há conexão com o Supabase remoto, nem leitura de segredos. `tests/run-remote-homolog.mjs` é um script **separado, remoto**, que só deve ser rodado de propósito (não faz parte de `npm test`).
 - Os testes de importação usam um **lote ARTIFICIAL** (`tests/fixtures/artificial-batch.mjs`): 25 questões genéricas geradas em pasta temporária pelo mesmo `build.mjs` do lote real. Nenhum arquivo editorial é necessário.
-- Migrations: as suítes aplicam as 8 migrations de `supabase/migrations` num banco vazio, com o stub de `auth` em `tests/stubs/`.
+- Migrations: as suítes aplicam as 9 migrations de `supabase/migrations` num banco vazio, com o stub de `auth` em `tests/stubs/`.
 
 ## Correção por IA: pausada
 A função `practice-feedback` está implantada na homologação, mas sem chave (`ANTHROPIC_API_KEY`): responde "não configurada". O app não chama a função.

@@ -2,6 +2,7 @@ import * as React from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { getAppSupabase } from "./appSupabase";
 import { api, type Profile } from "./rpc";
+import { purgeCleanAccountCache } from "../practiceStore";
 
 /**
  * Autenticação do app (e-mail e senha, com confirmação de e-mail obrigatória).
@@ -197,7 +198,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       },
       async signOut() {
         // "local": encerra só este navegador; não derruba as outras sessões do usuário.
+        const uid = session?.user.id;
         await sb().auth.signOut({ scope: "local" });
+        // tira deste navegador o cache da Prática desse usuário se tudo já está salvo na conta; o que não foi salvo fica (só abre para ele)
+        if (uid) purgeCleanAccountCache(uid);
         setProfile(null);
       },
       async saveProfile(name, focus, goal) {

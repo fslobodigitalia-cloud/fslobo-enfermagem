@@ -596,3 +596,100 @@
   font-weight: 800;
   color: var(--fsl-navy);
 }
+
+/* ── Prática na conta: estados de salvamento, conflito e rascunho antigo ── */
+.fsl-sync {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+.fsl-sync.is-compact {
+  gap: 8px;
+}
+.fsl-sync-status {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: #f4f7fa;
+  font-weight: 700;
+  color: var(--fsl-navy);
+  overflow-wrap: anywhere;
+}
+.fsl-sync-status svg {
+  flex: none;
+  margin-top: 2px;
+}
+.fsl-sync-status.is-saved {
+  background: var(--fsl-mint-2);
+}
+.fsl-sync-status.is-dirty {
+  background: #fff7e6;
+}
+.fsl-sync-status.is-error,
+.fsl-sync-status.is-session,
+.fsl-sync-status.is-conflict {
+  background: #ffeceb;
+}
+.fsl-spin {
+  animation: fsl-spin 1s linear infinite;
+}
+@keyframes fsl-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fsl-spin {
+    animation: none;
+  }
+}
+.fsl-sync-conflict,
+.fsl-sync-legacy {
+  display: grid;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: #fff7e6;
+  border: 1px solid #f0d9a8;
+  min-width: 0;
+}
+.fsl-sync-conflict h3,
+.fsl-sync-legacy h3 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--fsl-navy);
+}
+.fsl-sync-ver {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: #fff;
+  min-width: 0;
+}
+.fsl-sync-ver h4 {
+  margin: 0;
+  font-size: 15.5px;
+  font-weight: 800;
+  color: var(--fsl-navy);
+}
+.fsl-sync-label {
+  margin: 4px 0 0;
+  font-size: 13.5px;
+  font-weight: 800;
+  color: var(--fsl-muted);
+}
+.fsl-sync-choices {
+  display: grid;
+  gap: 8px;
+}
+.fsl-sync-choices .fsl-btn {
+  width: 100%;
+}
+.fsl-sync-backup {
+  margin: 0;
+}

@@ -1,16 +1,20 @@
 import * as React from "react";
 import { Link, Navigate, Route, Routes } from "react-router-dom";
 import { useP } from "../base";
-import { ArrowLeft, ArrowRight } from "lucide-react";
+import { ArrowLeft, ArrowRight, Info } from "lucide-react";
 import { BarChart3, FilePenLine } from "../components/icons";
 import { Illustration } from "../components/Illustration";
 import { LocalNote, PracticeTopbar, SourcesBlock } from "../components/PracticeParts";
 import { EXERCISES, MODALITIES, NOT_REAL_DATA } from "../data/practice";
-import { clearAllPractice, hasAnyPracticeText, usePracticeData, type ExerciseProgress } from "../practiceStore";
+import { hasAnyPracticeText, isDirty, usePracticeData, usePracticeStore, type ExerciseProgress } from "../practiceStore";
+import { usePracticeSync } from "../practiceSyncContext";
 import PracticeExercise from "./PracticeExercise";
 
-function statusOf(pr: ExerciseProgress | undefined): string {
+function statusOf(pr: ExerciseProgress | undefined, account: boolean): string {
   if (!pr) return "Não iniciado";
+  if (account && pr.sync?.conflict) return "Conflito entre aparelhos: precisa de sua escolha";
+  if (account && isDirty(pr)) return "Alterações não salvas na conta";
+  if (account && pr.sync && pr.sync.rev > 0) return "Salvo na sua conta";
   if (pr.revision !== null) return "Revisão em andamento";
   if (pr.compared) return "Exemplo visto";
   if (pr.draft.trim()) return "Rascunho salvo neste navegador";
@@ -20,8 +24,11 @@ function statusOf(pr: ExerciseProgress | undefined): string {
 function PracticeHome({ avatarInitial }: { avatarInitial?: string }) {
   const p = useP();
   const { data, storageOk } = usePracticeData();
+  const store = usePracticeStore();
+  const sync = usePracticeSync(); // nulo na demonstração
   const [confirmClear, setConfirmClear] = React.useState(false);
-  const any = hasAnyPracticeText(data);
+  const [clearFailed, setClearFailed] = React.useState(false);
+  const any = hasAnyPracticeText(data) || Object.values(data.items).some((p) => (p.sync?.rev ?? 0) > 0);
 
   return (
     <div className="fsl-screen">
@@ -76,7 +83,7 @@ function PracticeHome({ avatarInitial }: { avatarInitial?: string }) {
                     <span className="fsl-px-ex-body">
                       <strong>{e.title}</strong>
                       <span className="fsl-note">{e.setting}</span>
-                      <span className="fsl-px-status">{statusOf(data.items[e.id])}</span>
+                      <span className="fsl-px-status">{statusOf(data.items[e.id], !!sync)}</span>
                     </span>
                     <ArrowRight size={24} aria-hidden="true" />
                   </Link>
@@ -88,19 +95,35 @@ function PracticeHome({ avatarInitial }: { avatarInitial?: string }) {
       })}
 
       <section className="fsl-card fsl-px-local" aria-labelledby="local-titulo">
-        <h2 id="local-titulo" className="fsl-h3">Seus textos neste navegador</h2>
-        <LocalNote storageOk={storageOk} />
+        <h2 id="local-titulo" className="fsl-h3">{sync ? "Seus textos da Prática" : "Seus textos neste navegador"}</h2>
+        {sync ? (
+          <p className="fsl-demo-note">
+            <Info size={16} aria-hidden="true" />
+            <span>
+              O texto fica guardado neste navegador (cópia para não perder) e vai para a sua conta quando você toca em “Salvar na minha conta”, dentro de cada exercício.
+              Só a sua conta acessa. Não vale pontos nem ranking.
+            </span>
+          </p>
+        ) : (
+          <LocalNote storageOk={storageOk} />
+        )}
         {confirmClear ? (
           <div className="fsl-px-confirm" role="alert">
-            <p>Apagar todos os textos, conferências e revisões da Prática salvos neste navegador?</p>
+            <p>
+              {sync
+                ? "Apagar todos os textos, autoavaliações e revisões da Prática, na sua conta e neste navegador? Isto não pode ser desfeito."
+                : "Apagar todos os textos, conferências e revisões da Prática salvos neste navegador?"}
+            </p>
+            {clearFailed ? <p className="fsl-alert is-error" role="alert">Não foi possível apagar tudo agora. O que não foi apagado continua salvo; tente de novo.</p> : null}
             <div className="fsl-compare-actions">
               <button type="button" className="fsl-btn fsl-btn-outline" onClick={() => setConfirmClear(false)}>Cancelar</button>
               <button
                 type="button"
                 className="fsl-btn fsl-btn-navy"
-                onClick={() => {
-                  clearAllPractice();
-                  setConfirmClear(false);
+                onClick={async () => {
+                  const done = sync ? await sync.removeAll() : (store.clearAll(), true);
+                  setClearFailed(!done);
+                  if (done) setConfirmClear(false);
                 }}
               >
                 Sim, apagar
@@ -109,7 +132,7 @@ function PracticeHome({ avatarInitial }: { avatarInitial?: string }) {
           </div>
         ) : (
           <button type="button" className="fsl-btn fsl-btn-outline" disabled={!any} onClick={() => setConfirmClear(true)}>
-            Apagar meus textos da Prática
+            {sync ? "Apagar meu progresso da Prática" : "Apagar meus textos da Prática"}
           </button>
         )}
       </section>

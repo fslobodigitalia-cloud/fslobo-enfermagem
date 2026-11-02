@@ -52,8 +52,9 @@ export async function run(db, label = "") {
     "20261031120001_study_foundation.sql", "20261031120002_study_content.sql", "20261031120003_study_attempts.sql", "20261031120004_study_rpcs.sql",
     "20261031130001_fix_admin_deletion_and_indexes.sql", "20261031140001_complete_attempts_and_review_scope.sql",
     "20261101120001_admin_rpcs_and_versioning.sql", "20261102120001_practice_ai_feedback_usage.sql",
+    "20261103120001_practice_progress.sql",
   ];
-  ok(JSON.stringify(files) === JSON.stringify(EXPECTED_MIGRATIONS), "as 8 migrations versionadas aplicadas no banco local (" + files.length + ")");
+  ok(JSON.stringify(files) === JSON.stringify(EXPECTED_MIGRATIONS), "as 9 migrations versionadas aplicadas no banco local (" + files.length + ")");
 
   // fotografia completa do conteúdo (para provar "sem gravações parciais")
   const snap = async () => (await q(`select md5(coalesce(string_agg(x, '|' order by x), '')) h, count(*)::int n from (

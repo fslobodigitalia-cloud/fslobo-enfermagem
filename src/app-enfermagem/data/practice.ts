@@ -24,6 +24,8 @@ export type ModelPart = { text: string; comment: string };
 
 export type Exercise = {
   id: string;
+  /** Versão do conteúdo do exercício. O texto salvo na conta fica vinculado a (id, versão); o servidor só aceita pares do catálogo (migration 0009). */
+  version: number;
   mode: PracticeMode;
   title: string;
   setting: string;
@@ -134,6 +136,7 @@ const SIGN_NOTE =
 export const EXERCISES: Exercise[] = [
   {
     id: "anotacao-dispneia-noite",
+    version: 1,
     mode: "anotacao",
     title: "Desconforto ao respirar à noite",
     setting: "Clínica médica · plantão noturno",
@@ -190,6 +193,7 @@ export const EXERCISES: Exercise[] = [
   },
   {
     id: "anotacao-curativo-umido",
+    version: 1,
     mode: "anotacao",
     title: "Curativo úmido no pós-operatório",
     setting: "Clínica cirúrgica · plantão diurno",
@@ -240,6 +244,7 @@ export const EXERCISES: Exercise[] = [
   },
   {
     id: "evolucao-posoperatorio-3dias",
+    version: 1,
     mode: "evolucao",
     title: "Dor e mobilização em 3 dias de pós-operatório",
     setting: "Clínica cirúrgica · plantão diurno",
